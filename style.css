@@ -239,3 +239,36 @@ input:focus, select:focus { border-color: var(--secondary); background: white; o
     .welcome-banner { flex-direction: column; text-align: center; gap: 15px; }
     .date-badge { width: 100%; }
 }
+/* ============================================================
+   8. GESTION DU MENU RÉDUIT (COLLAPSED)
+   ============================================================ */
+/* Réduction de la largeur de la barre latérale */
+.sidebar.collapsed {
+    width: 70px;
+}
+
+/* Cache le texte (PF ERP, Accueil, etc.) quand c'est réduit */
+.sidebar.collapsed .brand-text,
+.sidebar.collapsed .nav-text {
+    display: none;
+}
+
+/* Centre les icônes quand le menu est fermé */
+.sidebar.collapsed .nav-link {
+    justify-content: center;
+    padding: 12px 0;
+}
+
+.sidebar.collapsed .brand {
+    justify-content: center;
+    padding-left: 0;
+}
+
+.sidebar.collapsed .brand i {
+    margin: 0;
+}
+
+/* Ajustement du bouton burger quand fermé */
+.sidebar.collapsed #btn-toggle-menu {
+    margin: 0 auto;
+}
