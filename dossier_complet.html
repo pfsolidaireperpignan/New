@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF Solidaire - Atelier Dossier (V32 - Modale)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="app-loader">
+        <i class="fas fa-circle-notch fa-spin" style="font-size:3rem; color:#10b981;"></i>
+    </div>
+
+    <div id="preview-modal" class="hidden">
+        <div class="modal-content-preview">
+            <div class="preview-header">
+                <span style="font-weight:bold; color:#64748b;" id="preview-title">Document</span>
+                <button class="btn-close-preview" onclick="closePreview()">FERMER ✖</button>
+            </div>
+            <div id="preview-container"></div>
+        </div>
+    </div>
+
+    <nav class="sidebar">
+        <div class="brand">
+            <i class="fas fa-dove"></i> 
+            <span class="brand-text">PF ERP</span> 
+            <span style="font-size:0.5em; color:#64748b; font-weight:400; margin-left:5px;" class="brand-text">v17</span>
+            <button id="btn-toggle-menu" onclick="toggleSidebar()" style="margin-left:auto; border:none; background:transparent; cursor:pointer; color:#64748b;">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item"><a href="index.html" class="nav-link"><i class="fas fa-home"></i> <span class="nav-text">Accueil</span></a></li>
+            <li class="nav-item"><a href="index.html" class="nav-link"><i class="fas fa-folder-open"></i> <span class="nav-text">Dossier Admin</span></a></li>
+            <li class="nav-item"><a href="index.html" class="nav-link"><i class="fas fa-users"></i> <span class="nav-text">Base Clients</span></a></li>
+            <li class="nav-item"><a href="index.html" class="nav-link"><i class="fas fa-boxes"></i> <span class="nav-text">Gestion Stock</span></a></li>
+            <li class="nav-item"><a href="facturation_v2.html" class="nav-link"><i class="fas fa-file-invoice-dollar"></i> <span class="nav-text">Facturation</span></a></li>
+            
+            <li class="nav-item" style="margin-top:20px; border-top:1px solid #e2e8f0; pt:10px;"></li>
+            <li class="nav-item"><a href="#" class="nav-link active"><i class="fas fa-layer-group"></i> <span class="nav-text">Atelier Dossier</span></a></li>
+            
+            <li class="nav-item" style="margin-top:auto;"><a href="#" onclick="window.logout()" class="nav-link" style="color:#ef4444;"><i class="fas fa-power-off"></i> <span class="nav-text">Déconnexion</span></a></li>
+        </ul>
+    </nav>
+
+    <div class="main-content">
+        <div class="header-fusion">
+            <div>
+                <h2 style="margin-bottom:5px;"><i class="fas fa-tools" style="color:#ea580c;"></i> Atelier de Fusion</h2>
+                <p style="margin:0; color:#64748b; font-size:0.9rem;">1. Ajoutez. 2. Vérifiez (👁️) et Découpez (✂️). 3. Fusionnez !</p>
+            </div>
+            <button id="btn-merge" class="btn-fusion" onclick="fusionnerTout()" disabled>
+                <i class="fas fa-file-pdf"></i> TÉLÉCHARGER LE DOSSIER
+            </button>
+        </div>
+
+        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('fileInput').click()">
+            <input type="file" id="fileInput" multiple accept=".pdf, .jpg, .jpeg, .png" style="display:none" onchange="handleFiles(this.files)">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h3 style="margin:0; font-size:1.1rem; color:#1e293b;">Glissez vos fichiers ici ou cliquez</h3>
+            <p style="margin-top:5px; color:#94a3b8; font-size:0.9rem;">(PDF, JPG, PNG)</p>
+        </div>
+
+        <div id="fileList" class="file-list">
+            <div style="padding:40px; text-align:center; color:#cbd5e1; font-style:italic;" id="empty-msg">
+                La liste est vide.
+            </div>
+        </div>
+    </div>
+
+    <button id="mobile-menu-btn" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+    </button>
+    <div id="mobile-overlay" onclick="toggleSidebar()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:4000;"></div>
+
+    <script type="module">
+        import { auth } from './js/config.js'; 
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // VÉRIFICATION CONNEXION
+        onAuthStateChanged(auth, (user) => {
+            const loader = document.getElementById('app-loader');
+            if (user) {
+                if(loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
+        window.logout = function() {
+            if(confirm("Se déconnecter ?")) { signOut(auth).then(() => window.location.href = "index.html"); }
+        };
+
+        window.toggleSidebar = function() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            const btnIcon = document.querySelector('#mobile-menu-btn i');
+            
+            if (window.innerWidth < 768) {
+                sidebar.classList.toggle('mobile-open');
+                if (sidebar.classList.contains('mobile-open')) {
+                    overlay.style.display = 'block';
+                    btnIcon.classList.remove('fa-bars'); btnIcon.classList.add('fa-times');
+                } else {
+                    overlay.style.display = 'none';
+                    btnIcon.classList.remove('fa-times'); btnIcon.classList.add('fa-bars');
+                }
+            } else {
+                sidebar.classList.toggle('collapsed');
+            }
+        };
+
+        // GESTION DRAG & DROP
+        const dropZone = document.getElementById('drop-zone');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+        });
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            handleFiles(dt.files);
+        }, false);
+
+        // LOGIQUE ATELIER
+        let fichiers = []; 
+
+        const el = document.getElementById('fileList');
+        Sortable.create(el, {
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: function (evt) {
+                const item = fichiers.splice(evt.oldIndex, 1)[0];
+                fichiers.splice(evt.newIndex, 0, item);
+                renderList(); 
+            },
+        });
+
+        window.handleFiles = function(files) {
+            Array.from(files).forEach(file => { fichiers.push(file); });
+            renderList();
+        };
+
+        function renderList() {
+            const container = document.getElementById('fileList');
+            const emptyMsg = '<div style="padding:40px; text-align:center; color:#cbd5e1; font-style:italic;" id="empty-msg">La liste est vide.</div>';
+            
+            if(fichiers.length === 0) {
+                container.innerHTML = emptyMsg;
+                document.getElementById('btn-merge').disabled = true;
+                return;
+            }
+            
+            document.getElementById('btn-merge').disabled = false;
+            container.innerHTML = ''; 
+
+            fichiers.forEach((file, index) => {
+                const isPdf = file.type === 'application/pdf';
+                const iconClass = isPdf ? 'file-icon' : 'file-icon img-icon';
+                const faIcon = isPdf ? 'fa-file-pdf' : 'fa-file-image';
+                const size = (file.size / 1024 / 1024).toFixed(2) + ' Mo';
+
+                // Boutons conditionnels
+                const splitBtn = isPdf 
+                    ? `<button class="btn-mini btn-split" onclick="window.diviserPdf(${index})" title="Diviser les pages"><i class="fas fa-cut"></i></button>`
+                    : '';
+
+                const html = `
+                    <div class="file-item">
+                        <i class="fas fa-grip-vertical drag-handle" title="Déplacer"></i>
+                        <div class="file-info">
+                            <div class="${iconClass}"><i class="fas ${faIcon}"></i></div>
+                            <div>
+                                <div style="font-weight:700; color:var(--dark);">${file.name}</div>
+                                <div style="font-size:0.8rem; color:var(--gray);">${size}</div>
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn-mini btn-view" onclick="window.previewFile(${index})" title="Visualiser"><i class="fas fa-eye"></i></button>
+                            ${splitBtn}
+                            <button class="btn-mini btn-del" onclick="window.removeFile(${index})" title="Retirer"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        window.removeFile = function(index) {
+            fichiers.splice(index, 1);
+            renderList();
+        };
+
+        // --- GESTION PREVISUALISATION (MODALE) ---
+        window.previewFile = function(index) {
+            const file = fichiers[index];
+            const url = URL.createObjectURL(file);
+            const modal = document.getElementById('preview-modal');
+            const container = document.getElementById('preview-container');
+            const title = document.getElementById('preview-title');
+
+            title.innerText = file.name;
+            container.innerHTML = ''; // Nettoyer
+
+            if(file.type === 'application/pdf') {
+                container.innerHTML = `<iframe src="${url}" id="preview-frame"></iframe>`;
+            } else {
+                container.innerHTML = `<img src="${url}" id="preview-image">`;
+            }
+
+            modal.classList.remove('hidden');
+        };
+
+        window.closePreview = function() {
+            document.getElementById('preview-modal').classList.add('hidden');
+            document.getElementById('preview-container').innerHTML = ''; // Stop video/memoire
+        };
+
+        // --- DIVISION PDF ---
+        window.diviserPdf = async function(index) {
+            const file = fichiers[index];
+            if(file.type !== 'application/pdf') return;
+
+            const btn = document.querySelectorAll('.btn-split')[index]; // Feedback
+            if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                const pageCount = pdf.getPageCount();
+
+                if(pageCount <= 1) {
+                    alert("Ce PDF ne contient qu'une seule page.");
+                    renderList();
+                    return;
+                }
+
+                if(!confirm(`Diviser ce document de ${pageCount} pages en ${pageCount} fichiers séparés ?`)) {
+                    renderList();
+                    return;
+                }
+
+                fichiers.splice(index, 1); // Retirer l'original
+
+                for (let i = 0; i < pageCount; i++) {
+                    const newPdf = await PDFLib.PDFDocument.create();
+                    const [copiedPage] = await newPdf.copyPages(pdf, [i]);
+                    newPdf.addPage(copiedPage);
+                    const pdfBytes = await newPdf.save();
+                    
+                    const newFile = new File([pdfBytes], `${file.name.replace('.pdf','')} - P${i+1}.pdf`, { type: 'application/pdf' });
+                    fichiers.splice(index + i, 0, newFile); // Insérer
+                }
+
+                renderList();
+
+            } catch (e) {
+                console.error(e);
+                alert("Erreur lors de la division : " + e.message);
+                renderList();
+            }
+        };
+
+        // --- FUSION ---
+        window.fusionnerTout = async function() {
+            const btn = document.getElementById('btn-merge');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> TRAITEMENT...';
+            btn.disabled = true;
+            
+            try {
+                const { PDFDocument } = PDFLib;
+                const pdfDoc = await PDFDocument.create();
+
+                for (const file of fichiers) {
+                    const arrayBuffer = await file.arrayBuffer();
+
+                    if (file.type === 'application/pdf') {
+                        const sourcePdf = await PDFDocument.load(arrayBuffer);
+                        const copiedPages = await pdfDoc.copyPages(sourcePdf, sourcePdf.getPageIndices());
+                        copiedPages.forEach((page) => pdfDoc.addPage(page));
+                    } 
+                    else {
+                        let image;
+                        if (file.type === 'image/jpeg' || file.type === 'image/jpg') image = await pdfDoc.embedJpg(arrayBuffer);
+                        else if (file.type === 'image/png') image = await pdfDoc.embedPng(arrayBuffer);
+                        
+                        if(image) {
+                            const page = pdfDoc.addPage();
+                            const { width, height } = image.scaleToFit(page.getWidth(), page.getHeight());
+                            page.drawImage(image, {
+                                x: page.getWidth() / 2 - width / 2,
+                                y: page.getHeight() / 2 - height / 2,
+                                width: width,
+                                height: height,
+                            });
+                        }
+                    }
+                }
+
+                const pdfBytes = await pdfDoc.save();
+                download(pdfBytes, "Dossier_Complet_PF.pdf", "application/pdf");
+                
+            } catch (err) {
+                alert("Erreur lors de la fusion : " + err.message);
+                console.error(err);
+            }
+            
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        };
+    </script>
+</body>
+</html>
