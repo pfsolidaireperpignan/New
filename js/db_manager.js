@@ -1,11 +1,11 @@
-/* js/db_manager.js - VERSION FINALE */
+/* js/db_manager.js - VERSION RÉPARÉE */
 import { db } from './config.js';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, getDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getVal, setVal } from './utils.js';
 
 let importCache = [];
 
-// --- 1. CLIENTS (Optimisé) ---
+// --- CHARGEMENT BASE CLIENTS ---
 export async function chargerBaseClients() {
     const tbody = document.getElementById('clients-table-body');
     if(!tbody) return;
@@ -35,7 +35,7 @@ export async function chargerBaseClients() {
     } catch (e) { console.error(e); }
 }
 
-// --- 2. IMPORT (La fonction qui manquait) ---
+// --- IMPORT FACTURATION ---
 export async function chargerSelectImport() {
     const select = document.getElementById('select-import-client');
     if(!select) return;
@@ -50,14 +50,14 @@ export async function chargerSelectImport() {
         snaps.forEach(doc => {
             const d = doc.data();
             importCache.push({ id: doc.id, ...d });
-            // Gestion robuste des noms (ancienne vs nouvelle version)
-            const clientNom = d.client_nom || d.client?.nom || "Inconnu";
-            const defuntNom = d.defunt_nom || d.defunt?.nom || "?";
+            // Gestion des deux formats de données possibles
             const num = d.numero || d.info?.numero || "DOC";
+            const client = d.client_nom || d.client?.nom || "?";
+            const defunt = d.defunt_nom || d.defunt?.nom || "?";
             
             const opt = document.createElement('option');
             opt.value = doc.id;
-            opt.innerText = `${num} - ${clientNom} (Défunt: ${defuntNom})`;
+            opt.innerText = `${num} - ${client} (Défunt: ${defunt})`;
             select.appendChild(opt);
         });
     } catch(e) { console.error(e); select.innerHTML = '<option>Erreur</option>'; }
@@ -70,7 +70,7 @@ export function importerClientSelectionne() {
     
     const data = importCache.find(d => d.id === id);
     if(data) {
-        // Import intelligent (gère les deux structures de données)
+        // Import intelligent
         if(data.client || data.client_nom) {
             setVal('civilite_mandant', data.client?.civility || 'M.');
             setVal('soussigne', data.client?.nom || data.client_nom);
@@ -86,7 +86,7 @@ export function importerClientSelectionne() {
     }
 }
 
-// --- 3. DOSSIER & GED ---
+// --- SAUVEGARDE & GED ---
 export async function sauvegarderDossier() {
     const btn = document.getElementById('btn-save-bdd');
     if(btn) btn.innerHTML = "Sauvegarde...";
@@ -148,7 +148,7 @@ export async function chargerDossier(id) {
             viderFormulaire();
             document.getElementById('dossier_id').value = id;
             
-            if(data.defunt) { setVal('nom', data.defunt.nom); setVal('prenom', data.defunt.prenom); /* Ajouter les autres champs si besoin */ }
+            if(data.defunt) { setVal('nom', data.defunt.nom); setVal('prenom', data.defunt.prenom); /* etc */ }
             // Charge la GED Visuelle
             const gedDiv = document.getElementById('liste_pieces_jointes');
             if(data.ged && data.ged.length > 0) {
@@ -160,5 +160,4 @@ export async function chargerDossier(id) {
 }
 
 export async function supprimerDossier(id) { if(confirm("Supprimer ?")) { await deleteDoc(doc(db,"dossiers_admin",id)); chargerBaseClients(); } }
-// Placeholder Stocks
 export async function chargerStock() {} export async function ajouterArticle() {} export async function supprimerArticle(id) {}
