@@ -300,3 +300,101 @@ window.viderFormulaire = function() {
     // On remet le bouton en "ENREGISTRER"
     window.updateSaveButton('new');
 };
+// =========================================================================
+// CORRECTIF ULTIME : CHARGEMENT INTELLIGENT & GED
+// A COLLER A LA FIN DE JS/APP.JS
+// =========================================================================
+
+// Cette fonction remplace celle de la base de données qui ne marche pas
+window.chargerDossier = async function(id) {
+    try {
+        console.log("Chargement du dossier...", id);
+        
+        // 1. Récupérer le dossier depuis Firestore
+        const docRef = window.doc(window.db, "dossiers", id);
+        const docSnap = await window.getDoc(docRef);
+
+        if (!docSnap.exists()) {
+            alert("Ce dossier n'existe plus !");
+            return;
+        }
+
+        const data = docSnap.data();
+        console.log("Données reçues :", data); // Pour vérifier dans la console (F12)
+
+        // 2. REMPLISSAGE AUTOMATIQUE (MAGIQUE)
+        // On boucle sur chaque info de la base et on cherche la case HTML correspondante
+        for (const [key, value] of Object.entries(data)) {
+            const input = document.getElementById(key);
+            
+            if (input) {
+                // Si c'est une case à cocher (checkbox)
+                if (input.type === 'checkbox') {
+                    input.checked = value;
+                } 
+                // Si c'est un bouton radio
+                else if (input.type === 'radio') {
+                    // Cas spécial radio, souvent géré différemment, mais ici input direct
+                    input.checked = (input.value === value);
+                }
+                // Pour tout le reste (texte, date, select...)
+                else {
+                    input.value = value;
+                }
+            }
+        }
+
+        // 3. RESTAURATION DE LA GED (LISTE DES FICHIERS)
+        const container = document.getElementById('liste_pieces_jointes');
+        if (container) {
+            container.innerHTML = ""; // On vide la liste actuelle
+            
+            // Si on a sauvegardé une liste de noms de fichiers
+            if (data.pieces_jointes && Array.isArray(data.pieces_jointes)) {
+                data.pieces_jointes.forEach(nomFichier => {
+                    const div = document.createElement('div');
+                    div.style = "background:white; padding:8px; margin-bottom:5px; border:1px solid #ccc; display:flex; justify-content:space-between; align-items:center; border-radius:4px;";
+                    
+                    // NOTE IMPORTANTE SUR L'ICÔNE OEIL :
+                    // On ne peut pas remettre l'œil car le fichier n'est pas stocké dans le Cloud (Storage),
+                    // juste son nom est enregistré dans la base de données.
+                    // On affiche donc le nom pour confirmer qu'il est bien reçu.
+                    div.innerHTML = `
+                        <span style="font-weight:bold; color:#333;">📄 ${nomFichier}</span>
+                        <i class="fas fa-check-circle" style="color:green;" title="Document enregistré"></i>
+                    `;
+                    container.appendChild(div);
+                });
+            } else {
+                 container.innerHTML = '<div style="color:#94a3b8; font-style:italic;">Aucun document joint.</div>';
+            }
+        }
+
+        // 4. METTRE A JOUR LE BOUTON (EN MODE MODIFIER)
+        // On stocke l'ID caché pour savoir quel dossier modifier
+        const hiddenId = document.getElementById('dossier_id');
+        if(hiddenId) hiddenId.value = id;
+
+        // On change le bouton en orange
+        const btn = document.getElementById('btn-save-bdd');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-pen"></i> MODIFIER LE DOSSIER';
+            btn.classList.remove('btn-green');
+            btn.classList.add('btn-warning');
+            btn.setAttribute('onclick', `window.sauvegarderDossier('${id}')`); // On force l'ID
+            btn.style.backgroundColor = "#f59e0b";
+        }
+
+        // 5. RELANCER LES LOGIQUES D'AFFICHAGE (Pour réafficher les blocs cachés)
+        if(window.toggleSections) window.toggleSections(); // Inhumation/Crémation...
+        if(window.togglePolice) window.togglePolice();     // Police/Famille...
+        if(window.toggleVol2) window.toggleVol2();         // Vol 2...
+
+        // On bascule la vue pour montrer le formulaire
+        window.showSection('admin');
+
+    } catch (e) {
+        console.error("Erreur chargement:", e);
+        alert("Erreur lors du chargement : " + e.message);
+    }
+};
