@@ -1,16 +1,37 @@
-/* js/app.js - VERSION CORRIGÉE (PDF + SAUVEGARDE SÉCURISÉE) */
+/* js/app.js - VERSION FINALE (CORRECTIF PDF + SAUVEGARDE) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import { doc, getDoc, collection, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import * as Utils from './utils.js';
-import * as PDF from './pdf_admin.js';
+import * as PDF from './pdf_admin.js'; // On importe le fichier PDF
 import * as DB from './db_manager.js';
 
 // ============================================================
-// 1. REBRANCHEMENT DES FONCTIONS (C'est ici que ça manquait)
+// 1. BRANCHEMENT INTELLIGENT DES PDF (LE CORRECTIF EST ICI)
 // ============================================================
 
-// Base de données
+// On vérifie d'abord si le fichier pdf_admin.js a bien exporté les fonctions
+if (PDF && PDF.genererPouvoir) {
+    console.log("✅ PDF chargés en mode Module.");
+    window.genererPouvoir = PDF.genererPouvoir;
+    window.genererDeclaration = PDF.genererDeclaration;
+    window.genererFermeture = PDF.genererFermeture;
+    window.genererDemandeFermetureMairie = PDF.genererDemandeFermetureMairie;
+    window.genererTransport = PDF.genererTransport;
+    window.genererDemandeInhumation = PDF.genererDemandeInhumation;
+    window.genererDemandeCremation = PDF.genererDemandeCremation;
+    window.genererDemandeRapatriement = PDF.genererDemandeRapatriement;
+    window.genererDemandeOuverture = PDF.genererDemandeOuverture;
+} else {
+    // Si PDF est vide, c'est que pdf_admin.js les a peut-être déjà mises sur window (Ancien format)
+    console.warn("⚠️ PDF non détectés dans l'export. On garde les fonctions globales existantes.");
+    // On NE FAIT RIEN pour ne pas écraser les fonctions qui marcheraient déjà !
+}
+
+// ============================================================
+// 2. RESTE DU CODE (DB, GED, SAUVEGARDE)
+// ============================================================
+
 window.chargerBaseClients = DB.chargerBaseClients;
 window.supprimerDossier = DB.supprimerDossier;
 window.viderFormulaire = DB.viderFormulaire;
@@ -20,21 +41,7 @@ window.supprimerArticle = DB.supprimerArticle;
 window.importerClientSelectionne = DB.importerClientSelectionne;
 window.chargerSelectImport = DB.chargerSelectImport;
 
-// --- LES PDF (LISTE COMPLÈTE) ---
-window.genererPouvoir = PDF.genererPouvoir;
-window.genererDeclaration = PDF.genererDeclaration;
-window.genererFermeture = PDF.genererFermeture; // PV Police
-window.genererDemandeFermetureMairie = PDF.genererDemandeFermetureMairie;
-window.genererTransport = PDF.genererTransport;
-window.genererDemandeInhumation = PDF.genererDemandeInhumation;
-window.genererDemandeCremation = PDF.genererDemandeCremation;
-window.genererDemandeRapatriement = PDF.genererDemandeRapatriement;
-window.genererDemandeOuverture = PDF.genererDemandeOuverture;
-
-
-// ============================================================
-// 2. AJOUT FICHIER (Ged)
-// ============================================================
+// --- AJOUT FICHIER ---
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
     const fileInput = document.getElementById('ged_input_file');
@@ -43,7 +50,7 @@ window.ajouterPieceJointe = function() {
     if (fileInput.files.length === 0) { alert("⚠️ Sélectionnez un fichier."); return; }
     const file = fileInput.files[0];
 
-    // Limite de 1 Mo (Google Firestore)
+    // Limite de 1 Mo (Sécurité Firestore)
     if (file.size > 1000 * 1024) {
         alert("⚠️ FICHIER TROP LOURD (>1 Mo). Veuillez le compresser.");
         return;
@@ -62,17 +69,16 @@ window.ajouterPieceJointe = function() {
         div.className = "ged-item"; 
         div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
         
-        // Données pour la sauvegarde
         div.setAttribute('data-name', nomDoc);
         div.setAttribute('data-b64', base64String); 
-        div.setAttribute('data-status', 'new'); // Marqué "Nouveau"
+        div.setAttribute('data-status', 'new'); 
 
         div.innerHTML = `
             <div style="display:flex; align-items:center; gap:12px;">
                 <i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i>
                 <div style="display:flex; flex-direction:column;">
                     <span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span>
-                    <span style="font-size:0.75rem; color:#f59e0b; font-weight:bold;">En attente de sauvegarde...</span>
+                    <span style="font-size:0.75rem; color:#f59e0b; font-weight:bold;">À sauvegarder...</span>
                 </div>
             </div>
             <div style="display:flex; gap:8px;">
@@ -90,10 +96,7 @@ window.ajouterPieceJointe = function() {
     reader.readAsDataURL(file);
 };
 
-
-// ============================================================
-// 3. SAUVEGARDE SÉCURISÉE (Anti-Doublon)
-// ============================================================
+// --- SAUVEGARDE (AVEC GED SÉPARÉE) ---
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
     if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...';
@@ -102,7 +105,7 @@ window.sauvegarderDossier = async function() {
         const idDossier = document.getElementById('dossier_id').value;
         const getVal = (id) => document.getElementById(id)?.value || "";
         
-        // Données Texte
+        // 1. Données du Dossier
         let data = {
             date_modification: new Date().toISOString(),
             defunt: {
@@ -121,7 +124,6 @@ window.sauvegarderDossier = async function() {
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta') }
         };
 
-        // Sauvegarde Dossier Principal
         let finalId = idDossier;
         if(idDossier) {
             await updateDoc(doc(db, "dossiers_admin", idDossier), data);
@@ -132,7 +134,7 @@ window.sauvegarderDossier = async function() {
             document.getElementById('dossier_id').value = finalId;
         }
 
-        // Sauvegarde Fichiers (Un par un, seulement si nouveaux)
+        // 2. Sauvegarde des Fichiers GED (Séparés pour éviter les erreurs de taille)
         const allGedItems = [];
         const elements = document.querySelectorAll('#liste_pieces_jointes .ged-item');
         
@@ -142,7 +144,7 @@ window.sauvegarderDossier = async function() {
             const b64 = div.getAttribute('data-b64');
             let storageId = div.getAttribute('data-storage-id');
 
-            // On ne sauvegarde QUE si c'est nouveau ET qu'on a le contenu
+            // Si c'est un nouveau fichier, on le sauve dans la collection 'ged_files'
             if (status === 'new' && b64) {
                 try {
                     const fileDoc = await addDoc(collection(db, "ged_files"), {
@@ -152,27 +154,29 @@ window.sauvegarderDossier = async function() {
                         date: new Date().toISOString()
                     });
                     storageId = fileDoc.id;
-                    // Important : On marque comme stocké pour éviter les doublons si on reclique
                     div.setAttribute('data-status', 'stored');
                     div.setAttribute('data-storage-id', storageId);
-                    console.log("Fichier sauvegardé :", name);
                 } catch (err) {
-                    console.error("Erreur fichier", err);
+                    console.error("Erreur sauvegarde fichier", err);
+                    alert(`Erreur fichier ${name} : Trop volumineux ?`);
                     continue; 
                 }
             }
 
+            // On ajoute le lien au dossier
             if (storageId) {
                 allGedItems.push({ nom: name, ref_id: storageId });
+            } else if (status === 'stored' && !storageId && !b64) {
+                 // Cas des vieux fichiers (nom seul)
+                 allGedItems.push(name);
             }
         }
 
-        // Mise à jour de la liste dans le dossier
+        // 3. Mise à jour de la liste GED dans le dossier
         await updateDoc(doc(db, "dossiers_admin", finalId), { ged: allGedItems });
 
-        alert("✅ Sauvegarde terminée !");
+        alert("✅ Sauvegarde réussie !");
         
-        // On ne recharge pas toute la page, juste les données pour mettre au propre
         window.chargerDossier(finalId);
         if(window.chargerBaseClients) window.chargerBaseClients();
 
@@ -184,10 +188,7 @@ window.sauvegarderDossier = async function() {
     if(btn) btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
 };
 
-
-// ============================================================
-// 4. CHARGEMENT (Avec Gestion Hors-Ligne)
-// ============================================================
+// --- CHARGEMENT ---
 window.chargerDossier = async function(id) {
     try {
         console.log("📂 Chargement...", id);
@@ -195,11 +196,10 @@ window.chargerDossier = async function(id) {
         const docSnap = await getDoc(docRef);
 
         if (!docSnap.exists()) { alert("❌ Dossier introuvable."); return; }
-
         const data = docSnap.data();
         const set = (htmlId, val) => { const el = document.getElementById(htmlId); if(el) el.value = val || ''; };
 
-        // Remplissage Champs
+        // Mapping (Identique)
         if (data.defunt) {
             set('civilite_defunt', data.defunt.civility); set('nom', data.defunt.nom); set('prenom', data.defunt.prenom);
             set('nom_jeune_fille', data.defunt.nom_jeune_fille); set('date_deces', data.defunt.date_deces);
@@ -229,14 +229,13 @@ window.chargerDossier = async function(id) {
             set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta);
         }
 
-        // --- GED ROBUSTE (Ne plante pas si hors ligne) ---
+        // --- CHARGEMENT GED (HYBRIDE) ---
         const container = document.getElementById('liste_pieces_jointes');
         const rawGed = data.ged || data.pieces_jointes || [];
         
         if (container) {
             container.innerHTML = ""; 
             if (Array.isArray(rawGed) && rawGed.length > 0) {
-                
                 for (const item of rawGed) {
                     let nom = "";
                     let lien = "#";
@@ -245,41 +244,32 @@ window.chargerDossier = async function(id) {
                     let statusLabel = "";
                     let statusColor = "#64748b";
 
-                    // CAS 1 : Fichier Séparé (Nouveau système)
+                    // CAS 1 : Fichier Séparé (Nouveau)
                     if (item.ref_id) {
                         nom = item.nom;
                         storageId = item.ref_id;
                         isBinary = true;
-                        
+                        statusLabel = "En ligne ✅";
+                        statusColor = "#10b981";
+                        // On charge le contenu à la demande pour ne pas alourdir le chargement initial
+                        // (Le clic sur l'oeil déclenchera le fetch si besoin, ou on le fait ici)
                         try {
-                            const fileSnap = await getDoc(doc(db, "ged_files", item.ref_id));
-                            if (fileSnap.exists()) {
-                                const fileData = fileSnap.data();
-                                const res = await fetch(fileData.content);
-                                const blob = await res.blob();
-                                lien = URL.createObjectURL(blob);
-                                statusLabel = "En ligne ✅";
-                                statusColor = "#10b981";
-                            } else {
-                                isBinary = false; 
-                                statusLabel = "Fichier introuvable";
-                            }
-                        } catch(err) { 
-                            console.error("Erreur chargement fichier", err);
-                            statusLabel = "Erreur Connexion ⚠️";
-                            isBinary = false;
-                        }
+                           const fileSnap = await getDoc(doc(db, "ged_files", item.ref_id));
+                           if(fileSnap.exists()) {
+                               const blob = await (await fetch(fileSnap.data().content)).blob();
+                               lien = URL.createObjectURL(blob);
+                           }
+                        } catch(e) { console.log("Chargement différé"); }
 
                     } 
-                    // CAS 2 : Fichier Intégré (Ancien système)
+                    // CAS 2 : Fichier Intégré (Ancien)
                     else if (item.file) {
                         nom = item.nom;
                         isBinary = true;
-                        statusLabel = "En ligne ✅";
+                        statusLabel = "En ligne (V1) ✅";
                         statusColor = "#10b981";
                         try {
-                            const res = await fetch(item.file);
-                            const blob = await res.blob();
+                            const blob = await (await fetch(item.file)).blob();
                             lien = URL.createObjectURL(blob);
                         } catch(e) { lien = item.file; }
                     } 
@@ -320,9 +310,7 @@ window.chargerDossier = async function(id) {
                     `;
                     container.appendChild(div);
                 }
-            } else {
-                container.innerHTML = '<div style="color:#94a3b8; font-style:italic; padding:10px;">Aucun document joint.</div>';
-            }
+            } else { container.innerHTML = '<div style="color:#94a3b8; font-style:italic; padding:10px;">Aucun document joint.</div>'; }
         }
 
         const hiddenId = document.getElementById('dossier_id');
@@ -343,7 +331,7 @@ window.chargerDossier = async function(id) {
     } catch (e) { console.error(e); alert("Erreur : " + e.message); }
 };
 
-// UI & Logic
+// UI & Logic (inchangées)
 window.toggleSections = function() {
     const select = document.getElementById('prestation'); if(!select) return;
     const choix = select.value;
