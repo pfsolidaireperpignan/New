@@ -1,209 +1,261 @@
-/* js/app.js - CONNECTION ET UI (Version Réparée) */
+/* js/app.js - VERSION COMPLÈTE ET CORRIGÉE (05/02/2026) */
+
+// 1. IMPORTS (Ne changez pas ça)
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import * as Utils from './utils.js';
 import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
-// --- 1. RENDRE LES FONCTIONS DB ACCESSIBLES AU HTML ---
+// ============================================================
+// A. EXPOSER LES FONCTIONS AU HTML (Indispensable pour vos boutons)
+// ============================================================
+
+// Base de données
 window.chargerBaseClients = DB.chargerBaseClients;
 window.chargerDossier = DB.chargerDossier;
+window.sauvegarderDossier = DB.sauvegarderDossier;
 window.supprimerDossier = DB.supprimerDossier;
 window.viderFormulaire = DB.viderFormulaire;
-window.chargerStock = DB.chargerStock; 
-window.sauvegarderDossier = DB.sauvegarderDossier; 
+window.chargerStock = DB.chargerStock;
+window.ajouterArticleStock = DB.ajouterArticle; // Vérifiez si c'est ajouterArticle ou ajouterArticleStock dans db_manager
+window.supprimerArticle = DB.supprimerArticle;
 window.importerClientSelectionne = DB.importerClientSelectionne;
+window.chargerSelectImport = DB.chargerSelectImport;
 
-// Fonctions PDF
+// PDF
 window.genererPouvoir = PDF.genererPouvoir;
 window.genererDeclaration = PDF.genererDeclaration;
+window.genererFermeture = PDF.genererFermeture; // Police
+window.genererDemandeFermetureMairie = PDF.genererDemandeFermetureMairie; // Mairie
+window.genererTransport = PDF.genererTransport;
 window.genererDemandeInhumation = PDF.genererDemandeInhumation;
-// (Vous pouvez ajouter les autres ici si besoin)
+window.genererDemandeCremation = PDF.genererDemandeCremation;
+window.genererDemandeRapatriement = PDF.genererDemandeRapatriement;
+window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 
-// --- 2. FONCTIONS D'INTERFACE (Celles qui manquaient !) ---
 
-// Navigation principale (Menu Gauche)
+// ============================================================
+// B. LOGIQUE D'INTERFACE (NAVIGATION & ONGLETS)
+// ============================================================
+
+// Navigation du Menu Gauche
 window.showSection = function(id) {
-    document.querySelectorAll('.main-content > div').forEach(div => { 
-        if(div.id.startsWith('view-')) div.classList.add('hidden'); 
+    // 1. Cacher toutes les vues
+    document.querySelectorAll('.main-content > div').forEach(div => {
+        if(div.id.startsWith('view-')) div.classList.add('hidden');
     });
+
+    // 2. Afficher la vue demandée
     const target = document.getElementById('view-' + id);
     if(target) target.classList.remove('hidden');
 
-    // Chargement dynamique des données
+    // 3. Actions automatiques selon la vue
     if(id === 'base') DB.chargerBaseClients();
-    if(id === 'admin') DB.chargerSelectImport(); // Charge la liste pour l'import
+    if(id === 'stock') DB.chargerStock();
+    if(id === 'admin') DB.chargerSelectImport();
 };
 
-// Onglets du Dossier Admin (Identité / Technique)
-window.switchAdminTab = function(tab) {
+// Menu Mobile (Burger)
+window.toggleSidebar = function() {
+    const sb = document.querySelector('.sidebar');
+    const overlay = document.getElementById('mobile-overlay');
+    
+    if(window.innerWidth < 768) {
+        // Mode Mobile
+        sb.classList.toggle('mobile-open');
+        if(overlay) overlay.style.display = sb.classList.contains('mobile-open') ? 'block' : 'none';
+    } else {
+        // Mode Bureau
+        sb.classList.toggle('collapsed');
+    }
+};
+
+// Onglets Dossier (Identité / Technique)
+window.switchAdminTab = function(tabName) {
     // Cacher les contenus
-    document.getElementById('tab-content-identite').classList.add('hidden'); 
+    document.getElementById('tab-content-identite').classList.add('hidden');
     document.getElementById('tab-content-technique').classList.add('hidden');
     
     // Désactiver les boutons
     document.getElementById('tab-btn-identite').classList.remove('active');
     document.getElementById('tab-btn-technique').classList.remove('active');
 
-    // Activer la sélection
-    document.getElementById('tab-content-' + tab).classList.remove('hidden');
-    document.getElementById('tab-btn-' + tab).classList.add('active');
+    // Activer celui demandé
+    document.getElementById('tab-content-' + tabName).classList.remove('hidden');
+    document.getElementById('tab-btn-' + tabName).classList.add('active');
 };
 
-// Gestion du Menu Latéral (Burger)
-window.toggleSidebar = function() { 
-    const sb = document.querySelector('.sidebar'); 
-    if(sb) sb.classList.toggle('collapsed'); 
-};
+// ============================================================
+// C. LOGIQUE MÉTIER (LES FONCTIONS QUI MANQUAIENT)
+// ============================================================
 
-// Fonction GED (Ajouter un fichier visuellement)
-window.ajouterPieceJointe = function() {
-    const container = document.getElementById('liste_pieces_jointes');
-    const fileInput = document.getElementById('ged_input_file');
-    const nameInput = document.getElementById('ged_file_name');
-
-    // 1. VÉRIFICATION : Est-ce qu'un fichier est bien sélectionné ?
-    if (fileInput.files.length === 0) {
-        alert("⚠️ Veuillez sélectionner un fichier (PDF ou Image) avant d'ajouter.");
-        return;
-    }
-
-    const file = fileInput.files[0];
-    // On prend le nom écrit, sinon on prend le nom du fichier par défaut
-    const nomDoc = nameInput.value || file.name;
-
-    // 2. CRÉATION DU LIEN (Magie du navigateur pour voir le fichier sans serveur)
-    const fileURL = URL.createObjectURL(file);
-
-    // Nettoyage du message "Aucun document"
-    if(container.innerText.includes('Aucun document')) container.innerHTML = "";
-
-    // 3. CRÉATION DE LA LIGNE AVEC LE BOUTON VOIR
-    const div = document.createElement('div');
-    // Style joli (Flexbox)
-    div.style = "background:white; padding:8px 12px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-radius:6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
-    
-    div.innerHTML = `
-        <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
-            <i class="fas fa-file-alt" style="color:#3b82f6; font-size:1.2rem;"></i>
-            <span style="font-weight:600; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">${nomDoc}</span>
-        </div>
-        
-        <div style="display:flex; gap:15px; align-items:center;">
-            <a href="${fileURL}" target="_blank" title="Visualiser" style="color:#059669; font-size:1.1rem; cursor:pointer; transition:0.2s;">
-                <i class="fas fa-eye"></i>
-            </a>
-
-            <i class="fas fa-trash-alt" title="Supprimer" style="color:#ef4444; font-size:1.1rem; cursor:pointer;" onclick="this.closest('div').parentElement.remove()"></i>
-        </div>
-    `;
-    
-    container.appendChild(div);
-
-    // 4. RESET DES CHAMPS (Pour être prêt pour le prochain document)
-    fileInput.value = ""; 
-    nameInput.value = "";
-};
-
-// --- 3. INITIALISATION ET AUTHENTIFICATION ---
-onAuthStateChanged(auth, (user) => {
-    const loader = document.getElementById('app-loader');
-    if(loader) loader.style.display = 'none'; // Cache le chargement infini
-    
-    if(user) { 
-        document.getElementById('login-screen')?.classList.add('hidden'); 
-        Utils.chargerLogoBase64(); 
-        
-        // Connexion manuelle des boutons (au cas où onclick HTML échoue)
-        const btnSave = document.getElementById('btn-save-bdd');
-        if(btnSave) btnSave.onclick = DB.sauvegarderDossier;
-        
-        const btnImport = document.getElementById('btn-import');
-        if(btnImport) btnImport.onclick = DB.importerClientSelectionne;
-        
-    } else { 
-        document.getElementById('login-screen')?.classList.remove('hidden'); 
-    }
-});
-
-window.loginFirebase = async function() { 
-    try { 
-        await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-password').value); 
-    } catch(e) { alert("Erreur login : " + e.message); } 
-};
-
-window.logoutFirebase = async function() { 
-    await signOut(auth); 
-    window.location.reload(); 
-};
-// --- FONCTION MANQUANTE : GESTION DES BLOCS (INHUMATION / CREMATION / RAPATRIEMENT) ---
+// 1. Gestion Affichage (Inhumation / Crémation / Rapatriement)
 window.toggleSections = function() {
-    // 1. Récupérer la valeur choisie
     const select = document.getElementById('prestation');
-    if (!select) return; // Sécurité si l'élément n'existe pas
+    if(!select) return;
     const choix = select.value;
 
-    // 2. Récupérer les blocs HTML (Sections du formulaire)
-    const blocInhum = document.getElementById('bloc_inhumation');
-    const blocCrem = document.getElementById('bloc_cremation');
-    const blocRap = document.getElementById('bloc_rapatriement');
-
-    // 3. Récupérer les boutons PDF correspondants (Colonne de droite)
+    // Récupération des blocs
+    const bInhum = document.getElementById('bloc_inhumation');
+    const bCrem = document.getElementById('bloc_cremation');
+    const bRap = document.getElementById('bloc_rapatriement');
+    
+    // Récupération des boutons PDF
     const btnInhum = document.getElementById('btn_inhumation');
     const btnCrem = document.getElementById('btn_cremation');
     const btnRap = document.getElementById('btn_rapatriement');
 
-    // 4. TOUT CACHER D'ABORD (Remise à zéro)
-    // On ajoute la classe 'hidden' partout
-    if(blocInhum) blocInhum.classList.add('hidden');
-    if(blocCrem) blocCrem.classList.add('hidden');
-    if(blocRap) blocRap.classList.add('hidden');
+    // Tout cacher par défaut
+    if(bInhum) bInhum.classList.add('hidden');
+    if(bCrem) bCrem.classList.add('hidden');
+    if(bRap) bRap.classList.add('hidden');
     
     if(btnInhum) btnInhum.classList.add('hidden');
     if(btnCrem) btnCrem.classList.add('hidden');
     if(btnRap) btnRap.classList.add('hidden');
 
-    // 5. AFFICHER SEULEMENT CE QUI EST CHOISI
-    if (choix === "Inhumation") {
-        if(blocInhum) blocInhum.classList.remove('hidden');
+    // Afficher selon le choix
+    if(choix === "Inhumation") {
+        if(bInhum) bInhum.classList.remove('hidden');
         if(btnInhum) btnInhum.classList.remove('hidden');
-    } 
-    else if (choix === "Crémation") {
-        if(blocCrem) blocCrem.classList.remove('hidden');
+    }
+    else if(choix === "Crémation") {
+        if(bCrem) bCrem.classList.remove('hidden');
         if(btnCrem) btnCrem.classList.remove('hidden');
-    } 
-    else if (choix === "Rapatriement") {
-        if(blocRap) blocRap.classList.remove('hidden');
+    }
+    else if(choix === "Rapatriement") {
+        if(bRap) bRap.classList.remove('hidden');
         if(btnRap) btnRap.classList.remove('hidden');
     }
 };
 
-// Petite astuce : On lance la fonction une fois au démarrage pour que l'affichage soit correct dès le début
-// (Attendre un tout petit peu que le HTML soit chargé)
-setTimeout(() => {
-    if(window.toggleSections) window.toggleSections();
-}, 500);
-// --- FONCTION POUR AFFICHER/CACHER LE VOL 2 ---
+// 2. Gestion Vol 2 (Rapatriement)
 window.toggleVol2 = function() {
-    // 1. On regarde si la case est cochée
-    const checkbox = document.getElementById('check_vol2');
-    const blocVol2 = document.getElementById('bloc_vol2');
+    const chk = document.getElementById('check_vol2');
+    const bloc = document.getElementById('bloc_vol2');
+    if(chk && bloc) {
+        if(chk.checked) bloc.classList.remove('hidden');
+        else bloc.classList.add('hidden');
+    }
+};
 
-    // Sécurité : si un des éléments n'existe pas, on arrête
-    if (!checkbox || !blocVol2) return;
+// 3. Gestion Police vs Famille
+window.togglePolice = function() {
+    const select = document.getElementById('type_presence_select');
+    const blocPolice = document.getElementById('police_fields');
+    const blocFamille = document.getElementById('famille_fields');
+    
+    if(!select) return;
 
-    // 2. Si coché => on affiche. Sinon => on cache.
-    if (checkbox.checked) {
-        blocVol2.classList.remove('hidden');
+    if(select.value === 'police') {
+        if(blocPolice) blocPolice.classList.remove('hidden');
+        if(blocFamille) blocFamille.classList.add('hidden');
     } else {
-        blocVol2.classList.add('hidden');
+        if(blocPolice) blocPolice.classList.add('hidden');
+        if(blocFamille) blocFamille.classList.remove('hidden');
     }
 };
-// A COPIER A LA FIN DE APP.JS
-window.toggleVol2 = function() {
-    const checkbox = document.getElementById('check_vol2');
-    const blocVol2 = document.getElementById('bloc_vol2');
-    if (checkbox && blocVol2) {
-        if (checkbox.checked) blocVol2.classList.remove('hidden');
-        else blocVol2.classList.add('hidden');
+
+// 4. Copie Automatique Mandant -> Témoin
+window.copierMandant = function() {
+    const chk = document.getElementById('copy_mandant');
+    if(chk && chk.checked) {
+        const nom = document.getElementById('soussigne').value; // Nom Mandant
+        const lien = document.getElementById('lien').value; // Lien Mandant
+        
+        if(document.getElementById('f_nom_prenom')) document.getElementById('f_nom_prenom').value = nom;
+        if(document.getElementById('f_lien')) document.getElementById('f_lien').value = lien;
     }
 };
+
+// 5. GED (Pièces Jointes) avec Visionneuse
+window.ajouterPieceJointe = function() {
+    const container = document.getElementById('liste_pieces_jointes');
+    const fileInput = document.getElementById('ged_input_file');
+    const nameInput = document.getElementById('ged_file_name');
+
+    if (fileInput.files.length === 0) {
+        alert("⚠️ Veuillez sélectionner un fichier.");
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const nomDoc = nameInput.value || file.name;
+    const fileURL = URL.createObjectURL(file);
+
+    // Enlever le message "Aucun document"
+    if(container.innerText.includes('Aucun')) container.innerHTML = "";
+
+    const div = document.createElement('div');
+    div.style = "background:white; padding:8px; margin-bottom:5px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; border-radius:6px;";
+    
+    div.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px;">
+            <i class="fas fa-file-pdf" style="color:#ef4444;"></i>
+            <span style="font-weight:600; color:#334155;">${nomDoc}</span>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <a href="${fileURL}" target="_blank" style="color:#10b981; cursor:pointer; font-size:1.1rem;" title="Voir">
+                <i class="fas fa-eye"></i>
+            </a>
+            <i class="fas fa-trash-alt" style="color:#ef4444; cursor:pointer; font-size:1.1rem;" onclick="this.parentElement.parentElement.remove()"></i>
+        </div>
+    `;
+    container.appendChild(div);
+
+    // Reset
+    fileInput.value = "";
+    nameInput.value = "";
+};
+
+
+// ============================================================
+// D. AUTHENTIFICATION & INITIALISATION
+// ============================================================
+
+window.loginFirebase = async function() {
+    try {
+        await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-password').value);
+    } catch(e) {
+        alert("Erreur de connexion : " + e.message);
+    }
+};
+
+window.logoutFirebase = async function() {
+    await signOut(auth);
+    window.location.reload();
+};
+
+// Écouteur d'état (Se lance au démarrage)
+onAuthStateChanged(auth, (user) => {
+    const loader = document.getElementById('app-loader');
+    if(loader) loader.style.display = 'none'; // Fin du chargement
+    
+    if(user) {
+        // UTILISATEUR CONNECTÉ
+        document.getElementById('login-screen')?.classList.add('hidden');
+        Utils.chargerLogoBase64();
+        
+        // Chargements initiaux
+        DB.chargerBaseClients();
+        if(document.getElementById('view-stock') && !document.getElementById('view-stock').classList.contains('hidden')) {
+            DB.chargerStock();
+        }
+
+        // Horloge
+        setInterval(() => {
+            const now = new Date();
+            if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+            if(document.getElementById('header-date')) document.getElementById('header-date').innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+        }, 1000);
+
+        // Petit délai pour initialiser l'affichage technique correct
+        setTimeout(() => {
+            if(window.toggleSections) window.toggleSections();
+        }, 500);
+
+    } else {
+        // UTILISATEUR DÉCONNECTÉ
+        document.getElementById('login-screen')?.classList.remove('hidden');
+    }
+});
