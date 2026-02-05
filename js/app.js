@@ -125,3 +125,55 @@ onAuthStateChanged(auth, (user) => {
         document.getElementById('login-screen').classList.remove('hidden');
     }
 });
+
+// --- 5. FONCTIONS UI GED (A ajouter à la fin de app.js) ---
+window.ajouterPieceJointe = function() {
+    const input = document.getElementById('ged_input_file');
+    const nameInput = document.getElementById('ged_file_name');
+    const container = document.getElementById('liste_pieces_jointes');
+    
+    // On prend le nom saisi, ou le nom du fichier, ou "Document"
+    let fileName = nameInput.value || (input.files[0] ? input.files[0].name : "Document");
+    
+    if(container.innerHTML.includes('Aucun document')) container.innerHTML = "";
+    
+    const div = document.createElement('div');
+    div.style = "background:white; padding:5px 10px; border-radius:4px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;";
+    div.innerHTML = `
+        <span><i class="fas fa-file-pdf" style="color:#ef4444; margin-right:5px;"></i> ${fileName}</span>
+        <i class="fas fa-trash" style="color:#94a3b8; cursor:pointer;" onclick="this.parentElement.remove()"></i>
+    `;
+    container.appendChild(div);
+    
+    // Reset inputs
+    input.value = "";
+    nameInput.value = "";
+};
+
+window.copierMandant = function() {
+    if(document.getElementById('copy_mandant').checked) {
+        document.getElementById('f_nom_prenom').value = document.getElementById('civilite_mandant').value + ' ' + document.getElementById('soussigne').value;
+        document.getElementById('f_lien').value = document.getElementById('lien').value;
+    } else {
+        document.getElementById('f_nom_prenom').value = "";
+        document.getElementById('f_lien').value = "";
+    }
+};
+
+window.togglePolice = function() {
+    const type = document.getElementById('type_presence_select').value;
+    if(type === 'police') {
+        document.getElementById('police_fields').classList.remove('hidden');
+        document.getElementById('famille_fields').classList.add('hidden');
+    } else {
+        document.getElementById('police_fields').classList.add('hidden');
+        document.getElementById('famille_fields').classList.remove('hidden');
+    }
+};
+
+window.toggleVol2 = function() {
+    const chk = document.getElementById('check_vol2');
+    const bloc = document.getElementById('bloc_vol2');
+    if(chk && chk.checked) bloc.classList.remove('hidden');
+    else bloc.classList.add('hidden');
+};
