@@ -58,19 +58,50 @@ window.toggleSidebar = function() {
 // Fonction GED (Ajouter un fichier visuellement)
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
-    // Si c'est le texte par défaut "Aucun document", on le vide
-    if(container.innerText.includes('Aucun document')) container.innerHTML = "";
-    
-    const nomFichier = prompt("Nom du document (ex: Livret de famille) :");
-    if(nomFichier) {
-        const div = document.createElement('div');
-        div.style = "background:white; padding:8px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; border-radius:6px;";
-        div.innerHTML = `
-            <span>📄 ${nomFichier}</span>
-            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="this.parentElement.remove()"></i>
-        `;
-        container.appendChild(div);
+    const fileInput = document.getElementById('ged_input_file');
+    const nameInput = document.getElementById('ged_file_name');
+
+    // 1. VÉRIFICATION : Est-ce qu'un fichier est bien sélectionné ?
+    if (fileInput.files.length === 0) {
+        alert("⚠️ Veuillez sélectionner un fichier (PDF ou Image) avant d'ajouter.");
+        return;
     }
+
+    const file = fileInput.files[0];
+    // On prend le nom écrit, sinon on prend le nom du fichier par défaut
+    const nomDoc = nameInput.value || file.name;
+
+    // 2. CRÉATION DU LIEN (Magie du navigateur pour voir le fichier sans serveur)
+    const fileURL = URL.createObjectURL(file);
+
+    // Nettoyage du message "Aucun document"
+    if(container.innerText.includes('Aucun document')) container.innerHTML = "";
+
+    // 3. CRÉATION DE LA LIGNE AVEC LE BOUTON VOIR
+    const div = document.createElement('div');
+    // Style joli (Flexbox)
+    div.style = "background:white; padding:8px 12px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-radius:6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
+    
+    div.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+            <i class="fas fa-file-alt" style="color:#3b82f6; font-size:1.2rem;"></i>
+            <span style="font-weight:600; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">${nomDoc}</span>
+        </div>
+        
+        <div style="display:flex; gap:15px; align-items:center;">
+            <a href="${fileURL}" target="_blank" title="Visualiser" style="color:#059669; font-size:1.1rem; cursor:pointer; transition:0.2s;">
+                <i class="fas fa-eye"></i>
+            </a>
+
+            <i class="fas fa-trash-alt" title="Supprimer" style="color:#ef4444; font-size:1.1rem; cursor:pointer;" onclick="this.closest('div').parentElement.remove()"></i>
+        </div>
+    `;
+    
+    container.appendChild(div);
+
+    // 4. RESET DES CHAMPS (Pour être prêt pour le prochain document)
+    fileInput.value = ""; 
+    nameInput.value = "";
 };
 
 // --- 3. INITIALISATION ET AUTHENTIFICATION ---
