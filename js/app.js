@@ -104,3 +104,50 @@ window.logoutFirebase = async function() {
     await signOut(auth); 
     window.location.reload(); 
 };
+// --- FONCTION MANQUANTE : GESTION DES BLOCS (INHUMATION / CREMATION / RAPATRIEMENT) ---
+window.toggleSections = function() {
+    // 1. Récupérer la valeur choisie
+    const select = document.getElementById('prestation');
+    if (!select) return; // Sécurité si l'élément n'existe pas
+    const choix = select.value;
+
+    // 2. Récupérer les blocs HTML (Sections du formulaire)
+    const blocInhum = document.getElementById('bloc_inhumation');
+    const blocCrem = document.getElementById('bloc_cremation');
+    const blocRap = document.getElementById('bloc_rapatriement');
+
+    // 3. Récupérer les boutons PDF correspondants (Colonne de droite)
+    const btnInhum = document.getElementById('btn_inhumation');
+    const btnCrem = document.getElementById('btn_cremation');
+    const btnRap = document.getElementById('btn_rapatriement');
+
+    // 4. TOUT CACHER D'ABORD (Remise à zéro)
+    // On ajoute la classe 'hidden' partout
+    if(blocInhum) blocInhum.classList.add('hidden');
+    if(blocCrem) blocCrem.classList.add('hidden');
+    if(blocRap) blocRap.classList.add('hidden');
+    
+    if(btnInhum) btnInhum.classList.add('hidden');
+    if(btnCrem) btnCrem.classList.add('hidden');
+    if(btnRap) btnRap.classList.add('hidden');
+
+    // 5. AFFICHER SEULEMENT CE QUI EST CHOISI
+    if (choix === "Inhumation") {
+        if(blocInhum) blocInhum.classList.remove('hidden');
+        if(btnInhum) btnInhum.classList.remove('hidden');
+    } 
+    else if (choix === "Crémation") {
+        if(blocCrem) blocCrem.classList.remove('hidden');
+        if(btnCrem) btnCrem.classList.remove('hidden');
+    } 
+    else if (choix === "Rapatriement") {
+        if(blocRap) blocRap.classList.remove('hidden');
+        if(btnRap) btnRap.classList.remove('hidden');
+    }
+};
+
+// Petite astuce : On lance la fonction une fois au démarrage pour que l'affichage soit correct dès le début
+// (Attendre un tout petit peu que le HTML soit chargé)
+setTimeout(() => {
+    if(window.toggleSections) window.toggleSections();
+}, 500);
