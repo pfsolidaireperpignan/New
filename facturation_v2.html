@@ -24,6 +24,7 @@
             <h3 style="margin-top:0; color:#111827; margin-bottom:24px;">NOUVEAU DOCUMENT</h3>
             <div style="display:grid; gap:12px;">
                 <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Devis')"><i class="fas fa-file-contract"></i> MODÈLE DEVIS</button>
+                
                 <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Inhumation')"><i class="fas fa-church"></i> INHUMATION</button>
                 <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Cremation')"><i class="fas fa-fire"></i> CRÉMATION</button>
                 <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Rapatriement')"><i class="fas fa-plane"></i> RAPATRIEMENT</button>
@@ -196,8 +197,18 @@
                         <input type="date" id="doc_date" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
                     <input id="defunt_nom" list="defunts_suggestions" placeholder="Concerne le défunt (Nom Prénom)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
-                    <div style="display:none;"> <input id="defunt_date_naiss"><input id="defunt_date_deces">
+                    
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <div style="flex:1;">
+                            <label style="font-size:0.8rem; color:#6b7280;">Né(e) le</label>
+                            <input type="date" id="defunt_date_naiss" style="width:100%; padding:8px; border-radius:6px; border:1px solid #e5e7eb;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="font-size:0.8rem; color:#6b7280;">Décédé(e) le</label>
+                            <input type="date" id="defunt_date_deces" style="width:100%; padding:8px; border-radius:6px; border:1px solid #e5e7eb;">
+                        </div>
                     </div>
+
                 </div>
             </div>
 
