@@ -1,4 +1,4 @@
-/* style.css - VERSION FINALE COMPLETE */
+/* style.css - VERSION FUSIONNÉE (ADMIN + FACTURATION V2) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
@@ -100,37 +100,7 @@ body {
     margin-bottom: 30px;
 }
 
-/* --- ONGLETS STYLE "PILULE" (Ventes/Achats) --- */
-.page-header .btn-tab-container {
-    background: #e5e7eb;
-    padding: 5px;
-    border-radius: 50px;
-    display: inline-flex;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.btn-tab {
-    padding: 10px 25px;
-    border: none;
-    background: transparent;
-    color: #6b7280;
-    font-weight: 700;
-    font-size: 0.9rem;
-    cursor: pointer;
-    border-radius: 50px;
-    transition: all 0.3s ease;
-    display: flex; align-items: center; gap: 8px;
-}
-.btn-tab:hover { color: #374151; background: rgba(255,255,255,0.5); }
-.btn-tab.active {
-    background: white;
-    color: var(--primary-dark);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    transform: scale(1.05);
-}
-#btn-tab-achats.active { color: #ef4444; }
-
-/* --- CARTES & UI --- */
+/* --- GRILLES & LAYOUT --- */
 .card {
     background: var(--surface);
     border-radius: var(--radius);
@@ -158,38 +128,117 @@ input, select, textarea {
 }
 input:focus, select:focus { outline: none; border-color: var(--primary); ring: 2px var(--primary); }
 
-/* --- TABLEAUX --- */
-table { width: 100%; border-collapse: collapse; }
-th { text-align: left; padding: 12px; color: var(--gray); font-size: 0.8rem; text-transform: uppercase; border-bottom: 2px solid var(--border); }
-td { padding: 15px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-tr:last-child td { border-bottom: none; }
-
-/* --- BADGES --- */
-.badge { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
-.badge-blue { background: #e0f2fe; color: #0284c7; }
-.badge-green { background: #dcfce7; color: #16a34a; }
-.badge-red { background: #fee2e2; color: #dc2626; }
-.badge-gray { background: #f3f4f6; color: #4b5563; }
-
-/* Badges Spécifiques Achats */
-.badge-regle { background: #d1fae5; color: #059669; border: 1px solid #a7f3d0; }
-.badge-attente { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
-
-/* --- BOUTONS --- */
+/* --- BOUTONS (MODERNES & LEGACY) --- */
 .btn {
     padding: 10px 20px; border: none; border-radius: 8px;
     font-weight: 600; cursor: pointer; transition: all 0.2s;
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center; gap: 8px; text-decoration:none;
 }
+/* Modernes */
 .btn-primary { background: var(--primary); color: white; }
 .btn-primary:hover { background: var(--primary-dark); }
 .btn-danger { background: var(--danger); color: white; }
 .btn-icon { background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 5px; }
 .btn-icon:hover { background: #f3f4f6; border-radius: 50%; }
 
-/* --- ZONE DÉPLIABLE (ACHATS) --- */
-.toggle-form-container { overflow: hidden; max-height: 0; opacity: 0; transition: all 0.4s ease; margin-bottom: 0; }
-.toggle-form-container.open { max-height: 800px; opacity: 1; margin-bottom: 25px; }
+/* Legacy (Pour votre ancien Admin qui utilise btn-blue/red) */
+.btn-blue { background-color: var(--secondary); color: white; }
+.btn-blue:hover { background-color: #2563eb; }
+.btn-red { background-color: var(--danger); color: white; }
+.btn-red:hover { background-color: #dc2626; }
+.btn-green { background-color: var(--primary); color: white; }
+
+/* --- TABLEAUX --- */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 12px; color: var(--gray); font-size: 0.8rem; text-transform: uppercase; border-bottom: 2px solid var(--border); letter-spacing: 0.05em; }
+td { padding: 15px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+td small { display: block; line-height: 1.2; }
+
+/* --- BADGES & STOCK --- */
+.badge { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+.badge-blue { background: #e0f2fe; color: #0284c7; }
+.badge-green { background: #dcfce7; color: #16a34a; }
+.badge-red { background: #fee2e2; color: #dc2626; }
+.badge-gray { background: #f3f4f6; color: #4b5563; }
+
+/* Gestion Stock (Ancien code) */
+.stock-alert { color: #dc2626; font-weight: bold; background-color: #fee2e2; padding: 2px 8px; border-radius: 4px; }
+.stock-ok { color: #16a34a; font-weight: bold; background-color: #dcfce7; padding: 2px 8px; border-radius: 4px; }
+
+/* --- MODALES (Pour Dossier Complet & Choix) --- */
+.modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9000;
+    display: flex; justify-content: center; align-items: center;
+}
+.modal.hidden { display: none; }
+.modal-content {
+    background: white; padding: 30px; border-radius: 12px;
+    width: 90%; max-width: 500px;
+    text-align: center;
+}
+
+/* ============================================================
+   NOUVEAU STYLE FACTURATION V2 (ONGLETS & TIROIRS)
+   ============================================================ */
+
+/* 1. Conteneur des boutons onglets */
+.page-header .btn-tab-container {
+    background: #e5e7eb;
+    padding: 5px;
+    border-radius: 50px;
+    display: inline-flex;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+    margin-left: auto;
+}
+
+/* 2. Le bouton onglet "Pilule" */
+.btn-tab {
+    padding: 10px 25px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    display: flex; align-items: center; gap: 8px;
+}
+.btn-tab:hover { color: #374151; background: rgba(255,255,255,0.5); }
+
+/* 3. État Actif */
+.btn-tab.active {
+    background: white;
+    color: var(--primary-dark);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transform: scale(1.05);
+}
+#btn-tab-achats.active { color: #ef4444; }
+
+/* 4. Badges Spécifiques Achats */
+.badge-regle { 
+    background: #d1fae5; color: #059669; border: 1px solid #a7f3d0; 
+    padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; 
+}
+.badge-attente { 
+    background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; 
+    padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; 
+}
+
+/* 5. Tiroir Déroulant (Nouvelle Dépense) */
+.toggle-form-container { 
+    overflow: hidden; 
+    max-height: 0; 
+    opacity: 0; 
+    transition: all 0.4s ease; 
+    margin-bottom: 0; 
+}
+.toggle-form-container.open { 
+    max-height: 800px; 
+    opacity: 1; 
+    margin-bottom: 25px; 
+}
 
 /* --- MOBILE --- */
 #mobile-menu-btn { display: none; }
