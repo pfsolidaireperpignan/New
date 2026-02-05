@@ -1,18 +1,15 @@
-/* js/app.js - VERSION FINALE CORRIGÉE (05/02/2026) */
+/* js/app.js - VERSION FINALE ET NETTOYÉE */
 
-// 1. IMPORTS ESSENTIELS (C'est ici que ça bloquait !)
+// 1. IMPORTS
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
-// On importe les outils Firestore directement depuis Internet pour éviter l'erreur "window.doc"
+// Importation des outils Firestore pour lire la base de données
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import * as Utils from './utils.js';
 import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
-// ============================================================
-// A. CONNECTION AU HTML (Pour que vos boutons marchent)
-// ============================================================
-// On "attache" les fonctions au navigateur
+// 2. EXPOSITION DES FONCTIONS (Pour le HTML)
 window.chargerBaseClients = DB.chargerBaseClients;
 window.sauvegarderDossier = DB.sauvegarderDossier;
 window.supprimerDossier = DB.supprimerDossier;
@@ -35,41 +32,33 @@ window.genererDemandeRapatriement = PDF.genererDemandeRapatriement;
 window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 
 
-// ============================================================
-// B. FONCTION DE CHARGEMENT INTELLIGENTE (Celle qui plantait)
-// ============================================================
-// ============================================================
-// CORRECTION : CHARGEMENT INTELLIGENT (Cherche partout)
-// ============================================================
+// 3. FONCTION DE CHARGEMENT INTELLIGENTE (Cherche dans 'dossiers' ET 'clients')
 window.chargerDossier = async function(id) {
     try {
         console.log("Recherche du dossier ID :", id);
         
-        // 1. IMPORT (Nécessaire ici pour être sûr)
-        const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
-        
-        // 2. TENTATIVE 1 : On cherche dans la collection "dossiers"
+        // Etape A : On cherche dans la collection "dossiers"
         let docRef = doc(db, "dossiers", id);
         let docSnap = await getDoc(docRef);
 
-        // 3. TENTATIVE 2 : Si pas trouvé, on cherche dans "clients" (Erreur fréquente de nommage)
+        // Etape B : Si pas trouvé, on cherche dans "clients" (le plan de secours)
         if (!docSnap.exists()) {
-            console.log("Pas trouvé dans 'dossiers', recherche dans 'clients'...");
+            console.log("Pas trouvé dans 'dossiers', test dans 'clients'...");
             docRef = doc(db, "clients", id);
             docSnap = await getDoc(docRef);
         }
 
-        // 4. SI TOUJOURS PAS TROUVÉ
+        // Etape C : Si toujours rien...
         if (!docSnap.exists()) {
-            alert("⚠️ PROBLÈME D'ADRESSE :\nImpossible de trouver ce dossier.\n\nID cherché : " + id + "\nCollections testées : 'dossiers' et 'clients'.\n\nVérifiez le nom de votre collection dans Firebase.");
+            alert("❌ Dossier introuvable !\nIl a peut-être été supprimé ou l'ID est incorrect.");
             return;
         }
 
-        // 5. SI TROUVÉ : ON AFFICHE !
+        // Etape D : On a trouvé ! On remplit le formulaire
         const data = docSnap.data();
-        console.log("Données trouvées :", data);
+        console.log("Données chargées :", data);
 
-        // Remplissage des champs
+        // Remplissage des champs texte/date/select
         for (const [key, value] of Object.entries(data)) {
             const input = document.getElementById(key);
             if (input) {
@@ -78,7 +67,7 @@ window.chargerDossier = async function(id) {
             }
         }
 
-        // Remplissage GED
+        // Remplissage de la liste des documents (GED)
         const container = document.getElementById('liste_pieces_jointes');
         if (container) {
             container.innerHTML = ""; 
@@ -100,58 +89,7 @@ window.chargerDossier = async function(id) {
             }
         }
 
-        // Mise à jour du bouton Modifier
-        const hiddenId = document.getElementById('dossier_id');
-        if(hiddenId) hiddenId.value = id;
-
-        const btn = document.getElementById('btn-save-bdd');
-        if (btn) {
-            btn.innerHTML = '<i class="fas fa-pen"></i> MODIFIER LE DOSSIER';
-            btn.classList.remove('btn-green');
-            btn.classList.add('btn-warning'); 
-            btn.style.backgroundColor = "#f59e0b"; 
-            btn.onclick = function() { window.sauvegarderDossier(id); };
-        }
-
-        // Réveil des sections cachées
-        if(window.toggleSections) window.toggleSections();
-        if(window.togglePolice) window.togglePolice();
-        if(window.toggleVol2) window.toggleVol2();
-
-        // Affichage final
-        window.showSection('admin');
-
-    } catch (e) {
-        console.error(e);
-        alert("Erreur technique : " + e.message);
-    }
-};
-        // 2. Gestion de la GED (Pièces Jointes)
-        const container = document.getElementById('liste_pieces_jointes');
-        if (container) {
-            container.innerHTML = ""; // On nettoie la liste
-            
-            if (data.pieces_jointes && Array.isArray(data.pieces_jointes) && data.pieces_jointes.length > 0) {
-                data.pieces_jointes.forEach(nomFichier => {
-                    const div = document.createElement('div');
-                    div.style = "background:white; padding:8px; margin-bottom:5px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; border-radius:4px;";
-                    // NOTE : Pour les dossiers sauvegardés, on affiche un Validé vert ✅
-                    // car le fichier réel n'est pas stocké dans le Cloud, seul son nom l'est.
-                    div.innerHTML = `
-                        <span style="font-weight:600; color:#334155;">📄 ${nomFichier}</span>
-                        <div style="display:flex; align-items:center; gap:5px;">
-                            <span style="font-size:0.8rem; color:green;">Enregistré ✅</span>
-                            <i class="fas fa-trash-alt" style="color:#ef4444; cursor:pointer; margin-left:10px;" onclick="this.parentElement.parentElement.remove()"></i>
-                        </div>
-                    `;
-                    container.appendChild(div);
-                });
-            } else {
-                container.innerHTML = '<div style="color:#94a3b8; font-style:italic;">Aucun document joint.</div>';
-            }
-        }
-
-        // 3. Mise à jour du Bouton en mode "MODIFIER"
+        // Mise à jour du bouton en "MODIFIER"
         const hiddenId = document.getElementById('dossier_id');
         if(hiddenId) hiddenId.value = id;
 
@@ -161,65 +99,55 @@ window.chargerDossier = async function(id) {
             btn.classList.remove('btn-green');
             btn.classList.add('btn-warning'); 
             btn.style.backgroundColor = "#f59e0b"; // Orange
-            // On force le clic à sauvegarder CE dossier spécifique
+            // On force le bouton à sauvegarder CE dossier précis
             btn.onclick = function() { window.sauvegarderDossier(id); };
         }
 
-        // 4. Réactiver les blocs masqués (Rapatriement, Police...)
+        // Réveil des sections cachées (selon les données chargées)
         if(window.toggleSections) window.toggleSections();
         if(window.togglePolice) window.togglePolice();
         if(window.toggleVol2) window.toggleVol2();
 
-        // 5. Afficher la page
+        // Affichage de la vue Admin
         window.showSection('admin');
 
     } catch (e) {
-        console.error("Erreur critique chargement:", e);
-        alert("Erreur lors du chargement : " + e.message);
+        console.error("Erreur chargement:", e);
+        alert("Erreur technique : " + e.message);
     }
 };
 
 
-// ============================================================
-// C. LOGIQUE D'INTERFACE & OUTILS
-// ============================================================
-
+// 4. LOGIQUE D'INTERFACE (UI)
 window.toggleSections = function() {
     const select = document.getElementById('prestation');
     if(!select) return;
     const choix = select.value;
     
-    // Identifiants des blocs
-    const blocs = {
-        'Inhumation': 'bloc_inhumation',
-        'Crémation': 'bloc_cremation',
-        'Rapatriement': 'bloc_rapatriement'
-    };
+    // On cache tout d'abord
+    const blocs = ['bloc_inhumation', 'bloc_cremation', 'bloc_rapatriement'];
+    const btns = ['btn_inhumation', 'btn_cremation', 'btn_rapatriement'];
     
-    // Tout cacher
-    Object.values(blocs).forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.classList.add('hidden');
+    blocs.forEach(id => { 
+        const el = document.getElementById(id); 
+        if(el) el.classList.add('hidden'); 
+    });
+    btns.forEach(id => { 
+        const el = document.getElementById(id); 
+        if(el) el.classList.add('hidden'); 
     });
 
-    // Afficher le bon
-    if(blocs[choix]) {
-        const el = document.getElementById(blocs[choix]);
-        if(el) el.classList.remove('hidden');
+    // On affiche le bon bloc
+    if(choix === 'Inhumation') {
+        document.getElementById('bloc_inhumation')?.classList.remove('hidden');
+        document.getElementById('btn_inhumation')?.classList.remove('hidden');
+    } else if(choix === 'Crémation') {
+        document.getElementById('bloc_cremation')?.classList.remove('hidden');
+        document.getElementById('btn_cremation')?.classList.remove('hidden');
+    } else if(choix === 'Rapatriement') {
+        document.getElementById('bloc_rapatriement')?.classList.remove('hidden');
+        document.getElementById('btn_rapatriement')?.classList.remove('hidden');
     }
-    
-    // Gestion des boutons PDF à droite
-    const btnInhum = document.getElementById('btn_inhumation');
-    const btnCrem = document.getElementById('btn_cremation');
-    const btnRap = document.getElementById('btn_rapatriement');
-    
-    if(btnInhum) btnInhum.classList.add('hidden');
-    if(btnCrem) btnCrem.classList.add('hidden');
-    if(btnRap) btnRap.classList.add('hidden');
-
-    if(choix === 'Inhumation' && btnInhum) btnInhum.classList.remove('hidden');
-    if(choix === 'Crémation' && btnCrem) btnCrem.classList.remove('hidden');
-    if(choix === 'Rapatriement' && btnRap) btnRap.classList.remove('hidden');
 };
 
 window.toggleVol2 = function() {
@@ -275,7 +203,7 @@ window.ajouterPieceJointe = function() {
     div.innerHTML = `
         <span style="font-weight:600; color:#334155;">📄 ${nomDoc}</span>
         <div style="display:flex; gap:10px;">
-            <a href="${fileURL}" target="_blank" style="color:#10b981; cursor:pointer;" title="Voir maintenant">
+            <a href="${fileURL}" target="_blank" style="color:#10b981; cursor:pointer;" title="Voir">
                 <i class="fas fa-eye"></i>
             </a>
             <i class="fas fa-trash-alt" style="color:#ef4444; cursor:pointer;" onclick="this.parentElement.parentElement.remove()"></i>
@@ -318,9 +246,7 @@ window.toggleSidebar = function() {
     }
 };
 
-// ============================================================
-// D. AUTHENTIFICATION (Démarrage)
-// ============================================================
+// 5. AUTHENTIFICATION (Lancement)
 window.loginFirebase = async function() {
     try { await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-password').value); } 
     catch(e) { alert("Erreur login: " + e.message); }
@@ -347,4 +273,3 @@ onAuthStateChanged(auth, (user) => {
         document.getElementById('login-screen')?.classList.remove('hidden');
     }
 });
-
