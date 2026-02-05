@@ -259,3 +259,44 @@ onAuthStateChanged(auth, (user) => {
         document.getElementById('login-screen')?.classList.remove('hidden');
     }
 });
+
+// --- GESTION DU BOUTON (ENREGISTRER vs MODIFIER) ---
+
+// Fonction pour changer l'apparence du bouton
+window.updateSaveButton = function(mode) {
+    const btn = document.getElementById('btn-save-bdd');
+    if (!btn) return;
+
+    if (mode === 'edit') {
+        // Mode MODIFICATION (Orange)
+        btn.innerHTML = '<i class="fas fa-pen"></i> MODIFIER';
+        btn.classList.remove('btn-green');
+        btn.classList.add('btn-warning'); // Si vous avez une classe orange/jaune
+        btn.style.backgroundColor = "#f59e0b"; // Force la couleur orange
+    } else {
+        // Mode CRÉATION (Vert)
+        btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
+        btn.classList.add('btn-green');
+        btn.classList.remove('btn-warning');
+        btn.style.backgroundColor = ""; // Remet la couleur par défaut
+    }
+};
+
+// On modifie la fonction existante de chargement pour activer le mode 'edit'
+const originalChargerDossier = window.chargerDossier;
+window.chargerDossier = async function(id) {
+    // 1. On appelle la fonction normale de chargement
+    if(originalChargerDossier) await originalChargerDossier(id);
+    
+    // 2. On change le bouton en "MODIFIER"
+    window.updateSaveButton('edit');
+};
+
+// On modifie la fonction vider pour remettre en "ENREGISTRER"
+const originalVider = window.viderFormulaire;
+window.viderFormulaire = function() {
+    if(originalVider) originalVider();
+    
+    // On remet le bouton en "ENREGISTRER"
+    window.updateSaveButton('new');
+};
