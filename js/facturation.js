@@ -1,6 +1,14 @@
-/* js/facturation.js - VERSION FINALE (DRAG & DROP + 2 COLONNES + DATES DÉFUNT) */
+/* js/facturation.js - VERSION FINALE (PDF COMPLET + DRAG DROP + SIGNATURES) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// --- VOS INFOS BANCAIRES ET CONDITIONS (A MODIFIER ICI) ---
+const INFO_SOCIETE = {
+    banque: "BANQUE POPULAIRE DU SUD",
+    iban: "FR76 1234 5678 9012 3456 7890 123",
+    bic: "BPOPSXXXX",
+    conditions: "Paiement à réception de la facture. Pas d'escompte pour paiement anticipé."
+};
 
 let paiements = []; 
 let cacheDepenses = []; 
@@ -19,10 +27,10 @@ onAuthStateChanged(auth, (user) => {
         chargerSuggestionsClients();
         if(document.getElementById('dep_date_fac')) document.getElementById('dep_date_fac').valueAsDate = new Date();
         
-        // ACTIVATION DU DRAG & DROP
+        // ACTIVATION DRAG & DROP
         const el = document.getElementById('tbody_lignes');
         if(el && window.Sortable) {
-            new Sortable(el, { handle: '.drag-handle', animation: 150 });
+            new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: window.calculTotal });
         }
     }
 });
@@ -206,7 +214,6 @@ window.chargerDocument = async (id) => {
         document.getElementById('client_adresse').value = data.client_adresse || data.client?.adresse; 
         document.getElementById('defunt_nom').value = data.defunt_nom || data.defunt?.nom;
         
-        // Chargement des dates du défunt
         document.getElementById('defunt_date_naiss').value = data.defunt_date_naiss || data.defunt?.date_naiss || "";
         document.getElementById('defunt_date_deces').value = data.defunt_date_deces || data.defunt?.date_deces || "";
 
@@ -228,22 +235,19 @@ window.chargerDocument = async (id) => {
     } 
 };
 
-// AJOUT LIGNE (RESTRICTION AUX 2 COLONNES)
 window.ajouterLigne = function(desc="", prix=0, type="Courant") { 
-    // Si l'ancien type était 'Avance', on le force en 'Courant' pour l'interface
     if(type === 'Avance') type = 'Courant';
-    
     const tr = document.createElement('tr'); 
     tr.className = "row-item"; 
-    tr.innerHTML = `<td class="drag-handle"><i class="fas fa-grip-lines"></i></td><td><input type="text" class="input-cell val-desc" value="${desc}"></td><td><select class="input-cell val-type"><option value="Courant" ${type==='Courant'?'selected':''}>Courant</option><option value="Optionnel" ${type==='Optionnel'?'selected':''}>Optionnel</option></select></td><td style="text-align:right;"><input type="number" class="input-cell val-prix" value="${prix}" step="0.01" oninput="window.calculTotal()"></td><td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; 
+    tr.innerHTML = `<td class="drag-handle"><i class="fas fa-grip-lines" style="color:#cbd5e1; cursor:grab;"></i></td><td><input type="text" class="input-cell val-desc" value="${desc}"></td><td><select class="input-cell val-type"><option value="Courant" ${type==='Courant'?'selected':''}>Courant</option><option value="Optionnel" ${type==='Optionnel'?'selected':''}>Optionnel</option></select></td><td style="text-align:right;"><input type="number" class="input-cell val-prix" value="${prix}" step="0.01" oninput="window.calculTotal()"></td><td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; 
     document.getElementById('tbody_lignes').appendChild(tr); 
     window.calculTotal(); 
 };
 
-window.ajouterSection = function(titre="SECTION") { const tr = document.createElement('tr'); tr.className = "row-section"; tr.innerHTML = `<td class="drag-handle"><i class="fas fa-grip-vertical"></i></td><td colspan="4"><input type="text" class="input-cell input-section" value="${titre}" style="font-weight:bold; color:#d97706;"></td><td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; document.getElementById('tbody_lignes').appendChild(tr); };
+window.ajouterSection = function(titre="SECTION") { const tr = document.createElement('tr'); tr.className = "row-section"; tr.innerHTML = `<td class="drag-handle"><i class="fas fa-grip-lines" style="color:#cbd5e1; cursor:grab;"></i></td><td colspan="4"><input type="text" class="input-cell input-section" value="${titre}" style="font-weight:bold; color:#d97706;"></td><td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; document.getElementById('tbody_lignes').appendChild(tr); };
 window.calculTotal = function() { let total = 0; document.querySelectorAll('.val-prix').forEach(i => total += parseFloat(i.value) || 0); document.getElementById('total_general').innerText = total.toFixed(2) + " €"; let paye = paiements.reduce((s, p) => s + parseFloat(p.montant), 0); document.getElementById('total_paye').innerText = paye.toFixed(2) + " €"; document.getElementById('reste_a_payer').innerText = (total - paye).toFixed(2) + " €"; document.getElementById('total_display').innerText = total.toFixed(2); };
 
-// SAUVEGARDE DOCUMENT (AVEC DATES DÉFUNT)
+// SAUVEGARDE
 window.sauvegarderDocument = async function() { 
     const lignes = []; 
     document.querySelectorAll('#tbody_lignes tr').forEach(tr => { 
@@ -257,11 +261,9 @@ window.sauvegarderDocument = async function() {
         date: document.getElementById('doc_date').value, 
         client_nom: document.getElementById('client_nom').value, 
         client_adresse: document.getElementById('client_adresse').value, 
-        
         defunt_nom: document.getElementById('defunt_nom').value, 
-        defunt_date_naiss: document.getElementById('defunt_date_naiss').value, // Ajout
-        defunt_date_deces: document.getElementById('defunt_date_deces').value, // Ajout
-
+        defunt_date_naiss: document.getElementById('defunt_date_naiss').value,
+        defunt_date_deces: document.getElementById('defunt_date_deces').value,
         total: parseFloat(document.getElementById('total_display').innerText), 
         lignes: lignes, 
         paiements: paiements, 
@@ -290,7 +292,7 @@ window.exportExcelSmart = function() { let csvContent = "data:text/csv;charset=u
 async function chargerSuggestionsClients() { try { const q = query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc")); const snap = await getDocs(q); const dl = document.getElementById('clients_suggestions'); dl.innerHTML = ""; snap.forEach(doc => { if(doc.data().mandant?.nom) dl.innerHTML += `<option value="${doc.data().mandant.nom}">`; }); } catch(e){} }
 window.checkClientAuto = function() { const val = document.getElementById('client_nom').value; const client = cacheFactures.find(f => f.finalClient === val); if(client) document.getElementById('client_adresse').value = client.client_adresse || client.client?.adresse || ''; };
 
-// --- GESTION DES MODÈLES (AVEC DEVIS & 2 COLONNES) ---
+// --- GESTION MODÈLES ---
 window.loadTemplate = function(type) { 
     const MODELES = { 
         "Inhumation": [ { type: 'section', text: 'PREPARATION/ORGANISATION DES OBSEQUES' }, { desc: 'Démarches administratives', prix: 250, cat: 'Courant' }, { desc: 'Vacation de Police (Pose de scellés)', prix: 25, cat: 'Courant' }, { type: 'section', text: 'PRÉPARATION DU DÉFUNT' }, { desc: 'Toilette et habillage défunt (e)', prix: 150, cat: 'Courant' }, { desc: 'Séjour en chambre funéraire (Forfait 3 jours)', prix: 350, cat: 'Optionnel' }, { type: 'section', text: 'TRANSPORT AVANT MISE EN BIERE' }, { desc: 'Transport avant mise en bière', prix: 250, cat: 'Courant' }, { type: 'section', text: '3. CERCUEIL & ACCESSOIRES' }, { desc: 'Cercueil Azur inhumation (avec quatre poignées en métal cache vis plastique, et cuvette biodégradable)', prix: 850, cat: 'Courant' }, { desc: 'Capiton (Tissu intérieur)', prix: 80, cat: 'Courant' }, { desc: 'Plaque d\'identité gravée (Obligatoire)', prix: 25, cat: 'Courant' }, { desc: 'Emblème religieux / Civil', prix: 40, cat: 'Optionnel' }, { type: 'section', text: '4. CÉRÉMONIE & CONVOI' }, { desc: 'Corbillard de cérémonie avec chauffeur', prix: 400, cat: 'Courant' }, { desc: 'Porteurs (Equipe de 4 personnes)', prix: 600, cat: 'Courant' }, { desc: 'Maître de cérémonie (Organisation & Gestion)', prix: 200, cat: 'Optionnel' }, { desc: 'Frais de culte', prix: 220, cat: 'Optionnel' }, { desc: 'Registre de condoléances', prix: 35, cat: 'Optionnel' }, { type: 'section', text: '5. CIMETIÈRE' }, { desc: 'Creusement et comblement de fosse / Ouverture de caveau', prix: 650, cat: 'Courant' }, { desc: 'Redevance inhumation (Taxe Mairie)', prix: 50, cat: 'Courant' }, { desc: 'Achat de concession', prix: 50, cat: 'Courant' } ],
@@ -309,7 +311,7 @@ window.loadTemplate = function(type) {
     window.calculTotal(); 
 };
 
-// --- 4. IMPRESSION PDF (2 COLONNES + DATES DÉFUNT) ---
+// --- 4. IMPRESSION PDF (CONFORME LOI) ---
 window.genererPDFFacture = function() {
     const data = {
         client: { nom: document.getElementById('client_nom').value, adresse: document.getElementById('client_adresse').value, civility: document.getElementById('client_civility').value },
@@ -334,27 +336,25 @@ window.generatePDFFromData = function(data, saveMode = false) {
     const doc = new jsPDF();
     const greenColor = [16, 185, 129]; 
     
-    // Header
+    // HEADER
     if (logoBase64) { try { doc.addImage(logoBase64,'PNG', 15, 10, 25, 25); } catch(e){} }
     doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.setTextColor(...greenColor);
     doc.text("PF SOLIDAIRE", 15, 40); doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.setTextColor(80); doc.text("32 Bd Léon Jean Grégory, Thuir", 15, 45);
     
-    // Client Box
     doc.setFillColor(245, 245, 245); doc.roundedRect(110, 10, 85, 25, 2, 2, 'F');
     doc.setFontSize(10); doc.setTextColor(0); doc.setFont("helvetica","bold");
     doc.text(`${data.client.civility || ''} ${data.client.nom}`, 115, 18);
     doc.setFont("helvetica","normal"); doc.setFontSize(9); 
     doc.text(doc.splitTextToSize(data.client.adresse || '', 80), 115, 24);
     
-    // Info Doc
+    // INFO DOC
     let y = 60; doc.setFontSize(14); doc.setFont("helvetica","bold"); doc.setTextColor(...greenColor);
     doc.text(`${data.info.type} N° ${data.info.numero}`, 15, y);
     doc.setFontSize(10); doc.setTextColor(0); doc.setFont("helvetica","normal");
     
-    // Dates du document
     doc.text(`Date : ${new Date(data.info.date).toLocaleDateString()}`, 15, y+6);
     
-    // Infos Défunt (AVEC DATES NAISSANCE/DECES)
+    // INFO DÉFUNT (Avec Dates)
     doc.text(`Défunt : ${data.defunt.nom}`, 15, y+12);
     let datesDefunt = "";
     if(data.defunt.naiss) datesDefunt += `Né(e) le : ${new Date(data.defunt.naiss).toLocaleDateString()} `;
@@ -364,7 +364,7 @@ window.generatePDFFromData = function(data, saveMode = false) {
 
     y += 25;
 
-    // --- TABLEAU 2 COLONNES (LÉGAL) ---
+    // --- TABLEAU 2 COLONNES ---
     const body = [];
     data.lignes.forEach(l => {
         if(l.type === 'section') {
@@ -372,10 +372,8 @@ window.generatePDFFromData = function(data, saveMode = false) {
         } else {
             let pCourant = "", pOptionnel = "";
             const prixFmt = parseFloat(l.prix).toFixed(2) + ' €';
-            
-            // Dispatch dans 2 colonnes seulement (Avance -> Courant)
             if (l.cat === 'Optionnel') pOptionnel = prixFmt;
-            else pCourant = prixFmt; // Courant + Avance
+            else pCourant = prixFmt; 
             
             body.push([l.desc, pCourant, pOptionnel]);
         }
@@ -389,15 +387,78 @@ window.generatePDFFromData = function(data, saveMode = false) {
         styles: { fontSize: 9, cellPadding: 3 }, 
         headStyles: { fillColor: [16, 185, 129], textColor: 255, halign: 'center', valign: 'middle' },
         columnStyles: { 
-            0: { cellWidth: 'auto' }, // Description
-            1: { halign: 'right', cellWidth: 35 }, // Courant
-            2: { halign: 'right', cellWidth: 35 }  // Optionnel
+            0: { cellWidth: 'auto' }, 
+            1: { halign: 'right', cellWidth: 35 }, 
+            2: { halign: 'right', cellWidth: 35 } 
         } 
     });
 
+    // --- TOTAUX & PAIEMENTS ---
     let finalY = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.setTextColor(0);
-    doc.text(`Total TTC : ${data.info.total.toFixed(2)} €`, 195, finalY, { align: 'right' });
+    const totalTTC = data.info.total;
+    const totalPaye = data.paiements.reduce((sum, p) => sum + parseFloat(p.montant), 0);
+    const resteAPayer = totalTTC - totalPaye;
+
+    // Total General
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(0);
+    doc.text(`Total TTC :`, 150, finalY);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${totalTTC.toFixed(2)} €`, 195, finalY, { align: 'right' });
+    finalY += 6;
+
+    // Acomptes déjà versés
+    if (data.paiements.length > 0) {
+        doc.setFont("helvetica", "normal");
+        doc.text(`Déjà réglé (Acomptes) :`, 150, finalY);
+        doc.text(`- ${totalPaye.toFixed(2)} €`, 195, finalY, { align: 'right' });
+        finalY += 6;
+    }
+
+    doc.setLineWidth(0.5); doc.line(140, finalY, 195, finalY); finalY += 6;
+
+    // Net à Payer
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text(`Net à Payer :`, 150, finalY);
+    doc.text(`${resteAPayer.toFixed(2)} €`, 195, finalY, { align: 'right' });
+
+    finalY += 20;
+
+    // --- PIED DE PAGE : DEVIS vs FACTURE ---
+    if (data.info.type === 'DEVIS') {
+        // CADRE SIGNATURE POUR DEVIS
+        if(finalY > 230) { doc.addPage(); finalY = 20; }
+        doc.setFontSize(10); doc.setFont("helvetica", "normal");
+        doc.text("Bon pour accord,", 15, finalY);
+        doc.text("Le client (Signature précédée de la mention 'Lu et approuvé')", 15, finalY + 5);
+        doc.rect(15, finalY + 10, 80, 30);
+        
+        doc.text("L'entreprise,", 120, finalY);
+        doc.rect(120, finalY + 10, 80, 30);
+    } else {
+        // RIB & CONDITIONS POUR FACTURE
+        if(finalY > 240) { doc.addPage(); finalY = 20; }
+        
+        // Conditions
+        doc.setFontSize(9); doc.setFont("helvetica", "bold");
+        doc.text("CONDITIONS DE RÈGLEMENT :", 15, finalY);
+        doc.setFont("helvetica", "normal");
+        doc.text(INFO_SOCIETE.conditions, 15, finalY + 5);
+        finalY += 15;
+
+        // Cadre RIB
+        doc.setFillColor(248, 250, 252);
+        doc.rect(15, finalY, 180, 25, 'F');
+        doc.setDrawColor(226, 232, 240);
+        doc.rect(15, finalY, 180, 25);
+        
+        doc.setFont("helvetica", "bold"); doc.setTextColor(0);
+        doc.text("COORDONNÉES BANCAIRES (RIB)", 20, finalY + 6);
+        
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+        doc.text(`Banque : ${INFO_SOCIETE.banque}`, 20, finalY + 14);
+        doc.text(`IBAN : ${INFO_SOCIETE.iban}`, 20, finalY + 20);
+        doc.text(`BIC : ${INFO_SOCIETE.bic}`, 120, finalY + 20);
+    }
     
     if(saveMode) doc.save(`${data.info.type}_${data.info.numero}.pdf`); else window.open(doc.output('bloburl'), '_blank');
 };
