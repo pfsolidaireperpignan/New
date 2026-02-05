@@ -1,15 +1,14 @@
-/* js/app.js - VERSION FINALE (GED VISUELLE + CORRECTIF DOSSIER) */
+/* js/app.js - VERSION FINALE (STOCKAGE BINAIRE BASE64 RESTAURÉ) */
 
-// 1. IMPORTS
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+// Import des outils Firestore (addDoc, updateDoc sont nécessaires pour la nouvelle sauvegarde)
+import { doc, getDoc, collection, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import * as Utils from './utils.js';
 import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
-// 2. CONNECTION AU HTML
+// --- CONNECTION AU HTML ---
 window.chargerBaseClients = DB.chargerBaseClients;
-window.sauvegarderDossier = DB.sauvegarderDossier;
 window.supprimerDossier = DB.supprimerDossier;
 window.viderFormulaire = DB.viderFormulaire;
 window.chargerStock = DB.chargerStock;
@@ -30,54 +29,145 @@ window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 
 
 // ============================================================
-// 3. FONCTION GED AMÉLIORÉE (AVEC L'OEIL)
+// 1. AJOUT FICHIER AVEC CONVERSION BINAIRE (Base64)
 // ============================================================
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
     const fileInput = document.getElementById('ged_input_file');
     const nameInput = document.getElementById('ged_file_name');
 
-    // Vérification
-    if (fileInput.files.length === 0) { 
-        alert("⚠️ Veuillez sélectionner un fichier (PDF ou Image) d'abord."); 
-        return; 
-    }
+    if (fileInput.files.length === 0) { alert("⚠️ Sélectionnez un fichier."); return; }
 
     const file = fileInput.files[0];
-    // On prend le nom saisi ou le nom du fichier
+    
+    // --- VÉRIFICATION LIMITE 800 KO ---
+    if (file.size > 800 * 1024) {
+        alert("⚠️ FICHIER TROP LOURD !\nLa limite est de 800 Ko pour le stockage binaire.\nVeuillez compresser votre fichier.");
+        return;
+    }
+
     const nomDoc = nameInput.value || file.name;
-    
-    // CRÉATION DU LIEN DE VISUALISATION (C'est ça qui manquait !)
-    const fileURL = URL.createObjectURL(file);
+    const dateAjout = new Date().toLocaleDateString();
 
-    // Nettoyage du message "Aucun document"
-    if(container.innerText.includes('Aucun document')) container.innerHTML = "";
-
-    const div = document.createElement('div');
-    div.style = "background:white; padding:8px; margin-bottom:5px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; border-radius:4px;";
+    // LECTURE DU FICHIER EN BINAIRE (Base64)
+    const reader = new FileReader();
     
-    div.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
-            <span style="font-weight:600; color:#334155;">📄 ${nomDoc}</span>
-        </div>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <a href="${fileURL}" target="_blank" style="color:#3b82f6; cursor:pointer; font-size:1.1rem;" title="Voir le document">
-                <i class="fas fa-eye"></i>
-            </a>
-            <i class="fas fa-trash-alt" style="color:#ef4444; cursor:pointer;" onclick="this.parentElement.parentElement.remove()"></i>
-        </div>
-    `;
-    
-    container.appendChild(div);
+    reader.onload = function(e) {
+        const base64String = e.target.result; // C'est ici que se trouve le fichier transformé en texte
 
-    // Reset des champs
-    fileInput.value = ""; 
-    nameInput.value = "";
+        if(container.innerText.includes('Aucun')) container.innerHTML = "";
+
+        const div = document.createElement('div');
+        div.className = "ged-item"; // Classe pour le repérer facilement
+        div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
+        
+        // ON STOCKE LE BINAIRE DANS UN ATTRIBUT CACHÉ (data-b64)
+        div.setAttribute('data-name', nomDoc);
+        div.setAttribute('data-b64', base64String); 
+
+        div.innerHTML = `
+            <div style="display:flex; align-items:center; gap:12px;">
+                <i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i>
+                <div style="display:flex; flex-direction:column;">
+                    <span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span>
+                    <span style="font-size:0.75rem; color:#64748b;">Prêt à enregistrer (${(file.size/1024).toFixed(0)} Ko)</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <a href="${base64String}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; text-decoration:none;" title="Voir">
+                    <i class="fas fa-eye"></i>
+                </a>
+                <button onclick="this.closest('div').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(div);
+
+        // Reset
+        fileInput.value = ""; 
+        nameInput.value = "";
+    };
+
+    // On lance la lecture
+    reader.readAsDataURL(file);
 };
 
 
 // ============================================================
-// 4. CHARGEMENT DOSSIER (Optimisé)
+// 2. SAUVEGARDE AMÉLIORÉE (Inclut le Binaire)
+// ============================================================
+window.sauvegarderDossier = async function() {
+    const btn = document.getElementById('btn-save-bdd');
+    if(btn) btn.innerHTML = "Sauvegarde en cours...";
+    
+    try {
+        // --- RÉCUPÉRATION DE LA GED AVEC LE BINAIRE ---
+        let gedList = [];
+        // On cherche tous les éléments qu'on a créés
+        document.querySelectorAll('#liste_pieces_jointes .ged-item').forEach(div => {
+            const name = div.getAttribute('data-name');
+            const b64 = div.getAttribute('data-b64');
+            if(name && b64) {
+                // On enregistre un OBJET complet : Nom + Fichier
+                gedList.push({ nom: name, file: b64 });
+            }
+        });
+
+        // --- RÉCUPÉRATION DES CHAMPS CLASSIQUES (Comme db_manager) ---
+        // Petite fonction utilitaire locale
+        const getVal = (id) => document.getElementById(id)?.value || "";
+        
+        const data = {
+            date_modification: new Date().toISOString(),
+            defunt: {
+                civility: getVal('civilite_defunt'), nom: getVal('nom'), prenom: getVal('prenom'), nom_jeune_fille: getVal('nom_jeune_fille'),
+                date_deces: getVal('date_deces'), lieu_deces: getVal('lieu_deces'), date_naiss: getVal('date_naiss'), lieu_naiss: getVal('lieu_naiss'),
+                adresse: getVal('adresse_fr'), pere: getVal('pere'), mere: getVal('mere'), situation: getVal('matrimoniale'),
+                conjoint: getVal('conjoint'), profession: getVal('profession_libelle')
+            },
+            mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), lien: getVal('lien'), adresse: getVal('demeurant') },
+            technique: {
+                type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'),
+                cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'),
+                heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'),
+                date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat')
+            },
+            transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta') },
+            
+            // ICI LE SECRET : On sauvegarde la liste complète avec les fichiers !
+            ged: gedList 
+        };
+
+        const id = document.getElementById('dossier_id').value;
+        
+        if(id) { 
+            // Mise à jour
+            await updateDoc(doc(db, "dossiers_admin", id), data); 
+            alert("✅ Dossier mis à jour avec les fichiers !"); 
+        }
+        else { 
+            // Création
+            data.date_creation = new Date().toISOString(); 
+            const ref = await addDoc(collection(db, "dossiers_admin"), data); 
+            document.getElementById('dossier_id').value = ref.id; 
+            alert("✅ Nouveau dossier créé et fichiers stockés !"); 
+        }
+        
+        // Rafraîchir la liste
+        if(window.chargerBaseClients) window.chargerBaseClients();
+
+    } catch(e) { 
+        console.error(e);
+        alert("Erreur Sauvegarde : " + e.message); 
+    }
+    
+    if(btn) btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
+};
+
+
+// ============================================================
+// 3. CHARGEMENT DOSSIER (Lecture du Binaire)
 // ============================================================
 window.chargerDossier = async function(id) {
     try {
@@ -90,7 +180,7 @@ window.chargerDossier = async function(id) {
         const data = docSnap.data();
         const set = (htmlId, val) => { const el = document.getElementById(htmlId); if(el) el.value = val || ''; };
 
-        // Remplissage...
+        // --- Remplissage Formulaire Standard ---
         if (data.defunt) {
             set('civilite_defunt', data.defunt.civility); set('nom', data.defunt.nom); set('prenom', data.defunt.prenom);
             set('nom_jeune_fille', data.defunt.nom_jeune_fille); set('date_deces', data.defunt.date_deces);
@@ -120,30 +210,67 @@ window.chargerDossier = async function(id) {
             set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta);
         }
 
-        // --- AFFICHAGE GED EXISTANTE ---
-        // On nettoie les "Enregistré" qui traînent dans le nom
-        const gedList = (data.ged || data.pieces_jointes || []).filter(n => !n.includes("Enregistré ✅"));
-        
+        // --- RESTAURATION DE LA GED (MAGIQUE) ---
         const container = document.getElementById('liste_pieces_jointes');
+        // On récupère la liste (soit ancien format 'pieces_jointes', soit nouveau 'ged')
+        const rawGed = data.ged || data.pieces_jointes || [];
+        
         if (container) {
             container.innerHTML = ""; 
-            if (Array.isArray(gedList) && gedList.length > 0) {
-                gedList.forEach(nomFichier => {
+            if (Array.isArray(rawGed) && rawGed.length > 0) {
+                rawGed.forEach(item => {
+                    // Vérification : Est-ce un objet (Nouveau) ou un texte (Ancien) ?
+                    let nom = item; 
+                    let lien = "#";
+                    let isBinary = false;
+
+                    if (typeof item === 'object' && item.file) {
+                        // C'est notre format binaire !
+                        nom = item.nom;
+                        lien = item.file; // C'est le code Base64
+                        isBinary = true;
+                    }
+
+                    // On filtre les faux fichiers "Enregistré"
+                    if(typeof nom === 'string' && nom.includes("Enregistré")) return;
+
                     const div = document.createElement('div');
-                    div.style = "background:white; padding:8px; margin-bottom:5px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; border-radius:4px;";
-                    // Pas d'œil ici car fichier non stocké, juste le nom
+                    div.className = "ged-item"; // Important pour la resauvegarde
+                    if(isBinary) {
+                        div.setAttribute('data-name', nom);
+                        div.setAttribute('data-b64', lien);
+                    }
+
+                    div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
+                    
+                    // Si on a le binaire, on met le bouton bleu actif
+                    const btnEye = isBinary 
+                        ? `<a href="${lien}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; text-decoration:none;" title="Voir le document"><i class="fas fa-eye"></i></a>`
+                        : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; cursor:not-allowed;" title="Non stocké"><i class="fas fa-eye-slash"></i></div>`;
+
                     div.innerHTML = `
-                        <span style="font-weight:600; color:#334155;">📄 ${nomFichier}</span>
-                        <small style="font-size:0.8rem; color:green; font-weight:bold;">Enregistré ✅</small>
-                        <i class="fas fa-trash-alt" style="color:#ef4444; cursor:pointer; margin-left:10px;" onclick="this.parentElement.remove()"></i>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i>
+                            <div style="display:flex; flex-direction:column;">
+                                <span style="font-weight:700; color:#334155; font-size:0.95rem;">${nom}</span>
+                                <span style="font-size:0.75rem; color:${isBinary ? '#10b981' : '#64748b'}; font-weight:600;">${isBinary ? 'Stocké en base ✅' : 'Ancien format (Nom seul)'}</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            ${btnEye}
+                            <button onclick="this.closest('div').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     `;
                     container.appendChild(div);
                 });
             } else {
-                container.innerHTML = '<div style="color:#94a3b8; font-style:italic;">Aucun document joint.</div>';
+                container.innerHTML = '<div style="color:#94a3b8; font-style:italic; padding:10px;">Aucun document joint.</div>';
             }
         }
 
+        // Bouton Modifier
         const hiddenId = document.getElementById('dossier_id');
         if(hiddenId) hiddenId.value = id;
         const btn = document.getElementById('btn-save-bdd');
@@ -151,6 +278,7 @@ window.chargerDossier = async function(id) {
             btn.innerHTML = `<i class="fas fa-pen"></i> MODIFIER LE DOSSIER`;
             btn.classList.remove('btn-green'); btn.classList.add('btn-warning'); 
             btn.style.backgroundColor = "#f59e0b"; 
+            // On appelle notre sauvegarde surchargée
             btn.onclick = function() { window.sauvegarderDossier(); };
         }
 
@@ -163,7 +291,7 @@ window.chargerDossier = async function(id) {
 };
 
 // ============================================================
-// 5. FONCTIONS UI
+// 4. FONCTIONS UI
 // ============================================================
 window.toggleSections = function() {
     const select = document.getElementById('prestation');
@@ -181,7 +309,6 @@ window.toggleSections = function() {
         document.getElementById(map[choix].btn)?.classList.remove('hidden');
     }
 };
-
 window.toggleVol2 = function() {
     const chk = document.getElementById('check_vol2');
     const bloc = document.getElementById('bloc_vol2');
@@ -190,7 +317,6 @@ window.toggleVol2 = function() {
         else bloc.classList.add('hidden');
     }
 };
-
 window.togglePolice = function() {
     const select = document.getElementById('type_presence_select');
     const blocPolice = document.getElementById('police_fields');
@@ -204,7 +330,6 @@ window.togglePolice = function() {
         if(blocFamille) blocFamille.classList.remove('hidden');
     }
 };
-
 window.copierMandant = function() {
     const chk = document.getElementById('copy_mandant');
     if(chk && chk.checked) {
@@ -214,7 +339,6 @@ window.copierMandant = function() {
         if(document.getElementById('f_lien')) document.getElementById('f_lien').value = lien;
     }
 };
-
 window.showSection = function(id) {
     document.querySelectorAll('.main-content > div').forEach(div => {
         if(div.id.startsWith('view-')) div.classList.add('hidden');
@@ -226,7 +350,6 @@ window.showSection = function(id) {
     if(id === 'stock') DB.chargerStock();
     if(id === 'admin') DB.chargerSelectImport();
 };
-
 window.switchAdminTab = function(tabName) {
     document.getElementById('tab-content-identite').classList.add('hidden');
     document.getElementById('tab-content-technique').classList.add('hidden');
@@ -235,18 +358,10 @@ window.switchAdminTab = function(tabName) {
     document.getElementById('tab-content-' + tabName).classList.remove('hidden');
     document.getElementById('tab-btn-' + tabName).classList.add('active');
 };
-
 window.toggleSidebar = function() {
     const sb = document.querySelector('.sidebar');
-    const overlay = document.getElementById('mobile-overlay');
-    if(window.innerWidth < 768) {
-        sb.classList.toggle('mobile-open');
-        if(overlay) overlay.style.display = sb.classList.contains('mobile-open') ? 'block' : 'none';
-    } else {
-        sb.classList.toggle('collapsed');
-    }
+    if(sb) sb.classList.toggle('collapsed');
 };
-
 window.loginFirebase = async function() {
     try { await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-password').value); } 
     catch(e) { alert("Erreur login: " + e.message); }
