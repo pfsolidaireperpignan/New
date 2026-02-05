@@ -1,7 +1,7 @@
-/* js/app.js - VERSION ULTIME (FIX PAGE BLANCHE + LIMITE TAILLE) */
+/* js/app.js - VERSION "SPLIT STORAGE" (Stockage séparé pour éviter la limite) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
-import { doc, getDoc, collection, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, getDoc, collection, addDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import * as Utils from './utils.js';
 import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
@@ -28,7 +28,7 @@ window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 
 
 // ============================================================
-// 1. AJOUT FICHIER (AVEC LIMITE STRICTE 500 KO)
+// 1. AJOUT FICHIER (Préparation)
 // ============================================================
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
@@ -36,24 +36,20 @@ window.ajouterPieceJointe = function() {
     const nameInput = document.getElementById('ged_file_name');
 
     if (fileInput.files.length === 0) { alert("⚠️ Sélectionnez un fichier."); return; }
-
     const file = fileInput.files[0];
-    
-    // --- NOUVELLE LIMITE STRICTE : 500 KO ---
-    // (Car 500 Ko deviennent ~700 Ko en base de données. La limite totale est 1000 Ko)
-    if (file.size > 500 * 1024) {
-        alert("⚠️ FICHIER TROP LOURD !\n\nPour ne pas bloquer la base de données, la limite est de 500 Ko.\nVotre fichier fait " + (file.size/1024).toFixed(0) + " Ko.\n\nVeuillez le compresser (ex: ilovepdf.com) avant de l'ajouter.");
+
+    // Limite de 1 Mo STRICTE par fichier (Limite Google)
+    if (file.size > 1000 * 1024) {
+        alert("⚠️ FICHIER TROP LOURD ( > 1 Mo ) !\nGoogle Firestore interdit les documents de plus de 1 Mo.\nVeuillez compresser ce fichier.");
         return;
     }
 
     const nomDoc = nameInput.value || file.name;
-    
     const reader = new FileReader();
+    
     reader.onload = function(e) {
         const base64String = e.target.result;
-        
-        // Création immédiate d'un Blob URL pour visualisation locale (sans bug)
-        const localUrl = URL.createObjectURL(file);
+        const localUrl = URL.createObjectURL(file); // Pour voir tout de suite
 
         if(container.innerText.includes('Aucun')) container.innerHTML = "";
 
@@ -61,15 +57,17 @@ window.ajouterPieceJointe = function() {
         div.className = "ged-item"; 
         div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
         
+        // On garde le binaire en mémoire pour la sauvegarde
         div.setAttribute('data-name', nomDoc);
         div.setAttribute('data-b64', base64String); 
+        div.setAttribute('data-status', 'new'); // Marqué comme "Nouveau" à sauvegarder
 
         div.innerHTML = `
             <div style="display:flex; align-items:center; gap:12px;">
                 <i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i>
                 <div style="display:flex; flex-direction:column;">
                     <span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span>
-                    <span style="font-size:0.75rem; color:#10b981; font-weight:600;">Prêt (${(file.size/1024).toFixed(0)} Ko)</span>
+                    <span style="font-size:0.75rem; color:#f59e0b; font-weight:bold;">En attente de sauvegarde...</span>
                 </div>
             </div>
             <div style="display:flex; gap:8px;">
@@ -82,32 +80,29 @@ window.ajouterPieceJointe = function() {
             </div>
         `;
         container.appendChild(div);
-
-        fileInput.value = ""; 
-        nameInput.value = "";
+        fileInput.value = ""; nameInput.value = "";
     };
     reader.readAsDataURL(file);
 };
 
 
 // ============================================================
-// 2. SAUVEGARDE
+// 2. SAUVEGARDE "SPLIT" (Le Secret pour éviter le crash)
 // ============================================================
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
-    if(btn) btn.innerHTML = "Sauvegarde...";
+    if(btn) btn.innerHTML = "Sauvegarde en cours...";
     
     try {
-        let gedList = [];
-        document.querySelectorAll('#liste_pieces_jointes .ged-item').forEach(div => {
-            const name = div.getAttribute('data-name');
-            const b64 = div.getAttribute('data-b64');
-            if(name && b64) gedList.push({ nom: name, file: b64 });
-        });
+        const idDossier = document.getElementById('dossier_id').value;
+        if (!idDossier && document.querySelectorAll('.ged-item[data-status="new"]').length > 0) {
+            // Si c'est un nouveau dossier avec des fichiers, on doit d'abord créer le dossier vide pour avoir un ID
+            alert("⚠️ Création du dossier... (Cliquez une 2ème fois pour les fichiers)");
+        }
 
+        // 1. D'abord on prépare les infos du dossier (Texte léger)
         const getVal = (id) => document.getElementById(id)?.value || "";
-        
-        const data = {
+        let data = {
             date_modification: new Date().toISOString(),
             defunt: {
                 civility: getVal('civilite_defunt'), nom: getVal('nom'), prenom: getVal('prenom'), nom_jeune_fille: getVal('nom_jeune_fille'),
@@ -122,32 +117,72 @@ window.sauvegarderDossier = async function() {
                 heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'),
                 date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat')
             },
-            transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta') },
-            ged: gedList 
+            transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta') }
         };
 
-        const id = document.getElementById('dossier_id').value;
-        
-        if(id) { 
-            await updateDoc(doc(db, "dossiers_admin", id), data); 
-            alert("✅ Dossier sauvegardé !"); 
-        } else { 
-            data.date_creation = new Date().toISOString(); 
-            const ref = await addDoc(collection(db, "dossiers_admin"), data); 
-            document.getElementById('dossier_id').value = ref.id; 
-            alert("✅ Dossier créé !"); 
+        // Sauvegarde ou Création du Dossier Principal (Sans les gros fichiers pour l'instant)
+        let docRef;
+        if(idDossier) {
+            docRef = doc(db, "dossiers_admin", idDossier);
+            await updateDoc(docRef, data);
+        } else {
+            data.date_creation = new Date().toISOString();
+            docRef = await addDoc(collection(db, "dossiers_admin"), data);
+            document.getElementById('dossier_id').value = docRef.id;
         }
+
+        // 2. Traitement des Fichiers (Sauvegarde Séparée)
+        const finalId = document.getElementById('dossier_id').value;
+        const allGedItems = [];
+
+        // On parcourt ce qui est affiché
+        const elements = document.querySelectorAll('#liste_pieces_jointes .ged-item');
         
+        for (const div of elements) {
+            const name = div.getAttribute('data-name');
+            const status = div.getAttribute('data-status'); // 'new' ou 'stored'
+            let storageId = div.getAttribute('data-storage-id'); // ID du fichier séparé
+            const b64 = div.getAttribute('data-b64');
+
+            if (status === 'new' && b64) {
+                // C'est un NOUVEAU fichier, on le sauve à part !
+                try {
+                    const fileDoc = await addDoc(collection(db, "ged_files"), {
+                        nom: name,
+                        content: b64,
+                        dossier_parent: finalId,
+                        date: new Date().toISOString()
+                    });
+                    storageId = fileDoc.id; // On récupère son ID unique
+                    console.log("Fichier sauvegardé à part :", storageId);
+                } catch (errFile) {
+                    console.error("Erreur sauvegarde fichier unique", errFile);
+                    alert(`Erreur sur le fichier ${name} : Trop lourd pour Firestore ?`);
+                    continue; // On saute ce fichier
+                }
+            }
+
+            // On ajoute à la liste du dossier (Juste le lien, c'est très léger !)
+            if (storageId) {
+                allGedItems.push({ nom: name, ref_id: storageId });
+            } else if (b64) {
+                 // Fallback ancien système (si pas d'ID mais b64, rare)
+                 // allGedItems.push({ nom: name, file: b64 }); 
+            }
+        }
+
+        // 3. On met à jour la liste des liens dans le dossier principal
+        await updateDoc(doc(db, "dossiers_admin", finalId), { ged: allGedItems });
+
+        alert("✅ Dossier et Fichiers sauvegardés avec succès !");
+        
+        // Recharge pour tout mettre au propre
+        window.chargerDossier(finalId);
         if(window.chargerBaseClients) window.chargerBaseClients();
 
     } catch(e) { 
         console.error(e);
-        // Message d'erreur plus clair pour la taille
-        if(e.message.includes("size")) {
-            alert("❌ ERREUR TAILLE : Le dossier est trop lourd pour la base de données !\nSupprimez la pièce jointe et essayez avec une plus petite.");
-        } else {
-            alert("Erreur Sauvegarde : " + e.message); 
-        }
+        alert("Erreur Globale : " + e.message); 
     }
     
     if(btn) btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
@@ -155,7 +190,7 @@ window.sauvegarderDossier = async function() {
 
 
 // ============================================================
-// 3. CHARGEMENT AVEC CORRECTIF "PAGE BLANCHE" (Blob)
+// 3. CHARGEMENT "SPLIT" (Rassemble les morceaux)
 // ============================================================
 window.chargerDossier = async function(id) {
     try {
@@ -168,7 +203,7 @@ window.chargerDossier = async function(id) {
         const data = docSnap.data();
         const set = (htmlId, val) => { const el = document.getElementById(htmlId); if(el) el.value = val || ''; };
 
-        // Remplissage Champs...
+        // Remplissage Champs (Identique)
         if (data.defunt) {
             set('civilite_defunt', data.defunt.civility); set('nom', data.defunt.nom); set('prenom', data.defunt.prenom);
             set('nom_jeune_fille', data.defunt.nom_jeune_fille); set('date_deces', data.defunt.date_deces);
@@ -198,42 +233,63 @@ window.chargerDossier = async function(id) {
             set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta);
         }
 
-        // --- AFFICHAGE GED ET CONVERSION BLOB (Solution Page Blanche) ---
+        // --- AFFICHAGE GED INTELLIGENTE ---
         const container = document.getElementById('liste_pieces_jointes');
         const rawGed = data.ged || data.pieces_jointes || [];
         
         if (container) {
             container.innerHTML = ""; 
             if (Array.isArray(rawGed) && rawGed.length > 0) {
-                // On utilise une boucle async pour pouvoir faire la conversion
+                
                 for (const item of rawGed) {
-                    let nom = item; 
+                    let nom = "";
                     let lien = "#";
                     let isBinary = false;
+                    let storageId = null;
 
-                    if (typeof item === 'object' && item.file) {
+                    // CAS 1 : Nouveau système séparé (ref_id)
+                    if (item.ref_id) {
                         nom = item.nom;
+                        storageId = item.ref_id;
                         isBinary = true;
                         
-                        // MAGIE : On transforme le texte Base64 en un "vrai" fichier pour le navigateur
+                        // On va chercher le contenu à la volée !
+                        try {
+                            const fileSnap = await getDoc(doc(db, "ged_files", item.ref_id));
+                            if (fileSnap.exists()) {
+                                const fileData = fileSnap.data();
+                                // Conversion B64 -> Blob pour affichage
+                                const res = await fetch(fileData.content);
+                                const blob = await res.blob();
+                                lien = URL.createObjectURL(blob);
+                            } else {
+                                isBinary = false; // Fichier perdu ?
+                            }
+                        } catch(err) { console.error("Erreur charge fichier", err); }
+
+                    } 
+                    // CAS 2 : Ancien système intégré (file)
+                    else if (item.file) {
+                        nom = item.nom;
+                        isBinary = true;
                         try {
                             const res = await fetch(item.file);
                             const blob = await res.blob();
-                            lien = URL.createObjectURL(blob); // Lien valide pour Chrome !
-                        } catch(err) {
-                            console.error("Erreur conversion PDF", err);
-                            lien = item.file; // Fallback au cas où
-                        }
+                            lien = URL.createObjectURL(blob);
+                        } catch(e) { lien = item.file; }
+                    } 
+                    // CAS 3 : Juste le nom (vieux archives)
+                    else {
+                        nom = item;
                     }
 
                     if(typeof nom === 'string' && nom.includes("Enregistré")) continue;
 
                     const div = document.createElement('div');
-                    div.className = "ged-item"; 
-                    if(isBinary) {
-                        div.setAttribute('data-name', nom);
-                        div.setAttribute('data-b64', item.file); // On garde l'original pour la resauvegarde
-                    }
+                    div.className = "ged-item";
+                    div.setAttribute('data-name', nom);
+                    div.setAttribute('data-status', 'stored');
+                    if(storageId) div.setAttribute('data-storage-id', storageId);
 
                     div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
                     
@@ -246,7 +302,7 @@ window.chargerDossier = async function(id) {
                             <i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i>
                             <div style="display:flex; flex-direction:column;">
                                 <span style="font-weight:700; color:#334155; font-size:0.95rem;">${nom}</span>
-                                <span style="font-size:0.75rem; color:${isBinary ? '#10b981' : '#64748b'}; font-weight:600;">${isBinary ? 'Stocké ✅' : 'Non stocké'}</span>
+                                <span style="font-size:0.75rem; color:${isBinary ? '#10b981' : '#64748b'}; font-weight:600;">${isBinary ? 'En ligne ✅' : 'Non accessible'}</span>
                             </div>
                         </div>
                         <div style="display:flex; gap:8px;">
@@ -281,62 +337,41 @@ window.chargerDossier = async function(id) {
     } catch (e) { console.error(e); alert("Erreur : " + e.message); }
 };
 
-// ============================================================
-// 4. UI
-// ============================================================
+// UI Functions (inchangées)
 window.toggleSections = function() {
-    const select = document.getElementById('prestation');
-    if(!select) return;
+    const select = document.getElementById('prestation'); if(!select) return;
     const choix = select.value;
-    const map = {
-        'Inhumation': { bloc: 'bloc_inhumation', btn: 'btn_inhumation' },
-        'Crémation': { bloc: 'bloc_cremation', btn: 'btn_cremation' },
-        'Rapatriement': { bloc: 'bloc_rapatriement', btn: 'btn_rapatriement' }
-    };
+    const map = { 'Inhumation': 'bloc_inhumation', 'Crémation': 'bloc_cremation', 'Rapatriement': 'bloc_rapatriement' };
     ['bloc_inhumation', 'bloc_cremation', 'bloc_rapatriement'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
     ['btn_inhumation', 'btn_cremation', 'btn_rapatriement'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
     if (map[choix]) {
-        document.getElementById(map[choix].bloc)?.classList.remove('hidden');
-        document.getElementById(map[choix].btn)?.classList.remove('hidden');
+        document.getElementById(map[choix])?.classList.remove('hidden');
+        document.getElementById('btn_'+choix.toLowerCase().replace('é','e'))?.classList.remove('hidden');
     }
 };
 window.toggleVol2 = function() {
     const chk = document.getElementById('check_vol2');
     const bloc = document.getElementById('bloc_vol2');
-    if(chk && bloc) {
-        if(chk.checked) bloc.classList.remove('hidden');
-        else bloc.classList.add('hidden');
-    }
+    if(chk && bloc) { chk.checked ? bloc.classList.remove('hidden') : bloc.classList.add('hidden'); }
 };
 window.togglePolice = function() {
     const select = document.getElementById('type_presence_select');
-    const blocPolice = document.getElementById('police_fields');
-    const blocFamille = document.getElementById('famille_fields');
+    const bP = document.getElementById('police_fields'); const bF = document.getElementById('famille_fields');
     if(!select) return;
-    if(select.value === 'police') {
-        if(blocPolice) blocPolice.classList.remove('hidden');
-        if(blocFamille) blocFamille.classList.add('hidden');
-    } else {
-        if(blocPolice) blocPolice.classList.add('hidden');
-        if(blocFamille) blocFamille.classList.remove('hidden');
-    }
+    if(select.value === 'police') { bP.classList.remove('hidden'); bF.classList.add('hidden'); }
+    else { bP.classList.add('hidden'); bF.classList.remove('hidden'); }
 };
 window.copierMandant = function() {
     const chk = document.getElementById('copy_mandant');
     if(chk && chk.checked) {
-        const nom = document.getElementById('soussigne').value;
-        const lien = document.getElementById('lien').value;
-        if(document.getElementById('f_nom_prenom')) document.getElementById('f_nom_prenom').value = nom;
-        if(document.getElementById('f_lien')) document.getElementById('f_lien').value = lien;
+        document.getElementById('f_nom_prenom').value = document.getElementById('soussigne').value;
+        document.getElementById('f_lien').value = document.getElementById('lien').value;
     }
 };
 window.showSection = function(id) {
-    document.querySelectorAll('.main-content > div').forEach(div => {
-        if(div.id.startsWith('view-')) div.classList.add('hidden');
-    });
+    document.querySelectorAll('.main-content > div').forEach(div => { if(div.id.startsWith('view-')) div.classList.add('hidden'); });
     const target = document.getElementById('view-' + id);
     if(target) target.classList.remove('hidden');
-    
     if(id === 'base') DB.chargerBaseClients();
     if(id === 'stock') DB.chargerStock();
     if(id === 'admin') DB.chargerSelectImport();
@@ -358,10 +393,8 @@ window.loginFirebase = async function() {
     catch(e) { alert("Erreur login: " + e.message); }
 };
 window.logoutFirebase = async function() { await signOut(auth); window.location.reload(); };
-
 onAuthStateChanged(auth, (user) => {
-    const loader = document.getElementById('app-loader');
-    if(loader) loader.style.display = 'none';
+    const loader = document.getElementById('app-loader'); if(loader) loader.style.display = 'none';
     if(user) {
         document.getElementById('login-screen')?.classList.add('hidden');
         Utils.chargerLogoBase64();
@@ -372,7 +405,5 @@ onAuthStateChanged(auth, (user) => {
             if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
             if(document.getElementById('header-date')) document.getElementById('header-date').innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
         }, 1000);
-    } else {
-        document.getElementById('login-screen')?.classList.remove('hidden');
-    }
+    } else { document.getElementById('login-screen')?.classList.remove('hidden'); }
 });
