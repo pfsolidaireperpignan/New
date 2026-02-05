@@ -198,3 +198,12 @@ window.toggleVol2 = function() {
         blocVol2.classList.add('hidden');
     }
 };
+// A COPIER A LA FIN DE APP.JS
+window.toggleVol2 = function() {
+    const checkbox = document.getElementById('check_vol2');
+    const blocVol2 = document.getElementById('bloc_vol2');
+    if (checkbox && blocVol2) {
+        if (checkbox.checked) blocVol2.classList.remove('hidden');
+        else blocVol2.classList.add('hidden');
+    }
+};
