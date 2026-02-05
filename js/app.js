@@ -1,7 +1,7 @@
-/* js/app.js - VERSION FINALE (STOCKAGE BINAIRE BASE64 RESTAURÉ) */
+/* js/app.js - VERSION FINALE (CORRECTIF SUPPRESSION & VISUALISATION) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
-// Import des outils Firestore (addDoc, updateDoc sont nécessaires pour la nouvelle sauvegarde)
+// Import des outils Firestore nécessaires
 import { doc, getDoc, collection, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import * as Utils from './utils.js';
 import * as PDF from './pdf_admin.js';
@@ -29,7 +29,7 @@ window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 
 
 // ============================================================
-// 1. AJOUT FICHIER AVEC CONVERSION BINAIRE (Base64)
+// 1. AJOUT FICHIER (Stockage Binaire Base64)
 // ============================================================
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
@@ -40,28 +40,27 @@ window.ajouterPieceJointe = function() {
 
     const file = fileInput.files[0];
     
-    // --- VÉRIFICATION LIMITE 800 KO ---
+    // Limite de sécurité (800 Ko) pour ne pas bloquer la base de données
     if (file.size > 800 * 1024) {
-        alert("⚠️ FICHIER TROP LOURD !\nLa limite est de 800 Ko pour le stockage binaire.\nVeuillez compresser votre fichier.");
+        alert("⚠️ FICHIER TROP LOURD !\nLa limite est de 800 Ko pour le stockage binaire.\nVeuillez compresser votre fichier PDF ou Image.");
         return;
     }
 
     const nomDoc = nameInput.value || file.name;
-    const dateAjout = new Date().toLocaleDateString();
-
-    // LECTURE DU FICHIER EN BINAIRE (Base64)
+    
+    // Lecture du fichier pour le transformer en texte (Base64)
     const reader = new FileReader();
     
     reader.onload = function(e) {
-        const base64String = e.target.result; // C'est ici que se trouve le fichier transformé en texte
+        const base64String = e.target.result;
 
         if(container.innerText.includes('Aucun')) container.innerHTML = "";
 
         const div = document.createElement('div');
-        div.className = "ged-item"; // Classe pour le repérer facilement
+        div.className = "ged-item"; // Classe essentielle pour la suppression
         div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
         
-        // ON STOCKE LE BINAIRE DANS UN ATTRIBUT CACHÉ (data-b64)
+        // On stocke les données dans le HTML pour la sauvegarde
         div.setAttribute('data-name', nomDoc);
         div.setAttribute('data-b64', base64String); 
 
@@ -70,14 +69,14 @@ window.ajouterPieceJointe = function() {
                 <i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i>
                 <div style="display:flex; flex-direction:column;">
                     <span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span>
-                    <span style="font-size:0.75rem; color:#64748b;">Prêt à enregistrer (${(file.size/1024).toFixed(0)} Ko)</span>
+                    <span style="font-size:0.75rem; color:#10b981; font-weight:600;">Prêt à enregistrer (${(file.size/1024).toFixed(0)} Ko)</span>
                 </div>
             </div>
             <div style="display:flex; gap:8px;">
                 <a href="${base64String}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; text-decoration:none;" title="Voir">
                     <i class="fas fa-eye"></i>
                 </a>
-                <button onclick="this.closest('div').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                <button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Supprimer">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
@@ -89,33 +88,30 @@ window.ajouterPieceJointe = function() {
         nameInput.value = "";
     };
 
-    // On lance la lecture
     reader.readAsDataURL(file);
 };
 
 
 // ============================================================
-// 2. SAUVEGARDE AMÉLIORÉE (Inclut le Binaire)
+// 2. SAUVEGARDE (Inclut les fichiers binaires)
 // ============================================================
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
-    if(btn) btn.innerHTML = "Sauvegarde en cours...";
+    if(btn) btn.innerHTML = "Sauvegarde...";
     
     try {
-        // --- RÉCUPÉRATION DE LA GED AVEC LE BINAIRE ---
+        // --- RECUPERATION GED ---
         let gedList = [];
-        // On cherche tous les éléments qu'on a créés
         document.querySelectorAll('#liste_pieces_jointes .ged-item').forEach(div => {
             const name = div.getAttribute('data-name');
             const b64 = div.getAttribute('data-b64');
             if(name && b64) {
-                // On enregistre un OBJET complet : Nom + Fichier
+                // On enregistre l'objet complet {nom, file}
                 gedList.push({ nom: name, file: b64 });
             }
         });
 
-        // --- RÉCUPÉRATION DES CHAMPS CLASSIQUES (Comme db_manager) ---
-        // Petite fonction utilitaire locale
+        // --- RECUPERATION CHAMPS ---
         const getVal = (id) => document.getElementById(id)?.value || "";
         
         const data = {
@@ -135,26 +131,23 @@ window.sauvegarderDossier = async function() {
             },
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta') },
             
-            // ICI LE SECRET : On sauvegarde la liste complète avec les fichiers !
+            // LA LISTE AVEC FICHIERS
             ged: gedList 
         };
 
         const id = document.getElementById('dossier_id').value;
         
         if(id) { 
-            // Mise à jour
             await updateDoc(doc(db, "dossiers_admin", id), data); 
-            alert("✅ Dossier mis à jour avec les fichiers !"); 
+            alert("✅ Dossier et fichiers sauvegardés !"); 
         }
         else { 
-            // Création
             data.date_creation = new Date().toISOString(); 
             const ref = await addDoc(collection(db, "dossiers_admin"), data); 
             document.getElementById('dossier_id').value = ref.id; 
-            alert("✅ Nouveau dossier créé et fichiers stockés !"); 
+            alert("✅ Dossier créé avec succès !"); 
         }
         
-        // Rafraîchir la liste
         if(window.chargerBaseClients) window.chargerBaseClients();
 
     } catch(e) { 
@@ -167,7 +160,7 @@ window.sauvegarderDossier = async function() {
 
 
 // ============================================================
-// 3. CHARGEMENT DOSSIER (Lecture du Binaire)
+// 3. CHARGEMENT (Restaure les fichiers binaires)
 // ============================================================
 window.chargerDossier = async function(id) {
     try {
@@ -180,7 +173,7 @@ window.chargerDossier = async function(id) {
         const data = docSnap.data();
         const set = (htmlId, val) => { const el = document.getElementById(htmlId); if(el) el.value = val || ''; };
 
-        // --- Remplissage Formulaire Standard ---
+        // Remplissage Champs
         if (data.defunt) {
             set('civilite_defunt', data.defunt.civility); set('nom', data.defunt.nom); set('prenom', data.defunt.prenom);
             set('nom_jeune_fille', data.defunt.nom_jeune_fille); set('date_deces', data.defunt.date_deces);
@@ -210,28 +203,27 @@ window.chargerDossier = async function(id) {
             set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta);
         }
 
-        // --- RESTAURATION DE LA GED (MAGIQUE) ---
+        // --- AFFICHAGE GED ---
         const container = document.getElementById('liste_pieces_jointes');
-        // On récupère la liste (soit ancien format 'pieces_jointes', soit nouveau 'ged')
+        // On récupère la liste (nouveau format 'ged' ou ancien 'pieces_jointes')
         const rawGed = data.ged || data.pieces_jointes || [];
         
         if (container) {
             container.innerHTML = ""; 
             if (Array.isArray(rawGed) && rawGed.length > 0) {
                 rawGed.forEach(item => {
-                    // Vérification : Est-ce un objet (Nouveau) ou un texte (Ancien) ?
                     let nom = item; 
                     let lien = "#";
                     let isBinary = false;
 
+                    // Détection : Est-ce un fichier stocké (Objet) ou juste un nom (Texte) ?
                     if (typeof item === 'object' && item.file) {
-                        // C'est notre format binaire !
                         nom = item.nom;
-                        lien = item.file; // C'est le code Base64
+                        lien = item.file; // Base64
                         isBinary = true;
                     }
 
-                    // On filtre les faux fichiers "Enregistré"
+                    // On ignore les vieux "Enregistré"
                     if(typeof nom === 'string' && nom.includes("Enregistré")) return;
 
                     const div = document.createElement('div');
@@ -243,10 +235,10 @@ window.chargerDossier = async function(id) {
 
                     div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
                     
-                    // Si on a le binaire, on met le bouton bleu actif
+                    // Bouton Oeil : Bleu si Binaire, Gris si Ancien Format
                     const btnEye = isBinary 
                         ? `<a href="${lien}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; text-decoration:none;" title="Voir le document"><i class="fas fa-eye"></i></a>`
-                        : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; cursor:not-allowed;" title="Non stocké"><i class="fas fa-eye-slash"></i></div>`;
+                        : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; cursor:not-allowed;" title="Ancien format (Non stocké)"><i class="fas fa-eye-slash"></i></div>`;
 
                     div.innerHTML = `
                         <div style="display:flex; align-items:center; gap:12px;">
@@ -258,7 +250,7 @@ window.chargerDossier = async function(id) {
                         </div>
                         <div style="display:flex; gap:8px;">
                             ${btnEye}
-                            <button onclick="this.closest('div').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                            <button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -278,7 +270,6 @@ window.chargerDossier = async function(id) {
             btn.innerHTML = `<i class="fas fa-pen"></i> MODIFIER LE DOSSIER`;
             btn.classList.remove('btn-green'); btn.classList.add('btn-warning'); 
             btn.style.backgroundColor = "#f59e0b"; 
-            // On appelle notre sauvegarde surchargée
             btn.onclick = function() { window.sauvegarderDossier(); };
         }
 
@@ -289,6 +280,7 @@ window.chargerDossier = async function(id) {
 
     } catch (e) { console.error(e); alert("Erreur : " + e.message); }
 };
+
 
 // ============================================================
 // 4. FONCTIONS UI
