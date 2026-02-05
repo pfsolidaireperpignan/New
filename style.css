@@ -1,4 +1,4 @@
-/* style.css - VERSION FINALE (LOGIN + HUB + ADMIN + FACTURE) */
+/* style.css - VERSION FINALE COMPLETE */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
@@ -28,247 +28,175 @@ body {
 
 .hidden { display: none !important; }
 
-/* ============================================================
-   1. ÉCRAN DE LOGIN (RÉPARÉ & OPAQUE)
-   ============================================================ */
-#login-screen {
-    position: fixed; 
-    inset: 0; 
-    background-color: #111827; /* Fond noir opaque */
-    z-index: 10000; 
-    display: flex; 
-    justify-content: center; 
+/* --- SIDEBAR (MENU) --- */
+.sidebar {
+    width: 260px;
+    background: white;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.sidebar .brand {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin-bottom: 40px;
+    display: flex;
     align-items: center;
+    gap: 10px;
 }
 
-#login-screen .card {
-    background: white; padding: 40px; border-radius: 16px; width: 100%; max-width: 400px; text-align: center;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-/* ============================================================
-   2. SIDEBAR (MENU GAUCHE - STYLE CLASSIQUE)
-   ============================================================ */
-.sidebar { 
-    width: 260px; background: var(--surface); border-right: 1px solid var(--border); 
-    display: flex; flex-direction: column; padding: 25px 20px; z-index: 100; flex-shrink: 0; 
-    box-shadow: 2px 0 10px rgba(0,0,0,0.02);
-}
-
-.brand { 
-    font-size: 1.4rem; font-weight: 800; color: var(--primary); margin-bottom: 35px; 
-    display: flex; align-items: center; gap: 10px; padding-left: 10px; 
-}
-
-.nav-menu { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 5px; }
-
-.nav-link { 
-    display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: 10px; 
-    text-decoration: none; color: var(--gray); font-weight: 600; font-size: 0.95rem; transition: all 0.2s; 
-}
-.nav-link:hover { background-color: #f8fafc; color: var(--dark); transform: translateX(3px); }
-.nav-link.active { background-color: #ecfdf5; color: var(--primary-dark); }
-.nav-link i { width: 24px; text-align: center; font-size: 1.1rem; }
-
-/* ============================================================
-   3. CONTENU PRINCIPAL
-   ============================================================ */
-.main-content { flex: 1; padding: 30px; overflow-y: auto; background-color: var(--light); }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-h1 { font-size: 1.8rem; font-weight: 800; margin: 0; color: var(--dark); letter-spacing: -0.5px; }
-
-/* ============================================================
-   4. STYLE DU HUB (ACCUEIL)
-   ============================================================ */
-/* Bannière */
-.welcome-banner {
-    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-    color: white; padding: 30px 40px; border-radius: 16px; margin-bottom: 30px;
-    display: flex; justify-content: space-between; align-items: center;
-    box-shadow: 0 10px 20px -5px rgba(0,0,0,0.2);
-}
-.welcome-text h2 { margin: 0; font-size: 1.8rem; color: white; }
-.welcome-text p { margin: 5px 0 0 0; color: #9ca3af; }
-.date-badge { text-align: right; background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); }
-#header-time { font-size: 1.5rem; font-weight: 700; color: white; }
-#header-date { font-size: 0.85rem; color: #d1d5db; }
-
-/* Mini Stats (Urgences...) */
-.quick-stats { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
-.mini-stat {
-    flex: 1; background: white; padding: 15px 20px; border-radius: 14px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.03); display: flex; align-items: center; gap: 15px;
-    cursor: pointer; border: 1px solid var(--border); min-width: 200px; transition: transform 0.2s;
-}
-.mini-stat:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-.mini-icon { width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-
-/* Grille Accès Rapide */
-.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-top: 15px; }
-.action-card {
-    background: white; padding: 25px; border-radius: 16px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.04); border: 1px solid var(--border);
-    cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; height: 160px;
-    position: relative; overflow: hidden;
-}
-.action-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
-
-/* Couleurs Cartes */
-.ac-blue:hover { border-bottom: 4px solid var(--secondary); }
-.ac-green:hover { border-bottom: 4px solid var(--primary); }
-.ac-orange:hover { border-bottom: 4px solid var(--warning); }
-.ac-purple:hover { border-bottom: 4px solid var(--purple); }
-
-.card-icon-bg { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 15px; }
-.ac-blue .card-icon-bg { background: #eff6ff; color: var(--secondary); }
-.ac-green .card-icon-bg { background: #ecfdf5; color: var(--primary); }
-.ac-orange .card-icon-bg { background: #fff7ed; color: var(--warning); }
-.ac-purple .card-icon-bg { background: #f3e8ff; color: var(--purple); }
-
-.card-title { font-size: 1.1rem; font-weight: 700; color: var(--dark); margin-bottom: 5px; }
-.card-desc { font-size: 0.85rem; color: var(--gray); line-height: 1.4; }
-.card-arrow { position: absolute; bottom: 20px; right: 20px; color: #cbd5e1; transition: 0.2s; }
-.action-card:hover .card-arrow { color: var(--dark); transform: translateX(5px); }
-
-/* ============================================================
-   5. ONGLETS AMÉLIORÉS (ADMIN & FACTURATION)
-   ============================================================ */
-.tabs-container { display: flex; gap: 15px; margin-bottom: 25px; }
-
-.tab-btn {
-    flex: 1; /* Prend toute la largeur */
-    padding: 15px 20px;
-    border: 1px solid var(--border);
-    background: white;
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 15px;
     color: var(--gray);
-    font-weight: 700;
-    font-size: 1rem;
-    border-radius: 12px;
+    text-decoration: none;
+    border-radius: var(--radius);
+    margin-bottom: 5px;
+    font-weight: 500;
+    transition: all 0.2s;
     cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 
-.tab-btn:hover { background: #f8fafc; transform: translateY(-1px); }
-
-/* Onglet Actif (Joli souligné) */
-.tab-btn.active {
-    background: white;
-    color: var(--secondary);
-    border-color: var(--secondary);
-    border-bottom-width: 4px;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-}
-/* Variante Rouge pour Achats */
-.tab-btn.active-red {
-    color: var(--danger);
-    border-color: var(--danger);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
+.nav-link:hover, .nav-link.active {
+    background-color: #ecfdf5;
+    color: var(--primary-dark);
 }
 
-/* ============================================================
-   6. FACTURATION (Cartes Stats & Tableaux)
-   ============================================================ */
-.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-bottom: 30px; }
-.stat-card { 
-    background: white; padding: 25px; border-radius: 16px; 
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-bottom: 4px solid transparent; 
-}
-.card-ca { border-bottom-color: var(--primary); } .card-ca .stat-value { color: var(--primary-dark); }
-.card-depense { border-bottom-color: var(--danger); } .card-depense .stat-value { color: #dc2626; }
-.card-result { border-bottom-color: var(--secondary); } .card-result .stat-value { color: #1d4ed8; }
+.nav-link i { width: 20px; text-align: center; }
 
-.stat-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #9ca3af; margin-bottom: 5px; }
-.stat-value { font-size: 2rem; font-weight: 800; color: var(--dark); }
+/* MENU RÉDUIT (COLLAPSED) */
+.sidebar.collapsed { width: 70px; }
+.sidebar.collapsed .brand-text, .sidebar.collapsed .nav-text { display: none; }
+.sidebar.collapsed .nav-link { justify-content: center; padding: 12px 0; }
+.sidebar.collapsed .brand { justify-content: center; padding-left: 0; }
+.sidebar.collapsed #btn-toggle-menu { margin: 0 auto; }
 
-.card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.03); margin-bottom: 25px; border: 1px solid var(--border); }
-
-.compta-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-.compta-table th { text-align: left; padding: 15px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--gray); background-color: #f9fafb; border-bottom: 1px solid var(--border); }
-.compta-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; font-size: 0.9rem; font-weight: 500; vertical-align: middle; }
-.compta-table tr:hover td { background-color: #f9fafb; }
-
-/* ============================================================
-   7. FORMULAIRES & BOUTONS
-   ============================================================ */
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px; }
-.span-2 { grid-column: span 2; }
-label { display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 6px; }
-input, select, textarea { width: 100%; padding: 12px 15px; border: 1px solid #d1d5db; border-radius: 10px; background: #f9fafb; box-sizing: border-box; font-size: 0.95rem; transition: 0.2s; }
-input:focus, select:focus { border-color: var(--secondary); background: white; outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
-
-.btn { padding: 12px 25px; border-radius: 10px; border: none; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 10px; transition: 0.2s; font-size: 0.9rem; }
-.btn:hover { opacity: 0.9; transform: translateY(-1px); }
-.btn-green { background: var(--primary); color: white; }
-.btn-blue { background: var(--secondary); color: white; }
-.btn-red { background: var(--danger); color: white; }
-.btn-purple { background: var(--purple); color: white; }
-.btn-grey { background: #e5e7eb; color: var(--dark); border: 1px solid #d1d5db; }
-.btn-icon { background: #f3f4f6; width: 35px; height: 35px; border-radius: 8px; border: none; cursor: pointer; color: var(--gray); display: inline-flex; align-items: center; justify-content: center; transition: 0.2s; }
-.btn-icon:hover { background: #e2e8f0; color: var(--dark); }
-
-/* Badges */
-.badge { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
-.badge-facture { background: #dcfce7; color: #166534; }
-.badge-devis { background: #ffedd5; color: #9a3412; }
-.badge-regle { background: #d1fae5; color: #047857; }
-.badge-attente { background: #fee2e2; color: #b91c1c; }
-
-/* Zone Tiroir (Ajout Dépense) */
-.toggle-form-container { overflow: hidden; max-height: 0; opacity: 0; transition: all 0.4s ease; margin-bottom: 0; }
-.toggle-form-container.open { max-height: 800px; opacity: 1; margin-bottom: 25px; }
-
-/* Mobile et Menu Burger */
-#mobile-menu-btn { display: none; } /* Bouton flottant mobile caché sur PC */
-
-/* Pour le bouton burger DANS la sidebar (PC), on force l'affichage s'il était caché */
+/* Bouton Burger PC */
 #btn-toggle-menu { 
-    display: block !important; /* IMPORTANT : On force l'affichage */
+    display: block; 
     background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #6b7280; margin-left: auto; 
 }
 
+/* --- MAIN CONTENT --- */
+.main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 30px;
+    position: relative;
+}
+
+/* --- HEADER --- */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+/* --- ONGLETS STYLE "PILULE" (Ventes/Achats) --- */
+.page-header .btn-tab-container {
+    background: #e5e7eb;
+    padding: 5px;
+    border-radius: 50px;
+    display: inline-flex;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.btn-tab {
+    padding: 10px 25px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    display: flex; align-items: center; gap: 8px;
+}
+.btn-tab:hover { color: #374151; background: rgba(255,255,255,0.5); }
+.btn-tab.active {
+    background: white;
+    color: var(--primary-dark);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transform: scale(1.05);
+}
+#btn-tab-achats.active { color: #ef4444; }
+
+/* --- CARTES & UI --- */
+.card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 25px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    margin-bottom: 25px;
+    border: 1px solid var(--border);
+}
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+/* --- FORMULAIRES --- */
+label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--gray); margin-bottom: 5px; }
+input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+input:focus, select:focus { outline: none; border-color: var(--primary); ring: 2px var(--primary); }
+
+/* --- TABLEAUX --- */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 12px; color: var(--gray); font-size: 0.8rem; text-transform: uppercase; border-bottom: 2px solid var(--border); }
+td { padding: 15px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+
+/* --- BADGES --- */
+.badge { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+.badge-blue { background: #e0f2fe; color: #0284c7; }
+.badge-green { background: #dcfce7; color: #16a34a; }
+.badge-red { background: #fee2e2; color: #dc2626; }
+.badge-gray { background: #f3f4f6; color: #4b5563; }
+
+/* Badges Spécifiques Achats */
+.badge-regle { background: #d1fae5; color: #059669; border: 1px solid #a7f3d0; }
+.badge-attente { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+/* --- BOUTONS --- */
+.btn {
+    padding: 10px 20px; border: none; border-radius: 8px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 8px;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-danger { background: var(--danger); color: white; }
+.btn-icon { background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 5px; }
+.btn-icon:hover { background: #f3f4f6; border-radius: 50%; }
+
+/* --- ZONE DÉPLIABLE (ACHATS) --- */
+.toggle-form-container { overflow: hidden; max-height: 0; opacity: 0; transition: all 0.4s ease; margin-bottom: 0; }
+.toggle-form-container.open { max-height: 800px; opacity: 1; margin-bottom: 25px; }
+
+/* --- MOBILE --- */
+#mobile-menu-btn { display: none; }
 @media (max-width: 768px) {
     .sidebar { position: fixed; transform: translateX(-100%); height: 100%; box-shadow: 5px 0 15px rgba(0,0,0,0.1); }
     .sidebar.mobile-open { transform: translateX(0); }
-    
-    #btn-toggle-menu { display: none !important; } /* Caché sur mobile car on a le bouton flottant */
-    
-    #mobile-menu-btn { display: flex !important; position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background: var(--primary); color: white; border-radius: 50%; border: none; justify-content: center; align-items: center; z-index: 6000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-    .stats-grid, .form-grid, .dashboard-grid { grid-template-columns: 1fr; }
-    .welcome-banner { flex-direction: column; text-align: center; gap: 15px; }
-    .date-badge { width: 100%; }
-}
-/* ============================================================
-   8. GESTION DU MENU RÉDUIT (COLLAPSED)
-   ============================================================ */
-/* Réduction de la largeur de la barre latérale */
-.sidebar.collapsed {
-    width: 70px;
-}
-
-/* Cache le texte (PF ERP, Accueil, etc.) quand c'est réduit */
-.sidebar.collapsed .brand-text,
-.sidebar.collapsed .nav-text {
-    display: none;
-}
-
-/* Centre les icônes quand le menu est fermé */
-.sidebar.collapsed .nav-link {
-    justify-content: center;
-    padding: 12px 0;
-}
-
-.sidebar.collapsed .brand {
-    justify-content: center;
-    padding-left: 0;
-}
-
-.sidebar.collapsed .brand i {
-    margin: 0;
-}
-
-/* Ajustement du bouton burger quand fermé */
-.sidebar.collapsed #btn-toggle-menu {
-    margin: 0 auto;
+    #btn-toggle-menu { display: none !important; }
+    #mobile-menu-btn { display: flex !important; position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background: var(--primary); color: white; border-radius: 50%; justify-content: center; align-items: center; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: none; font-size: 1.2rem; }
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
 }
