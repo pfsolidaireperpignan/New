@@ -38,34 +38,94 @@ window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 // ============================================================
 // B. FONCTION DE CHARGEMENT INTELLIGENTE (Celle qui plantait)
 // ============================================================
+// ============================================================
+// CORRECTION : CHARGEMENT INTELLIGENT (Cherche partout)
+// ============================================================
 window.chargerDossier = async function(id) {
     try {
-        console.log("Tentative de chargement du dossier...", id);
+        console.log("Recherche du dossier ID :", id);
         
-        // CORRECTION : On utilise les fonctions importées (plus de window.doc)
-        const docRef = doc(db, "dossiers", id);
-        const docSnap = await getDoc(docRef);
+        // 1. IMPORT (Nécessaire ici pour être sûr)
+        const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+        
+        // 2. TENTATIVE 1 : On cherche dans la collection "dossiers"
+        let docRef = doc(db, "dossiers", id);
+        let docSnap = await getDoc(docRef);
 
+        // 3. TENTATIVE 2 : Si pas trouvé, on cherche dans "clients" (Erreur fréquente de nommage)
         if (!docSnap.exists()) {
-            alert("Ce dossier est introuvable (peut-être supprimé ?)");
+            console.log("Pas trouvé dans 'dossiers', recherche dans 'clients'...");
+            docRef = doc(db, "clients", id);
+            docSnap = await getDoc(docRef);
+        }
+
+        // 4. SI TOUJOURS PAS TROUVÉ
+        if (!docSnap.exists()) {
+            alert("⚠️ PROBLÈME D'ADRESSE :\nImpossible de trouver ce dossier.\n\nID cherché : " + id + "\nCollections testées : 'dossiers' et 'clients'.\n\nVérifiez le nom de votre collection dans Firebase.");
             return;
         }
 
+        // 5. SI TROUVÉ : ON AFFICHE !
         const data = docSnap.data();
-        console.log("Données reçues :", data);
+        console.log("Données trouvées :", data);
 
-        // 1. Remplissage Automatique des champs
+        // Remplissage des champs
         for (const [key, value] of Object.entries(data)) {
             const input = document.getElementById(key);
             if (input) {
-                if (input.type === 'checkbox') {
-                    input.checked = value;
-                } else {
-                    input.value = value;
-                }
+                if (input.type === 'checkbox') input.checked = value;
+                else input.value = value;
             }
         }
 
+        // Remplissage GED
+        const container = document.getElementById('liste_pieces_jointes');
+        if (container) {
+            container.innerHTML = ""; 
+            if (data.pieces_jointes && Array.isArray(data.pieces_jointes) && data.pieces_jointes.length > 0) {
+                data.pieces_jointes.forEach(nomFichier => {
+                    const div = document.createElement('div');
+                    div.style = "background:white; padding:8px; margin-bottom:5px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; border-radius:4px;";
+                    div.innerHTML = `
+                        <span style="font-weight:600; color:#334155;">📄 ${nomFichier}</span>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <span style="font-size:0.8rem; color:green;">Enregistré ✅</span>
+                            <i class="fas fa-trash-alt" style="color:#ef4444; cursor:pointer; margin-left:10px;" onclick="this.parentElement.parentElement.remove()"></i>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            } else {
+                container.innerHTML = '<div style="color:#94a3b8; font-style:italic;">Aucun document joint.</div>';
+            }
+        }
+
+        // Mise à jour du bouton Modifier
+        const hiddenId = document.getElementById('dossier_id');
+        if(hiddenId) hiddenId.value = id;
+
+        const btn = document.getElementById('btn-save-bdd');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-pen"></i> MODIFIER LE DOSSIER';
+            btn.classList.remove('btn-green');
+            btn.classList.add('btn-warning'); 
+            btn.style.backgroundColor = "#f59e0b"; 
+            btn.onclick = function() { window.sauvegarderDossier(id); };
+        }
+
+        // Réveil des sections cachées
+        if(window.toggleSections) window.toggleSections();
+        if(window.togglePolice) window.togglePolice();
+        if(window.toggleVol2) window.toggleVol2();
+
+        // Affichage final
+        window.showSection('admin');
+
+    } catch (e) {
+        console.error(e);
+        alert("Erreur technique : " + e.message);
+    }
+};
         // 2. Gestion de la GED (Pièces Jointes)
         const container = document.getElementById('liste_pieces_jointes');
         if (container) {
@@ -287,3 +347,4 @@ onAuthStateChanged(auth, (user) => {
         document.getElementById('login-screen')?.classList.remove('hidden');
     }
 });
+
