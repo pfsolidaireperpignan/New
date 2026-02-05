@@ -55,7 +55,12 @@ export async function chargerSelectImport() {
         snaps.forEach(doc => {
             const d = doc.data();
             importCache.push({ id: doc.id, ...d });
-            const label = `${d.info?.type || 'DOC'} ${d.info?.numero || ''} - ${d.client?.nom || '?'} (Défunt: ${d.defunt?.nom || '?'})`;
+            // Gestion des différents formats de données (info.numero OU numero)
+            const num = d.info?.numero || d.numero || 'BROUILLON';
+            const client = d.client?.nom || d.client_nom || '?';
+            const defunt = d.defunt?.nom || d.defunt_nom || '?';
+            
+            const label = `${d.info?.type || 'DOC'} ${num} - ${client} (Défunt: ${defunt})`;
             const opt = document.createElement('option');
             opt.value = doc.id;
             opt.innerText = label;
@@ -74,16 +79,16 @@ export function importerClientSelectionne() {
     
     const data = importCache.find(d => d.id === id);
     if(data) {
-        if(data.client) {
-            setVal('civilite_mandant', data.client.civility);
-            setVal('soussigne', data.client.nom);
-            setVal('demeurant', data.client.adresse);
+        if(data.client || data.client_nom) {
+            setVal('civilite_mandant', data.client?.civility || 'M.');
+            setVal('soussigne', data.client?.nom || data.client_nom);
+            setVal('demeurant', data.client?.adresse || data.client_adresse);
         }
-        if(data.defunt) {
-            setVal('civilite_defunt', data.defunt.civility);
-            setVal('nom', data.defunt.nom);
-            setVal('date_naiss', data.defunt.date_naiss);
-            setVal('date_deces', data.defunt.date_deces);
+        if(data.defunt || data.defunt_nom) {
+            setVal('civilite_defunt', data.defunt?.civility || 'M.');
+            setVal('nom', data.defunt?.nom || data.defunt_nom);
+            setVal('date_naiss', data.defunt?.date_naiss);
+            setVal('date_deces', data.defunt?.date_deces);
         }
         alert("✅ Import réussi ! Complétez les autres champs.");
     }
@@ -214,6 +219,25 @@ export async function supprimerDossier(id) {
 }
 
 // --- STOCKS (On garde pour que ça marche aussi) ---
-export async function chargerStock() { /* ...code stock inchangé... */ }
-export async function ajouterArticle() { /* ... */ }
-export async function supprimerArticle(id) { /* ... */ }
+export async function chargerStock() { 
+    const tbody = document.getElementById('stock-table-body');
+    if(!tbody) return;
+    const q = query(collection(db, "stock_articles"), orderBy("nom"));
+    const snap = await getDocs(q);
+    tbody.innerHTML = "";
+    snap.forEach(doc => {
+        const d = doc.data();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><b>${d.nom}</b></td><td>${d.categorie}</td><td>${d.qte}</td><td><button onclick="window.supprimerArticle('${doc.id}')" style="color:red;border:none;background:none;"><i class="fas fa-trash"></i></button></td>`;
+        tbody.appendChild(tr);
+    });
+}
+export async function ajouterArticle() {
+    const nom = document.getElementById('st_nom').value;
+    const cat = document.getElementById('st_cat').value;
+    const qte = document.getElementById('st_qte').value;
+    if(nom) { await addDoc(collection(db, "stock_articles"), {nom, categorie:cat, qte:parseInt(qte)}); chargerStock(); document.getElementById('form-stock').classList.add('hidden'); }
+}
+export async function supprimerArticle(id) {
+    if(confirm("Supprimer ?")) { await deleteDoc(doc(db, "stock_articles", id)); chargerStock(); }
+}
