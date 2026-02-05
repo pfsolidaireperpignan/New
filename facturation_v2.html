@@ -19,24 +19,24 @@
     <datalist id="defunts_suggestions"></datalist>
     <datalist id="fournisseurs_list"></datalist>
 
-    <div id="modal-choix" class="modal hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9000; display:flex; justify-content:center; align-items:center;">
-        <div style="background:white; padding:30px; border-radius:15px; width:350px; text-align:center;">
-            <h3 style="margin-top:0;">CHOISIR UN MODÈLE</h3>
-            <button class="btn btn-blue" style="width:100%; margin-bottom:10px;" onclick="window.loadTemplate('Inhumation')"><i class="fas fa-church"></i> INHUMATION</button>
-            <button class="btn btn-blue" style="width:100%; margin-bottom:10px;" onclick="window.loadTemplate('Cremation')"><i class="fas fa-fire"></i> CRÉMATION</button>
-            <button class="btn btn-blue" style="width:100%; margin-bottom:10px;" onclick="window.loadTemplate('Rapatriement')"><i class="fas fa-plane"></i> RAPATRIEMENT</button>
-            <button class="btn btn-blue" style="width:100%; margin-bottom:10px;" onclick="window.loadTemplate('Transport')"><i class="fas fa-ambulance"></i> TRANSPORT</button>
-            <button class="btn btn-blue" style="width:100%; margin-bottom:10px;" onclick="window.loadTemplate('Exhumation')"><i class="fas fa-box-open"></i> EXHUMATION</button>
-            <button style="margin-top:15px; background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer;" onclick="document.getElementById('modal-choix').classList.add('hidden')">Fermer</button>
+    <div id="modal-choix" class="modal hidden">
+        <div style="background:white; padding:32px; border-radius:16px; width:350px; text-align:center; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+            <h3 style="margin-top:0; color:#111827; margin-bottom:24px;">NOUVEAU DOCUMENT</h3>
+            <div style="display:grid; gap:12px;">
+                <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Inhumation')"><i class="fas fa-church"></i> INHUMATION</button>
+                <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Cremation')"><i class="fas fa-fire"></i> CRÉMATION</button>
+                <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Rapatriement')"><i class="fas fa-plane"></i> RAPATRIEMENT</button>
+                <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Transport')"><i class="fas fa-ambulance"></i> TRANSPORT</button>
+                <button class="btn btn-blue" style="justify-content:center;" onclick="window.loadTemplate('Exhumation')"><i class="fas fa-box-open"></i> EXHUMATION</button>
+            </div>
+            <button style="margin-top:24px; background:none; border:none; color:#9ca3af; cursor:pointer;" onclick="document.getElementById('modal-choix').classList.add('hidden')">Annuler</button>
         </div>
     </div>
 
     <nav class="sidebar">
         <div class="brand">
             <i class="fas fa-dove"></i> <span class="brand-text">PF ERP</span>
-            <button id="btn-toggle-menu" onclick="window.toggleSidebar()">
-                <i class="fas fa-bars"></i>
-            </button>
+            <button id="btn-toggle-menu" onclick="window.toggleSidebar()"><i class="fas fa-bars"></i></button>
         </div>
         <ul class="nav-menu">
             <li><a href="index.html" class="nav-link"><i class="fas fa-home"></i> <span class="nav-text">Accueil</span></a></li>
@@ -54,21 +54,21 @@
             <div class="page-header">
                 <div>
                     <h1>Pilotage Financier</h1>
-                    <div style="margin-top:15px; display:flex; gap:10px;">
-                        <button class="btn-tab active" onclick="window.switchTab('factures')" id="btn-tab-factures">VENTES</button>
-                        <button class="btn-tab" onclick="window.switchTab('achats')" id="btn-tab-achats">ACHATS</button>
-                    </div>
+                    <div style="color:#6b7280; margin-top:5px;">Suivi de l'activité en temps réel</div>
                 </div>
-                <button class="btn btn-green" onclick="window.exportExcelSmart()"><i class="fas fa-file-excel"></i> EXPORT EXCEL</button>
+                <div class="btn-tab-container">
+                    <button class="btn-tab active" onclick="window.switchTab('factures')" id="btn-tab-factures">VENTES</button>
+                    <button class="btn-tab" onclick="window.switchTab('achats')" id="btn-tab-achats">ACHATS</button>
+                </div>
             </div>
 
             <div class="stats-grid">
                 <div class="stat-card card-ca">
-                    <div class="stat-label">CHIFFRE D'AFFAIRES</div>
+                    <div class="stat-label">CHIFFRE D'AFFAIRES (HT)</div>
                     <div class="stat-value" id="stat-ca">0.00 €</div>
                 </div>
                 <div class="stat-card card-depense">
-                    <div class="stat-label">DÉPENSES</div>
+                    <div class="stat-label">DÉPENSES TOTALES</div>
                     <div class="stat-value" id="stat-depenses">0.00 €</div>
                 </div>
                 <div class="stat-card card-result">
@@ -78,36 +78,37 @@
             </div>
 
             <div id="tab-factures">
-                <div style="display:flex; justify-content:space-between; margin-bottom:20px; align-items:center;">
-                    <div style="position:relative; width:300px;">
-                        <i class="fas fa-search" style="position:absolute; left:12px; top:12px; color:#9ca3af;"></i>
-                        <input type="text" id="search-facture" onkeyup="window.filtrerFactures()" placeholder="Rechercher client, n°..." style="width:100%; padding-left:35px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:24px; align-items:center;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="search-facture" onkeyup="window.filtrerFactures()" placeholder="Rechercher un client, n°...">
                     </div>
-                    <button class="btn btn-blue" onclick="document.getElementById('modal-choix').classList.remove('hidden')">
-                        <i class="fas fa-plus"></i> CRÉER UN DEVIS
-                    </button>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-green" onclick="window.exportExcelSmart()"><i class="fas fa-file-excel"></i> EXPORT</button>
+                        <button class="btn btn-blue" onclick="document.getElementById('modal-choix').classList.remove('hidden')">
+                            <i class="fas fa-plus"></i> CRÉER
+                        </button>
+                    </div>
                 </div>
                 
-                <div class="card" style="padding:0; overflow:hidden;">
+                <div class="card">
                     <table class="compta-table">
-                        <thead><tr><th>NUMÉRO</th><th>DATE</th><th>TYPE</th><th>CLIENT</th><th>DÉFUNT</th><th style="text-align:right;">TOTAL</th><th style="text-align:right;">RESTE</th><th style="text-align:center;">ACTIONS</th></tr></thead>
+                        <thead><tr><th>NUMÉRO</th><th>DATE</th><th>TYPE</th><th>CLIENT</th><th>DÉFUNT</th><th style="text-align:right;">TOTAL TTC</th><th style="text-align:right;">RESTE DÛ</th><th style="text-align:center;">ACTIONS</th></tr></thead>
                         <tbody id="list-body"></tbody>
                     </table>
                 </div>
             </div>
 
             <div id="tab-achats" class="hidden">
-                
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <div style="display:flex; gap:10px; align-items:center; flex:1;">
-                        <div style="position:relative; width:250px;">
-                            <i class="fas fa-search" style="position:absolute; left:12px; top:12px; color:#9ca3af;"></i>
-                            <input id="search_depense" placeholder="Rechercher..." style="width:100%; padding-left:35px;" onkeyup="window.filtrerDepenses()">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                    <div style="display:flex; gap:12px; align-items:center; flex:1;">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input id="search_depense" placeholder="Rechercher fournisseur..." onkeyup="window.filtrerDepenses()">
                         </div>
                         <button class="btn btn-grey" onclick="document.getElementById('advanced-filters').classList.toggle('hidden')"><i class="fas fa-filter"></i> FILTRES</button>
-                        
-                        <div style="background:white; padding:10px 20px; border-radius:10px; font-weight:bold; color:#ef4444; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                            TOTAL SÉLECTION : <span id="total-filtre-display">0.00 €</span>
+                        <div style="background:white; padding:10px 20px; border-radius:10px; border:1px solid #e5e7eb; font-weight:700; color:#ef4444;">
+                            SÉLECTION : <span id="total-filtre-display">0.00 €</span>
                         </div>
                     </div>
                     <button class="btn btn-red" onclick="window.toggleNewExpenseForm()">
@@ -115,46 +116,49 @@
                     </button>
                 </div>
 
-                <div id="advanced-filters" class="hidden" style="background:#e5e7eb; padding:20px; border-radius:15px; margin-bottom:20px;">
-                    <div class="form-grid" style="grid-template-columns: repeat(4, 1fr);">
-                        <div><label>Du</label><input type="date" id="filter_date_start" onchange="window.filtrerDepenses()"></div>
-                        <div><label>Au</label><input type="date" id="filter_date_end" onchange="window.filtrerDepenses()"></div>
+                <div id="advanced-filters" class="hidden" style="background:white; padding:20px; border-radius:16px; margin-bottom:24px; border:1px solid #e5e7eb; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px;">
+                        <div><label>Du</label><input type="date" id="filter_date_start" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;"></div>
+                        <div><label>Au</label><input type="date" id="filter_date_end" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;"></div>
                         <div><label>Catégorie</label>
-                            <select id="filter_cat" onchange="window.filtrerDepenses()">
+                            <select id="filter_cat" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                                 <option value="">Toutes</option>
                                 <option>Cercueils & Accessoires</option><option>Urnes</option><option>Fleurs & Articles</option><option>Marbrerie</option><option>Frais de Fret</option><option>Crématorium</option><option>Chambre Funéraire</option><option>Vacation Police</option><option>Taxes & Redevances</option><option>Sous-traitance</option><option>Carburant</option><option>Frais Généraux</option><option>Personnel</option>
                             </select>
                         </div>
-                        <div><label>Statut</label><select id="filter_statut" onchange="window.filtrerDepenses()"><option value="">Tous</option><option value="Réglé">Réglé</option><option value="En attente">En attente</option></select></div>
+                        <div><label>Statut</label><select id="filter_statut" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;"><option value="">Tous</option><option value="Réglé">Réglé</option><option value="En attente">En attente</option></select></div>
                     </div>
                 </div>
 
                 <div id="container-form-depense" class="toggle-form-container">
-                    <form class="card" id="form-depense" onsubmit="return false;" style="border-left:5px solid #ef4444;">
+                    <h3 style="margin-top:0; color:#991b1b; margin-bottom:20px;">SAISIE D'UNE DÉPENSE</h3>
+                    <form id="form-depense" onsubmit="return false;">
                         <input type="hidden" id="dep_edit_id">
-                        <div class="form-grid">
-                            <div><label>Date</label><input type="date" id="dep_date_fac"></div>
-                            <div><label>Fournisseur</label><input id="dep_fourn" list="fournisseurs_list" placeholder="Nom du fournisseur"></div>
-                            <div><label>Réf.</label><input id="dep_ref"></div>
-                            <div><label>Catégorie</label>
-                                <select id="dep_cat">
+                        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px;">
+                            <div><label>Date Facture</label><input type="date" id="dep_date_fac" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
+                            <div><label>Fournisseur</label><input id="dep_fourn" list="fournisseurs_list" placeholder="Nom..." style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
+                            <div><label>Réf. Pièce</label><input id="dep_ref" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
+                            <div><label>Montant TTC</label><input type="number" id="dep_montant" placeholder="0.00" step="0.01" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px; font-weight:bold;"></div>
+                            
+                            <div style="grid-column: span 2;"><label>Catégorie</label>
+                                <select id="dep_cat" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;">
                                     <option>Cercueils & Accessoires</option><option>Urnes</option><option>Fleurs & Articles</option><option>Marbrerie</option><option>Frais de Fret</option><option>Crématorium</option><option>Chambre Funéraire</option><option>Vacation Police</option><option>Taxes & Redevances</option><option>Sous-traitance</option><option>Carburant</option><option>Frais Généraux</option><option>Personnel</option>
                                 </select>
                             </div>
-                            <div class="span-2"><label>Détails</label><input id="dep_details" placeholder="Description..."></div>
-                            <div><label>Montant TTC</label><input type="number" id="dep_montant" placeholder="0.00" step="0.01"></div>
-                            <div><label>Statut</label><select id="dep_statut"><option>Réglé</option><option>En attente</option></select></div>
-                            <div><label>Règlement</label><select id="dep_mode"><option>Virement</option><option>CB</option><option>Espèces</option><option>Chèque</option></select></div>
-                            <div><label>Date Rég.</label><input type="date" id="dep_date_reg"></div>
+                            <div style="grid-column: span 2;"><label>Détails / Note</label><input id="dep_details" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
+                            
+                            <div><label>Statut</label><select id="dep_statut" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"><option>Réglé</option><option>En attente</option></select></div>
+                            <div><label>Moyen Paiement</label><select id="dep_mode" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"><option>Virement</option><option>CB</option><option>Espèces</option><option>Chèque</option><option>Prélèvement</option></select></div>
+                            <div><label>Date Règlement</label><input type="date" id="dep_date_reg" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
+                            
                             <div style="display:flex; align-items:flex-end; gap:10px;">
-                                <button id="btn-action-depense" class="btn btn-red" style="width:100%;" onclick="window.gererDepense()">ENREGISTRER</button>
-                                <button class="btn btn-grey" onclick="window.toggleNewExpenseForm()">ANNULER</button>
+                                <button id="btn-action-depense" class="btn btn-red" style="width:100%; justify-content:center;" onclick="window.gererDepense()">ENREGISTRER</button>
                             </div>
                         </div>
                     </form>
                 </div>
 
-                <div class="card" style="padding:0; overflow:hidden;">
+                <div class="card">
                     <table class="compta-table">
                         <thead><tr><th>DATE</th><th>FOURNISSEUR</th><th>CATÉGORIE</th><th>STATUT</th><th style="text-align:right;">MONTANT</th><th style="text-align:center;">ACTION</th></tr></thead>
                         <tbody id="depenses-body"></tbody>
@@ -168,40 +172,38 @@
             <div class="page-header">
                 <button class="btn btn-grey" onclick="window.showDashboard()"><i class="fas fa-arrow-left"></i> RETOUR</button>
                 <div style="display:flex; gap:10px;">
-                    <button class="btn btn-green" onclick="window.sauvegarderDocument()">SAUVEGARDER</button>
+                    <button class="btn btn-green" onclick="window.sauvegarderDocument()"><i class="fas fa-save"></i> SAUVEGARDER</button>
                     <button class="btn btn-grey" onclick="window.genererPDFFacture()"><i class="fas fa-print"></i> IMPRIMER</button>
-                    <button class="btn btn-blue" id="btn-transform" onclick="window.transformerEnFacture()" style="display:none;">FACTURER</button>
+                    <button class="btn btn-blue" id="btn-transform" onclick="window.transformerEnFacture()" style="display:none;"><i class="fas fa-magic"></i> FACTURER</button>
                 </div>
             </div>
             
-            <div class="form-grid">
-                <div class="card">
-                    <h3>CLIENT</h3>
-                    <div style="display:flex; gap:10px; margin-bottom:10px;">
-                        <select id="client_civility" style="width:80px;"><option>M.</option><option>Mme</option></select>
-                        <input id="client_nom" list="clients_suggestions" onchange="window.checkClientAuto()" placeholder="Nom Client">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px; margin-bottom:24px;">
+                <div class="card" style="padding:24px; margin-bottom:0;">
+                    <h3 style="margin-top:0; color:var(--primary); border-bottom:1px solid #eee; padding-bottom:10px;">CLIENT (PAYEUR)</h3>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <select id="client_civility" style="width:80px; padding:10px; border-radius:8px; border:1px solid #e5e7eb;"><option>M.</option><option>Mme</option></select>
+                        <input id="client_nom" list="clients_suggestions" onchange="window.checkClientAuto()" placeholder="Nom Prénom" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
-                    <input id="client_adresse" placeholder="Adresse complète">
+                    <input id="client_adresse" placeholder="Adresse complète" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                 </div>
-                <div class="card">
-                    <h3>INFOS DOCUMENT</h3>
-                    <div style="display:flex; gap:10px; margin-bottom:10px;">
-                        <select id="doc_type"><option>DEVIS</option><option>FACTURE</option></select>
-                        <input id="doc_numero" placeholder="Numéro Auto" readonly style="background:#e5e7eb; font-weight:bold;">
-                        <input type="date" id="doc_date">
+                <div class="card" style="padding:24px; margin-bottom:0;">
+                    <h3 style="margin-top:0; color:#111827; border-bottom:1px solid #eee; padding-bottom:10px;">INFOS DOCUMENT</h3>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <select id="doc_type" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;"><option>DEVIS</option><option>FACTURE</option></select>
+                        <input id="doc_numero" placeholder="Numéro Auto" readonly style="background:#f3f4f6; font-weight:bold; width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                        <input type="date" id="doc_date" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
-                    <input id="defunt_nom" list="defunts_suggestions" placeholder="Concerne le défunt...">
-                    <div style="display:flex; gap:10px; margin-top:10px;">
-                        <div style="flex:1;"><label style="font-size:0.8rem">Né(e) le</label><input type="date" id="defunt_date_naiss"></div>
-                        <div style="flex:1;"><label style="font-size:0.8rem">Décédé(e) le</label><input type="date" id="defunt_date_deces"></div>
+                    <input id="defunt_nom" list="defunts_suggestions" placeholder="Concerne le défunt (Nom Prénom)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                    <div style="display:none;"> <input id="defunt_date_naiss"><input id="defunt_date_deces">
                     </div>
                 </div>
             </div>
 
-            <div class="card">
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                    <h3>LIGNES</h3>
-                    <div>
+            <div class="card" style="padding:24px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center;">
+                    <h3 style="margin:0;">LIGNES DE PRESTATIONS</h3>
+                    <div style="display:flex; gap:10px;">
                         <button class="btn btn-grey" onclick="window.ajouterSection()">+ SECTION</button> 
                         <button class="btn btn-blue" onclick="window.ajouterLigne()">+ LIGNE</button>
                     </div>
@@ -209,21 +211,21 @@
                 <table style="width:100%; border-collapse:collapse;"><tbody id="tbody_lignes"></tbody></table>
             </div>
 
-            <div class="form-grid">
-                <div class="card" style="background:#ecfccb;">
-                    <h3>PAIEMENTS</h3>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
+                <div class="card" style="background:#ecfccb; border:1px solid #bef264; padding:24px; margin-bottom:0;">
+                    <h3 style="margin-top:0; color:#365314;">ENREGISTRER UN PAIEMENT</h3>
                     <div style="display:flex; gap:10px; margin-bottom:10px;">
-                        <input type="date" id="pay_date">
-                        <select id="pay_mode"><option>Virement</option><option>Chèque</option><option>Espèces</option></select>
-                        <input type="number" id="pay_amount" placeholder="€" step="0.01">
+                        <input type="date" id="pay_date" style="padding:8px; border-radius:6px; border:1px solid #84cc16;">
+                        <select id="pay_mode" style="padding:8px; border-radius:6px; border:1px solid #84cc16;"><option>Virement</option><option>Chèque</option><option>Espèces</option><option>CB</option></select>
+                        <input type="number" id="pay_amount" placeholder="€" step="0.01" style="padding:8px; border-radius:6px; border:1px solid #84cc16; font-weight:bold;">
                         <button class="btn btn-green" onclick="window.ajouterPaiement()">+</button>
                     </div>
-                    <div id="liste_paiements"></div>
+                    <div id="liste_paiements" style="font-size:0.9rem; color:#3f6212;"></div>
                 </div>
-                <div class="card" style="text-align:right;">
-                    <div style="font-size:1.5rem; font-weight:800; margin-bottom:10px;">TOTAL : <span id="total_general">0.00 €</span></div>
-                    <div style="color:#059669;">REGLÉ : <span id="total_paye">0.00 €</span></div>
-                    <div style="color:#dc2626; font-weight:bold; border-top:1px solid #eee; margin-top:10px; padding-top:10px;">RESTE : <span id="reste_a_payer">0.00 €</span></div>
+                <div class="card" style="text-align:right; padding:24px; margin-bottom:0; display:flex; flex-direction:column; justify-content:center;">
+                    <div style="font-size:1.5rem; font-weight:800; margin-bottom:10px; color:#111827;">TOTAL : <span id="total_general">0.00 €</span></div>
+                    <div style="color:#059669; font-weight:600;">REGLÉ : <span id="total_paye">0.00 €</span></div>
+                    <div style="color:#dc2626; font-weight:800; font-size:1.2rem; border-top:1px solid #eee; margin-top:10px; padding-top:10px;">RESTE : <span id="reste_a_payer">0.00 €</span></div>
                     <span id="total_display" class="hidden">0</span>
                 </div>
             </div>
