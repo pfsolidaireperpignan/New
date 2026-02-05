@@ -1,9 +1,10 @@
-/* js/facturation.js - VERSION RÉPARÉE */
+/* js/facturation.js - VERSION FINALE */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 let paiements = []; let cacheDepenses = []; let cacheFactures = []; let global_CA = 0; let global_Depenses = 0; let logoBase64 = null; const currentYear = new Date().getFullYear();
 
+// --- INIT ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
         chargerLogoBase64();
@@ -29,7 +30,6 @@ window.chargerListeFactures = async function() {
         
         snap.forEach((docSnap) => {
             const d = docSnap.data(); d.id = docSnap.id;
-            // Normalisation des données pour éviter les "undefined"
             d.finalNumero = d.numero || d.info?.numero || "BROUILLON";
             d.finalDate = d.date || d.info?.date || d.date_document || d.date_creation;
             d.finalType = d.type || d.info?.type || "DEVIS";
@@ -37,7 +37,6 @@ window.chargerListeFactures = async function() {
             d.finalClient = d.client_nom || d.client?.nom || "Inconnu";
             d.finalDefunt = d.defunt_nom || d.defunt?.nom || "";
             d.finalPaiements = d.paiements || [];
-            
             cacheFactures.push(d);
             if (d.finalType === "FACTURE" && new Date(d.date_creation).getFullYear() === currentYear) global_CA += d.finalTotal;
         });
@@ -56,9 +55,7 @@ window.filtrerFactures = function() {
         const reste = d.finalTotal - paye;
         let dateAffiche = "-";
         try { dateAffiche = new Date(d.finalDate).toLocaleDateString(); if(dateAffiche === 'Invalid Date') dateAffiche = ""; } catch(e){}
-        
         let badgeClass = d.finalType === 'FACTURE' ? 'badge-facture' : 'badge-devis';
-        
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="link-doc" onclick="window.chargerDocument('${d.id}')" style="cursor:pointer; color:#3b82f6;"><strong>${d.finalNumero}</strong></td>
