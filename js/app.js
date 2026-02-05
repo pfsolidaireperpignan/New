@@ -1,12 +1,16 @@
-/* js/app.js - VERSION "SPLIT STORAGE" (Stockage séparé pour éviter la limite) */
+/* js/app.js - VERSION CORRIGÉE (PDF + SAUVEGARDE SÉCURISÉE) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
-import { doc, getDoc, collection, addDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, getDoc, collection, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import * as Utils from './utils.js';
 import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
-// --- CONNECTION AU HTML ---
+// ============================================================
+// 1. REBRANCHEMENT DES FONCTIONS (C'est ici que ça manquait)
+// ============================================================
+
+// Base de données
 window.chargerBaseClients = DB.chargerBaseClients;
 window.supprimerDossier = DB.supprimerDossier;
 window.viderFormulaire = DB.viderFormulaire;
@@ -16,9 +20,10 @@ window.supprimerArticle = DB.supprimerArticle;
 window.importerClientSelectionne = DB.importerClientSelectionne;
 window.chargerSelectImport = DB.chargerSelectImport;
 
+// --- LES PDF (LISTE COMPLÈTE) ---
 window.genererPouvoir = PDF.genererPouvoir;
 window.genererDeclaration = PDF.genererDeclaration;
-window.genererFermeture = PDF.genererFermeture;
+window.genererFermeture = PDF.genererFermeture; // PV Police
 window.genererDemandeFermetureMairie = PDF.genererDemandeFermetureMairie;
 window.genererTransport = PDF.genererTransport;
 window.genererDemandeInhumation = PDF.genererDemandeInhumation;
@@ -28,7 +33,7 @@ window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 
 
 // ============================================================
-// 1. AJOUT FICHIER (Préparation)
+// 2. AJOUT FICHIER (Ged)
 // ============================================================
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
@@ -38,9 +43,9 @@ window.ajouterPieceJointe = function() {
     if (fileInput.files.length === 0) { alert("⚠️ Sélectionnez un fichier."); return; }
     const file = fileInput.files[0];
 
-    // Limite de 1 Mo STRICTE par fichier (Limite Google)
+    // Limite de 1 Mo (Google Firestore)
     if (file.size > 1000 * 1024) {
-        alert("⚠️ FICHIER TROP LOURD ( > 1 Mo ) !\nGoogle Firestore interdit les documents de plus de 1 Mo.\nVeuillez compresser ce fichier.");
+        alert("⚠️ FICHIER TROP LOURD (>1 Mo). Veuillez le compresser.");
         return;
     }
 
@@ -49,7 +54,7 @@ window.ajouterPieceJointe = function() {
     
     reader.onload = function(e) {
         const base64String = e.target.result;
-        const localUrl = URL.createObjectURL(file); // Pour voir tout de suite
+        const localUrl = URL.createObjectURL(file);
 
         if(container.innerText.includes('Aucun')) container.innerHTML = "";
 
@@ -57,10 +62,10 @@ window.ajouterPieceJointe = function() {
         div.className = "ged-item"; 
         div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);";
         
-        // On garde le binaire en mémoire pour la sauvegarde
+        // Données pour la sauvegarde
         div.setAttribute('data-name', nomDoc);
         div.setAttribute('data-b64', base64String); 
-        div.setAttribute('data-status', 'new'); // Marqué comme "Nouveau" à sauvegarder
+        div.setAttribute('data-status', 'new'); // Marqué "Nouveau"
 
         div.innerHTML = `
             <div style="display:flex; align-items:center; gap:12px;">
@@ -87,21 +92,17 @@ window.ajouterPieceJointe = function() {
 
 
 // ============================================================
-// 2. SAUVEGARDE "SPLIT" (Le Secret pour éviter le crash)
+// 3. SAUVEGARDE SÉCURISÉE (Anti-Doublon)
 // ============================================================
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
-    if(btn) btn.innerHTML = "Sauvegarde en cours...";
+    if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...';
     
     try {
         const idDossier = document.getElementById('dossier_id').value;
-        if (!idDossier && document.querySelectorAll('.ged-item[data-status="new"]').length > 0) {
-            // Si c'est un nouveau dossier avec des fichiers, on doit d'abord créer le dossier vide pour avoir un ID
-            alert("⚠️ Création du dossier... (Cliquez une 2ème fois pour les fichiers)");
-        }
-
-        // 1. D'abord on prépare les infos du dossier (Texte léger)
         const getVal = (id) => document.getElementById(id)?.value || "";
+        
+        // Données Texte
         let data = {
             date_modification: new Date().toISOString(),
             defunt: {
@@ -120,32 +121,29 @@ window.sauvegarderDossier = async function() {
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta') }
         };
 
-        // Sauvegarde ou Création du Dossier Principal (Sans les gros fichiers pour l'instant)
-        let docRef;
+        // Sauvegarde Dossier Principal
+        let finalId = idDossier;
         if(idDossier) {
-            docRef = doc(db, "dossiers_admin", idDossier);
-            await updateDoc(docRef, data);
+            await updateDoc(doc(db, "dossiers_admin", idDossier), data);
         } else {
             data.date_creation = new Date().toISOString();
-            docRef = await addDoc(collection(db, "dossiers_admin"), data);
-            document.getElementById('dossier_id').value = docRef.id;
+            const docRef = await addDoc(collection(db, "dossiers_admin"), data);
+            finalId = docRef.id;
+            document.getElementById('dossier_id').value = finalId;
         }
 
-        // 2. Traitement des Fichiers (Sauvegarde Séparée)
-        const finalId = document.getElementById('dossier_id').value;
+        // Sauvegarde Fichiers (Un par un, seulement si nouveaux)
         const allGedItems = [];
-
-        // On parcourt ce qui est affiché
         const elements = document.querySelectorAll('#liste_pieces_jointes .ged-item');
         
         for (const div of elements) {
             const name = div.getAttribute('data-name');
-            const status = div.getAttribute('data-status'); // 'new' ou 'stored'
-            let storageId = div.getAttribute('data-storage-id'); // ID du fichier séparé
+            const status = div.getAttribute('data-status');
             const b64 = div.getAttribute('data-b64');
+            let storageId = div.getAttribute('data-storage-id');
 
+            // On ne sauvegarde QUE si c'est nouveau ET qu'on a le contenu
             if (status === 'new' && b64) {
-                // C'est un NOUVEAU fichier, on le sauve à part !
                 try {
                     const fileDoc = await addDoc(collection(db, "ged_files"), {
                         nom: name,
@@ -153,36 +151,34 @@ window.sauvegarderDossier = async function() {
                         dossier_parent: finalId,
                         date: new Date().toISOString()
                     });
-                    storageId = fileDoc.id; // On récupère son ID unique
-                    console.log("Fichier sauvegardé à part :", storageId);
-                } catch (errFile) {
-                    console.error("Erreur sauvegarde fichier unique", errFile);
-                    alert(`Erreur sur le fichier ${name} : Trop lourd pour Firestore ?`);
-                    continue; // On saute ce fichier
+                    storageId = fileDoc.id;
+                    // Important : On marque comme stocké pour éviter les doublons si on reclique
+                    div.setAttribute('data-status', 'stored');
+                    div.setAttribute('data-storage-id', storageId);
+                    console.log("Fichier sauvegardé :", name);
+                } catch (err) {
+                    console.error("Erreur fichier", err);
+                    continue; 
                 }
             }
 
-            // On ajoute à la liste du dossier (Juste le lien, c'est très léger !)
             if (storageId) {
                 allGedItems.push({ nom: name, ref_id: storageId });
-            } else if (b64) {
-                 // Fallback ancien système (si pas d'ID mais b64, rare)
-                 // allGedItems.push({ nom: name, file: b64 }); 
             }
         }
 
-        // 3. On met à jour la liste des liens dans le dossier principal
+        // Mise à jour de la liste dans le dossier
         await updateDoc(doc(db, "dossiers_admin", finalId), { ged: allGedItems });
 
-        alert("✅ Dossier et Fichiers sauvegardés avec succès !");
+        alert("✅ Sauvegarde terminée !");
         
-        // Recharge pour tout mettre au propre
+        // On ne recharge pas toute la page, juste les données pour mettre au propre
         window.chargerDossier(finalId);
         if(window.chargerBaseClients) window.chargerBaseClients();
 
     } catch(e) { 
         console.error(e);
-        alert("Erreur Globale : " + e.message); 
+        alert("Erreur : " + e.message); 
     }
     
     if(btn) btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
@@ -190,7 +186,7 @@ window.sauvegarderDossier = async function() {
 
 
 // ============================================================
-// 3. CHARGEMENT "SPLIT" (Rassemble les morceaux)
+// 4. CHARGEMENT (Avec Gestion Hors-Ligne)
 // ============================================================
 window.chargerDossier = async function(id) {
     try {
@@ -203,7 +199,7 @@ window.chargerDossier = async function(id) {
         const data = docSnap.data();
         const set = (htmlId, val) => { const el = document.getElementById(htmlId); if(el) el.value = val || ''; };
 
-        // Remplissage Champs (Identique)
+        // Remplissage Champs
         if (data.defunt) {
             set('civilite_defunt', data.defunt.civility); set('nom', data.defunt.nom); set('prenom', data.defunt.prenom);
             set('nom_jeune_fille', data.defunt.nom_jeune_fille); set('date_deces', data.defunt.date_deces);
@@ -233,7 +229,7 @@ window.chargerDossier = async function(id) {
             set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta);
         }
 
-        // --- AFFICHAGE GED INTELLIGENTE ---
+        // --- GED ROBUSTE (Ne plante pas si hors ligne) ---
         const container = document.getElementById('liste_pieces_jointes');
         const rawGed = data.ged || data.pieces_jointes || [];
         
@@ -246,41 +242,51 @@ window.chargerDossier = async function(id) {
                     let lien = "#";
                     let isBinary = false;
                     let storageId = null;
+                    let statusLabel = "";
+                    let statusColor = "#64748b";
 
-                    // CAS 1 : Nouveau système séparé (ref_id)
+                    // CAS 1 : Fichier Séparé (Nouveau système)
                     if (item.ref_id) {
                         nom = item.nom;
                         storageId = item.ref_id;
                         isBinary = true;
                         
-                        // On va chercher le contenu à la volée !
                         try {
                             const fileSnap = await getDoc(doc(db, "ged_files", item.ref_id));
                             if (fileSnap.exists()) {
                                 const fileData = fileSnap.data();
-                                // Conversion B64 -> Blob pour affichage
                                 const res = await fetch(fileData.content);
                                 const blob = await res.blob();
                                 lien = URL.createObjectURL(blob);
+                                statusLabel = "En ligne ✅";
+                                statusColor = "#10b981";
                             } else {
-                                isBinary = false; // Fichier perdu ?
+                                isBinary = false; 
+                                statusLabel = "Fichier introuvable";
                             }
-                        } catch(err) { console.error("Erreur charge fichier", err); }
+                        } catch(err) { 
+                            console.error("Erreur chargement fichier", err);
+                            statusLabel = "Erreur Connexion ⚠️";
+                            isBinary = false;
+                        }
 
                     } 
-                    // CAS 2 : Ancien système intégré (file)
+                    // CAS 2 : Fichier Intégré (Ancien système)
                     else if (item.file) {
                         nom = item.nom;
                         isBinary = true;
+                        statusLabel = "En ligne ✅";
+                        statusColor = "#10b981";
                         try {
                             const res = await fetch(item.file);
                             const blob = await res.blob();
                             lien = URL.createObjectURL(blob);
                         } catch(e) { lien = item.file; }
                     } 
-                    // CAS 3 : Juste le nom (vieux archives)
+                    // CAS 3 : Nom seul
                     else {
                         nom = item;
+                        statusLabel = "Ancien format";
                     }
 
                     if(typeof nom === 'string' && nom.includes("Enregistré")) continue;
@@ -295,14 +301,14 @@ window.chargerDossier = async function(id) {
                     
                     const btnEye = isBinary 
                         ? `<a href="${lien}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; text-decoration:none;" title="Voir"><i class="fas fa-eye"></i></a>`
-                        : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; cursor:not-allowed;"><i class="fas fa-eye-slash"></i></div>`;
+                        : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px; cursor:not-allowed;" title="${statusLabel}"><i class="fas fa-eye-slash"></i></div>`;
 
                     div.innerHTML = `
                         <div style="display:flex; align-items:center; gap:12px;">
                             <i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i>
                             <div style="display:flex; flex-direction:column;">
                                 <span style="font-weight:700; color:#334155; font-size:0.95rem;">${nom}</span>
-                                <span style="font-size:0.75rem; color:${isBinary ? '#10b981' : '#64748b'}; font-weight:600;">${isBinary ? 'En ligne ✅' : 'Non accessible'}</span>
+                                <span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span>
                             </div>
                         </div>
                         <div style="display:flex; gap:8px;">
@@ -337,7 +343,7 @@ window.chargerDossier = async function(id) {
     } catch (e) { console.error(e); alert("Erreur : " + e.message); }
 };
 
-// UI Functions (inchangées)
+// UI & Logic
 window.toggleSections = function() {
     const select = document.getElementById('prestation'); if(!select) return;
     const choix = select.value;
