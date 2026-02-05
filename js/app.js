@@ -1,23 +1,24 @@
-/* js/app.js - CONNECTION ET ROUTAGE */
+/* js/app.js - CONNECTION GLOBALE */
 import { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import * as Utils from './utils.js';
 import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
-// 1. RENDRE LES FONCTIONS ACCESSIBLES AU HTML (onclick)
+// 1. RENDRE LES FONCTIONS GLOBALES (CRUCIAL POUR HTML)
 window.chargerBaseClients = DB.chargerBaseClients;
 window.chargerDossier = DB.chargerDossier;
 window.supprimerDossier = DB.supprimerDossier;
 window.viderFormulaire = DB.viderFormulaire;
 window.chargerStock = DB.chargerStock; 
-window.sauvegarderDossier = DB.sauvegarderDossier; // C'est ici que ça bloquait l'enregistrement !
+window.sauvegarderDossier = DB.sauvegarderDossier; 
 window.importerClientSelectionne = DB.importerClientSelectionne;
 
 // Fonctions PDF
 window.genererPouvoir = PDF.genererPouvoir;
 window.genererDeclaration = PDF.genererDeclaration;
 window.genererDemandeInhumation = PDF.genererDemandeInhumation;
-// ... ajoutez les autres PDF ici si besoin ...
+window.genererDemandeCremation = PDF.genererDemandeCremation;
+// ... (ajoutez les autres exports PDF si besoin)
 
 // 2. ROUTAGE ET AFFICHAGE
 window.showSection = function(id) {
@@ -27,9 +28,8 @@ window.showSection = function(id) {
     const target = document.getElementById('view-' + id);
     if(target) target.classList.remove('hidden');
 
-    // Chargement dynamique selon la page
     if(id === 'base') DB.chargerBaseClients();
-    if(id === 'admin') DB.chargerSelectImport(); // IMPORTANT: Charge la liste déroulante !
+    if(id === 'admin') DB.chargerSelectImport(); // Charge la liste import !
 };
 
 window.toggleSidebar = function() { 
@@ -43,19 +43,16 @@ window.switchAdminTab = function(tab) {
     document.getElementById('tab-content-' + tab).classList.remove('hidden');
 };
 
-// 3. INITIALISATION
+// 3. INITIALISATION (Débloque le chargement infini)
 onAuthStateChanged(auth, (user) => {
+    const loader = document.getElementById('app-loader');
+    if(loader) loader.style.display = 'none'; // CACHE LE LOADER QUOI QU'IL ARRIVE
+    
     if(user) { 
-        document.getElementById('login-screen').classList.add('hidden'); 
+        document.getElementById('login-screen')?.classList.add('hidden'); 
         Utils.chargerLogoBase64(); 
-        // Initialisation des listeners manuels si nécessaire
-        const btnSave = document.getElementById('btn-save-bdd');
-        if(btnSave) btnSave.onclick = DB.sauvegarderDossier;
-        
-        const btnImport = document.getElementById('btn-import');
-        if(btnImport) btnImport.onclick = DB.importerClientSelectionne;
     } else { 
-        document.getElementById('login-screen').classList.remove('hidden'); 
+        document.getElementById('login-screen')?.classList.remove('hidden'); 
     }
 });
 
