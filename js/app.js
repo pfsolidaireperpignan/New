@@ -151,3 +151,19 @@ window.toggleSections = function() {
 setTimeout(() => {
     if(window.toggleSections) window.toggleSections();
 }, 500);
+// --- FONCTION POUR AFFICHER/CACHER LE VOL 2 ---
+window.toggleVol2 = function() {
+    // 1. On regarde si la case est cochée
+    const checkbox = document.getElementById('check_vol2');
+    const blocVol2 = document.getElementById('bloc_vol2');
+
+    // Sécurité : si un des éléments n'existe pas, on arrête
+    if (!checkbox || !blocVol2) return;
+
+    // 2. Si coché => on affiche. Sinon => on cache.
+    if (checkbox.checked) {
+        blocVol2.classList.remove('hidden');
+    } else {
+        blocVol2.classList.add('hidden');
+    }
+};
