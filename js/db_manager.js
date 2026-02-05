@@ -1,11 +1,11 @@
-/* js/db_manager.js - VERSION RÉPARÉE */
+/* js/db_manager.js - VERSION FINALE */
 import { db } from './config.js';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, getDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getVal, setVal } from './utils.js';
 
 let importCache = [];
 
-// --- CHARGEMENT BASE CLIENTS ---
+// --- 1. CLIENTS ---
 export async function chargerBaseClients() {
     const tbody = document.getElementById('clients-table-body');
     if(!tbody) return;
@@ -35,7 +35,7 @@ export async function chargerBaseClients() {
     } catch (e) { console.error(e); }
 }
 
-// --- IMPORT FACTURATION ---
+// --- 2. IMPORT ---
 export async function chargerSelectImport() {
     const select = document.getElementById('select-import-client');
     if(!select) return;
@@ -50,14 +50,10 @@ export async function chargerSelectImport() {
         snaps.forEach(doc => {
             const d = doc.data();
             importCache.push({ id: doc.id, ...d });
-            // Gestion des deux formats de données possibles
-            const num = d.numero || d.info?.numero || "DOC";
-            const client = d.client_nom || d.client?.nom || "?";
-            const defunt = d.defunt_nom || d.defunt?.nom || "?";
-            
+            const label = `${d.info?.type || 'DOC'} ${d.info?.numero || ''} - ${d.client?.nom || '?'} (Défunt: ${d.defunt?.nom || '?'})`;
             const opt = document.createElement('option');
             opt.value = doc.id;
-            opt.innerText = `${num} - ${client} (Défunt: ${defunt})`;
+            opt.innerText = label;
             select.appendChild(opt);
         });
     } catch(e) { console.error(e); select.innerHTML = '<option>Erreur</option>'; }
@@ -70,31 +66,30 @@ export function importerClientSelectionne() {
     
     const data = importCache.find(d => d.id === id);
     if(data) {
-        // Import intelligent
-        if(data.client || data.client_nom) {
-            setVal('civilite_mandant', data.client?.civility || 'M.');
-            setVal('soussigne', data.client?.nom || data.client_nom);
-            setVal('demeurant', data.client?.adresse || data.client_adresse);
+        if(data.client) {
+            setVal('civilite_mandant', data.client.civility);
+            setVal('soussigne', data.client.nom);
+            setVal('demeurant', data.client.adresse);
         }
-        if(data.defunt || data.defunt_nom) {
-            setVal('civilite_defunt', data.defunt?.civility || 'M.');
-            setVal('nom', data.defunt?.nom || data.defunt_nom);
-            setVal('date_naiss', data.defunt?.date_naiss);
-            setVal('date_deces', data.defunt?.date_deces);
+        if(data.defunt) {
+            setVal('civilite_defunt', data.defunt.civility);
+            setVal('nom', data.defunt.nom);
+            setVal('date_naiss', data.defunt.date_naiss);
+            setVal('date_deces', data.defunt.date_deces);
         }
         alert("Données importées !");
     }
 }
 
-// --- SAUVEGARDE & GED ---
+// --- 3. SAUVEGARDE & GED ---
 export async function sauvegarderDossier() {
     const btn = document.getElementById('btn-save-bdd');
     if(btn) btn.innerHTML = "Sauvegarde...";
     
-    // GED : On lit ce qui est affiché à l'écran
+    // GED : On récupère la liste visible à l'écran
     let gedList = [];
-    document.querySelectorAll('#liste_pieces_jointes div').forEach(div => {
-        let txt = div.innerText.replace('📄', '').replace('Aucun document joint.', '').trim();
+    document.querySelectorAll('#liste_pieces_jointes div span').forEach(span => {
+        let txt = span.innerText.replace('📄 ', '').trim();
         if(txt) gedList.push(txt);
     });
 
@@ -148,12 +143,17 @@ export async function chargerDossier(id) {
             viderFormulaire();
             document.getElementById('dossier_id').value = id;
             
-            if(data.defunt) { setVal('nom', data.defunt.nom); setVal('prenom', data.defunt.prenom); /* etc */ }
+            if(data.defunt) { setVal('nom', data.defunt.nom); setVal('prenom', data.defunt.prenom); /* Remplir le reste... */ }
             // Charge la GED Visuelle
             const gedDiv = document.getElementById('liste_pieces_jointes');
             if(data.ged && data.ged.length > 0) {
                 gedDiv.innerHTML = "";
-                data.ged.forEach(name => gedDiv.innerHTML += `<div style="background:white; padding:5px; border:1px solid #ddd; margin-bottom:5px;">📄 ${name}</div>`);
+                data.ged.forEach(name => {
+                    const div = document.createElement('div');
+                    div.style = "background:white; padding:8px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; border-radius:6px;";
+                    div.innerHTML = `<span>📄 ${name}</span><i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="this.parentElement.remove()"></i>`;
+                    gedDiv.appendChild(div);
+                });
             }
         }
     } catch(e) { console.error(e); }
