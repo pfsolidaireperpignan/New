@@ -1,4 +1,4 @@
-/* js/facturation.js - VERSION FINALE */
+/* js/facturation.js - VERSION RÉPARÉE */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -16,7 +16,7 @@ onAuthStateChanged(auth, (user) => {
 
 function chargerLogoBase64() { const img = document.getElementById('logo-source'); if (img && img.naturalWidth > 0) { const c = document.createElement("canvas"); c.width=img.naturalWidth; c.height=img.naturalHeight; c.getContext("2d").drawImage(img,0,0); try{logoBase64=c.toDataURL("image/png");}catch(e){} } }
 
-// --- 1. FACTURES (Correction "Invalid Date") ---
+// --- 1. FACTURES ---
 window.chargerListeFactures = async function() {
     const tbody = document.getElementById('list-body');
     if(!tbody) return;
@@ -29,7 +29,7 @@ window.chargerListeFactures = async function() {
         
         snap.forEach((docSnap) => {
             const d = docSnap.data(); d.id = docSnap.id;
-            // Normalisation des données (Gère les anciens et nouveaux formats)
+            // Normalisation des données pour éviter les "undefined"
             d.finalNumero = d.numero || d.info?.numero || "BROUILLON";
             d.finalDate = d.date || d.info?.date || d.date_document || d.date_creation;
             d.finalType = d.type || d.info?.type || "DEVIS";
@@ -54,9 +54,8 @@ window.filtrerFactures = function() {
     results.forEach(d => {
         const paye = d.finalPaiements.reduce((s, p) => s + parseFloat(p.montant), 0);
         const reste = d.finalTotal - paye;
-        // Protection contre "Invalid Date"
         let dateAffiche = "-";
-        try { dateAffiche = new Date(d.finalDate).toLocaleDateString(); if(dateAffiche === 'Invalid Date') dateAffiche = "Date inconnue"; } catch(e){}
+        try { dateAffiche = new Date(d.finalDate).toLocaleDateString(); if(dateAffiche === 'Invalid Date') dateAffiche = ""; } catch(e){}
         
         let badgeClass = d.finalType === 'FACTURE' ? 'badge-facture' : 'badge-devis';
         
@@ -118,7 +117,7 @@ window.preparerModification = function(id) {
     if(d) { 
         document.getElementById('dep_edit_id').value=id; document.getElementById('dep_date_fac').value=d.date; document.getElementById('dep_ref').value=d.reference; 
         document.getElementById('dep_fourn').value=d.fournisseur; document.getElementById('dep_montant').value=d.montant; document.getElementById('dep_cat').value=d.categorie; 
-        document.getElementById('dep_details').value = d.details || ""; // Correction : Charge bien les détails
+        document.getElementById('dep_details').value = d.details || ""; 
         document.getElementById('dep_mode').value=d.mode; document.getElementById('dep_statut').value=d.statut; 
         document.getElementById('btn-action-depense').innerHTML="MODIFIER"; document.getElementById('container-form-depense').classList.add('open'); 
     } 
@@ -145,7 +144,7 @@ async function chargerSuggestionsClients() { try { const q = query(collection(db
 window.checkClientAuto = function() { const val = document.getElementById('client_nom').value; const client = cacheFactures.find(f => f.finalClient === val); if(client) document.getElementById('client_adresse').value = client.client_adresse || client.client?.adresse || ''; };
 window.loadTemplate = function(type) { const MODELES = { "Inhumation": [ { type: 'section', text: 'ORGANISATION' }, { desc: 'Démarches', prix: 250, cat: 'Courant' }, { type: 'section', text: 'CERCUEIL' }, { desc: 'Cercueil Chêne', prix: 850, cat: 'Courant' } ], "Cremation": [ { type: 'section', text: 'CREMATION' }, { desc: 'Urne', prix: 80, cat: 'Courant' } ], "Rapatriement": [ { type: 'section', text: 'TRANSPORT' }, { desc: 'Soins', prix: 350, cat: 'Courant' }, { desc: 'Cercueil Zinc', prix: 1200, cat: 'Courant' } ], "Transport": [ { type: 'section', text: 'TRANSPORT' }, { desc: 'Véhicule', prix: 300, cat: 'Courant' } ], "Exhumation": [ { type: 'section', text: 'EXHUMATION' }, { desc: 'Ouverture', prix: 600, cat: 'Courant' } ] }; document.getElementById('modal-choix').classList.add('hidden'); window.nouveauDocument(); if (MODELES[type]) { document.getElementById('tbody_lignes').innerHTML = ""; MODELES[type].forEach(item => { if(item.type === 'section') window.ajouterSection(item.text); else window.ajouterLigne(item.desc, item.prix, item.cat); }); } window.calculTotal(); };
 
-// --- 4. PDF ENGINE (Fix: Attaché à window) ---
+// --- 4. IMPRESSION PDF (Corrigé et Attaché à window) ---
 window.genererPDFFacture = function() {
     const data = {
         client: { nom: document.getElementById('client_nom').value, adresse: document.getElementById('client_adresse').value, civility: document.getElementById('client_civility').value },
