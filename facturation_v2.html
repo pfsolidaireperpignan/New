@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> FINANCE - Facturation</title>
+    <title>PF FINANCE - Facturation</title>
     
     <link rel="stylesheet" href="style.css">
     
@@ -11,6 +11,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    
+    <style>
+        .badge-gris { background-color: #e5e7eb; color: #374151; }
+    </style>
 </head>
 <body>
     <img id="logo-source" src="Logo.png" style="display: none;" crossorigin="anonymous">
@@ -119,9 +123,15 @@
                         <div>
                             <label>Statut</label>
                             <select id="filter_fac_statut" onchange="window.filtrerFactures()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
-                                <option value="">Statut (Tous)</option>
-                                <option value="Payé">Payé (Soldé)</option>
-                                <option value="En attente">En attente / Acompte</option>
+                                <option value="">Tout voir</option>
+                                <optgroup label="Factures">
+                                    <option value="Payé">Factures Payées</option>
+                                    <option value="En attente">Factures En attente</option>
+                                </optgroup>
+                                <optgroup label="Devis">
+                                    <option value="Devis En cours">Devis En cours</option>
+                                    <option value="Devis Sans suite">Devis Sans suite</option>
+                                </optgroup>
                             </select>
                         </div>
                     </div>
