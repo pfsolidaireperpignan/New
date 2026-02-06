@@ -1,4 +1,4 @@
-/* js/facturation.js - VERSION FINALE (CYCLE DE VIE DEVIS CORRIGÉ) */
+/* js/facturation.js - VERSION FINALE (AFFICHAGE DEVIS FIXE + COCHE VERTE) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -73,7 +73,6 @@ window.chargerListeFactures = async function() {
             d.finalDefunt = d.defunt_nom || d.defunt?.nom || "";
             d.finalPaiements = d.paiements || [];
             
-            // Initialisation statut si vide
             if(d.finalType === 'DEVIS' && !d.statut_doc) d.statut_doc = 'En cours';
             
             cacheFactures.push(d);
@@ -120,7 +119,6 @@ window.filtrerFactures = function() {
                 if (fStatut === "Devis Sans suite" && d.statut_doc !== "Sans suite") statutMatch = false;
             }
         } else {
-            // Par défaut, on masque les "Sans suite"
             if (d.finalType === 'DEVIS' && d.statut_doc === "Sans suite") statutMatch = false;
         }
 
@@ -145,24 +143,27 @@ window.filtrerFactures = function() {
         let classerBtn = "";
         let statutText = d.finalType;
 
-        // GESTION DES STATUTS DEVIS
+        // GESTION DES STATUTS DEVIS (CORRIGÉE SELON DEMANDE)
         if (d.finalType === 'DEVIS') {
             if (d.statut_doc === 'Validé') {
-                // CAS 1 : DEVIS TRANSFORMÉ EN FACTURE
-                statutText = "FACTURÉ";
-                badgeClass = "badge-regle"; // Vert
-                // Pas de bouton "Sans suite", juste une info visuelle
-                classerBtn = `<div style="width:34px; text-align:center; color:#10b981;" title="Ce devis a été facturé"><i class="fas fa-check-circle"></i></div>`;
+                // CAS 1 : TRANSFORMÉ EN FACTURE
+                // On garde l'apparence "DEVIS" (Orange)
+                statutText = "DEVIS";
+                badgeClass = "badge-devis"; 
+                // Mais on met l'icône verte de succès
+                classerBtn = `<div style="width:34px; text-align:center; color:#10b981; font-size:1.2rem;" title="Déjà facturé"><i class="fas fa-check-circle"></i></div>`;
             } 
             else if (d.statut_doc === 'Sans suite') {
-                // CAS 2 : DEVIS SANS SUITE
+                // CAS 2 : SANS SUITE (Gris et barré)
                 rowStyle = "background-color:#f3f4f6; color:#9ca3af; text-decoration:line-through;";
                 badgeClass = "badge-gris"; 
                 statutText = "SANS SUITE";
                 classerBtn = `<button class="btn-icon" style="color:#10b981;" onclick="window.classerSansSuite('${d.id}', 'En cours')" title="Réactiver"><i class="fas fa-undo"></i></button>`;
             } 
             else {
-                // CAS 3 : DEVIS EN COURS
+                // CAS 3 : EN COURS (Normal)
+                statutText = "DEVIS";
+                badgeClass = "badge-devis";
                 classerBtn = `<button class="btn-icon" style="color:#6b7280;" onclick="window.classerSansSuite('${d.id}', 'Sans suite')" title="Classer Sans Suite"><i class="fas fa-archive"></i></button>`;
             }
         }
@@ -381,9 +382,7 @@ window.sauvegarderDocument = async function() {
         total: parseFloat(document.getElementById('total_display').innerText), lignes: lignes, paiements: paiements, date_creation: new Date().toISOString(),
         statut_doc: document.getElementById('doc_type').value === 'DEVIS' ? 'En cours' : 'Validé'
     }; 
-    
     const id = document.getElementById('current_doc_id').value; 
-    
     try { 
         if(id) {
             await updateDoc(doc(db, "factures_v2", id), docData); 
