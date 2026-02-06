@@ -13,8 +13,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     
     <style>
+        /* SÉCURITÉ : CACHÉ PAR DÉFAUT */
+        body { display: none; } 
+
         :root { --primary: #10b981; --primary-dark: #059669; --secondary: #3b82f6; --dark: #1e293b; --light: #f8fafc; --gray: #64748b; --border: #e2e8f0; }
-        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; margin: 0; display: flex; height: 100vh; color: var(--dark); overflow: hidden; }
+        body.visible { font-family: 'Inter', sans-serif; background-color: #f1f5f9; margin: 0; display: flex; height: 100vh; color: var(--dark); overflow: hidden; }
         .hidden { display: none !important; }
 
         /* SIDEBAR V18 */
@@ -183,14 +186,16 @@
         import { auth } from './js/config.js'; 
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // === 1. SÉCURITÉ ACTIVE ===
+        // === 1. SÉCURITÉ GARDIEN (La modification est ici) ===
         onAuthStateChanged(auth, (user) => {
             const loader = document.getElementById('app-loader');
             if (user) {
-                // Connecté : On enlève le loader
+                // Si Connecté : On rend le corps de la page visible
+                document.body.classList.add('visible');
+                document.body.style.display = 'flex'; // On rétablit le flex
                 if(loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }
             } else {
-                // Pas connecté : Ouste !
+                // Si Pas connecté : Ouste, vers l'accueil !
                 window.location.href = "index.html";
             }
         });
@@ -218,9 +223,8 @@
             }
         };
 
-        // === 2. MOTEUR ATELIER (VOTRE CODE ORIGINAL) ===
+        // === 2. MOTEUR ATELIER ===
         
-        // GESTION DRAG & DROP
         const dropZone = document.getElementById('drop-zone');
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
@@ -236,7 +240,6 @@
             handleFiles(dt.files);
         }, false);
 
-        // LOGIQUE FICHIERS
         let fichiers = []; 
 
         const el = document.getElementById('fileList');
@@ -275,7 +278,6 @@
                 const faIcon = isPdf ? 'fa-file-pdf' : 'fa-file-image';
                 const size = (file.size / 1024 / 1024).toFixed(2) + ' Mo';
 
-                // Boutons conditionnels
                 const splitBtn = isPdf 
                     ? `<button class="btn-mini btn-split" onclick="window.diviserPdf(${index})" title="Diviser les pages"><i class="fas fa-cut"></i></button>`
                     : '';
@@ -306,7 +308,6 @@
             renderList();
         };
 
-        // --- GESTION PREVISUALISATION ---
         window.previewFile = function(index) {
             const file = fichiers[index];
             const url = URL.createObjectURL(file);
@@ -331,7 +332,6 @@
             document.getElementById('preview-container').innerHTML = ''; 
         };
 
-        // --- DIVISION PDF ---
         window.diviserPdf = async function(index) {
             const file = fichiers[index];
             if(file.type !== 'application/pdf') return;
@@ -355,7 +355,7 @@
                     return;
                 }
 
-                fichiers.splice(index, 1); // Retirer l'original
+                fichiers.splice(index, 1); 
 
                 for (let i = 0; i < pageCount; i++) {
                     const newPdf = await PDFLib.PDFDocument.create();
@@ -376,7 +376,6 @@
             }
         };
 
-        // --- FUSION ---
         window.fusionnerTout = async function() {
             const btn = document.getElementById('btn-merge');
             const originalText = btn.innerHTML;
