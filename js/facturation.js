@@ -1,4 +1,4 @@
-/* js/facturation.js - VERSION FINALE (LOGIQUE INCHANGÉE) */
+/* js/facturation.js - VERSION FINALE (GESTION DEVIS SANS SUITE) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -52,7 +52,7 @@ function chargerLogoBase64() {
     } 
 }
 
-// --- 1. FACTURES ---
+// --- 1. FACTURES / DEVIS ---
 window.chargerListeFactures = async function() {
     const tbody = document.getElementById('list-body');
     if(!tbody) return;
@@ -72,7 +72,13 @@ window.chargerListeFactures = async function() {
             d.finalClient = d.client_nom || d.client?.nom || "Inconnu";
             d.finalDefunt = d.defunt_nom || d.defunt?.nom || "";
             d.finalPaiements = d.paiements || [];
+            
+            // Nouveau champ pour le statut du devis (si absent, on met "En cours")
+            if(d.finalType === 'DEVIS' && !d.statut_doc) d.statut_doc = 'En cours';
+            
             cacheFactures.push(d);
+            
+            // Calcul CA seulement sur FACTURES actives
             if (d.finalType === "FACTURE" && new Date(d.date_creation).getFullYear() === currentYear) global_CA += d.finalTotal;
         });
         window.filtrerFactures(); window.chargerDepenses();
@@ -90,28 +96,48 @@ window.filtrerFactures = function() {
     const tbody = document.getElementById('list-body'); tbody.innerHTML = "";
     
     const results = cacheFactures.filter(d => {
+        // Recherche Texte
         const textMatch = (d.finalNumero.toLowerCase().includes(term)) || (d.finalClient.toLowerCase().includes(term));
+        // Type
         const typeMatch = !fType || fType === "" || d.finalType === fType;
-
+        // Date
         let dateMatch = true;
         const dDate = new Date(d.finalDate);
         if (fYear && fYear !== "" && dDate.getFullYear() != fYear) dateMatch = false;
         if (fMonth && fMonth !== "" && dDate.getMonth() != fMonth) dateMatch = false;
 
+        // --- FILTRE STATUT AVANCÉ ---
         let statutMatch = true;
         if (fStatut && fStatut !== "") {
-            const paye = d.finalPaiements.reduce((s, p) => s + parseFloat(p.montant), 0);
-            const reste = d.finalTotal - paye;
-            const isPaye = reste < 0.1; 
-            if (fStatut === "Payé" && !isPaye) statutMatch = false;
-            if (fStatut === "En attente" && isPaye) statutMatch = false;
+            // Logique FACTURE
+            if (d.finalType === 'FACTURE') {
+                const paye = d.finalPaiements.reduce((s, p) => s + parseFloat(p.montant), 0);
+                const reste = d.finalTotal - paye;
+                const isPaye = reste < 0.1;
+                
+                if (fStatut === "Payé" && !isPaye) statutMatch = false;
+                if (fStatut === "En attente" && isPaye) statutMatch = false;
+                // Si on cherche des devis, on cache les factures
+                if (fStatut.includes("Devis")) statutMatch = false; 
+            }
+            // Logique DEVIS
+            else if (d.finalType === 'DEVIS') {
+                // Si on cherche des factures, on cache les devis
+                if (fStatut === "Payé" || fStatut === "En attente") statutMatch = false;
+                
+                if (fStatut === "Devis En cours" && d.statut_doc === "Sans suite") statutMatch = false;
+                if (fStatut === "Devis Sans suite" && d.statut_doc !== "Sans suite") statutMatch = false;
+            }
+        } else {
+            // Par défaut (si aucun filtre statut), on masque les "Sans suite" pour ne pas polluer
+            if (d.finalType === 'DEVIS' && d.statut_doc === "Sans suite") statutMatch = false;
         }
 
         return textMatch && typeMatch && dateMatch && statutMatch;
     });
     
     if(results.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8;">Aucun document trouvé.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8;">Aucun document trouvé (Vérifiez les filtres).</td></tr>';
         return;
     }
 
@@ -123,22 +149,52 @@ window.filtrerFactures = function() {
         
         let badgeClass = d.finalType === 'FACTURE' ? 'badge-facture' : 'badge-devis';
         let statusColor = reste > 0.1 ? '#ef4444' : '#10b981'; 
+        
+        // GESTION AFFICHAGE SANS SUITE
+        let rowStyle = "";
+        let classerBtn = "";
+        let statutText = d.finalType;
+
+        if (d.finalType === 'DEVIS') {
+            if (d.statut_doc === 'Sans suite') {
+                rowStyle = "background-color:#f3f4f6; color:#9ca3af; text-decoration:line-through;";
+                badgeClass = "badge-gris"; // Classe CSS pour gris
+                statutText = "SANS SUITE";
+                // Bouton pour RÉACTIVER si besoin
+                classerBtn = `<button class="btn-icon" style="color:#10b981;" onclick="window.classerSansSuite('${d.id}', 'En cours')" title="Réactiver le devis"><i class="fas fa-undo"></i></button>`;
+            } else {
+                // Bouton pour CLASSER SANS SUITE
+                classerBtn = `<button class="btn-icon" style="color:#6b7280;" onclick="window.classerSansSuite('${d.id}', 'Sans suite')" title="Classer Sans Suite"><i class="fas fa-archive"></i></button>`;
+            }
+        }
 
         const tr = document.createElement('tr');
+        tr.style = rowStyle;
         tr.innerHTML = `
             <td class="link-doc" onclick="window.chargerDocument('${d.id}')" style="cursor:pointer; color:#3b82f6;"><strong>${d.finalNumero}</strong></td>
             <td>${dateAffiche}</td>
-            <td><span class="badge ${badgeClass}">${d.finalType}</span></td>
+            <td><span class="badge ${badgeClass}">${statutText}</span></td>
             <td><strong>${d.finalClient}</strong></td>
             <td>${d.finalDefunt}</td>
             <td style="text-align:right;">${d.finalTotal.toFixed(2)} €</td>
             <td style="text-align:right; font-weight:bold; color:${statusColor};">${reste.toFixed(2)} €</td>
-            <td style="text-align:center;">
-                <button class="btn-icon" onclick="window.chargerDocument('${d.id}')"><i class="fas fa-eye"></i></button>
-                <button class="btn-icon" style="color:red;" onclick="window.supprimerDocument('${d.id}')"><i class="fas fa-trash"></i></button>
+            <td style="text-align:center; display:flex; justify-content:center; gap:5px;">
+                <button class="btn-icon" onclick="window.chargerDocument('${d.id}')" title="Voir"><i class="fas fa-eye"></i></button>
+                ${classerBtn}
+                <button class="btn-icon" style="color:red;" onclick="window.supprimerDocument('${d.id}')" title="Supprimer"><i class="fas fa-trash"></i></button>
             </td>`;
         tbody.appendChild(tr);
     });
+};
+
+// --- NOUVELLE FONCTION : CLASSER SANS SUITE ---
+window.classerSansSuite = async function(id, etat) {
+    if(!confirm(etat === 'Sans suite' ? "Classer ce devis 'Sans suite' ? (Il sera masqué de la liste par défaut)" : "Réactiver ce devis ?")) return;
+    try {
+        await updateDoc(doc(db, "factures_v2", id), { statut_doc: etat });
+        // On recharge la liste pour voir l'effet immédiat
+        window.chargerListeFactures();
+    } catch(e) { alert("Erreur: " + e.message); }
 };
 
 // --- 2. DEPENSES ---
@@ -325,7 +381,9 @@ window.sauvegarderDocument = async function() {
         type: document.getElementById('doc_type').value, numero: document.getElementById('doc_numero').value, date: document.getElementById('doc_date').value, 
         client_nom: document.getElementById('client_nom').value, client_adresse: document.getElementById('client_adresse').value, 
         defunt_nom: document.getElementById('defunt_nom').value, defunt_date_naiss: document.getElementById('defunt_date_naiss').value, defunt_date_deces: document.getElementById('defunt_date_deces').value,
-        total: parseFloat(document.getElementById('total_display').innerText), lignes: lignes, paiements: paiements, date_creation: new Date().toISOString() 
+        total: parseFloat(document.getElementById('total_display').innerText), lignes: lignes, paiements: paiements, date_creation: new Date().toISOString(),
+        // IMPORTANT : On sauvegarde le statut du document (En cours par défaut)
+        statut_doc: document.getElementById('doc_type').value === 'DEVIS' ? 'En cours' : 'Validé'
     }; 
     const id = document.getElementById('current_doc_id').value; 
     try { 
@@ -391,7 +449,7 @@ window.loadTemplate = function(type) {
     window.calculTotal(); 
 };
 
-// IMPRESSION PDF
+// IMPRESSION PDF (LAYOUT OPTIMISÉ)
 window.genererPDFFacture = function() {
     const data = {
         client: { nom: document.getElementById('client_nom').value, adresse: document.getElementById('client_adresse').value, civility: document.getElementById('client_civility').value },
@@ -444,7 +502,6 @@ window.generatePDFFromData = function(data, saveMode = false) {
     let footerY = doc.lastAutoTable.finalY + 10;
     if (footerY > 250) { doc.addPage(); footerY = 20; }
 
-    // COLONNE DROITE : TOTAUX
     const rightLabelX = 165; const rightValueX = 195;
     const totalTTC = data.info.total;
     const totalPaye = data.paiements.reduce((sum, p) => sum + parseFloat(p.montant), 0);
@@ -468,7 +525,6 @@ window.generatePDFFromData = function(data, saveMode = false) {
     doc.text(`Net à Payer :`, rightLabelX, footerY, { align: 'right' }); 
     doc.text(`${resteAPayer.toFixed(2)} €`, rightValueX, footerY, { align: 'right' });
 
-    // COLONNE GAUCHE : RIB OU SIGNATURE
     const leftX = 15;
     let leftY = doc.lastAutoTable.finalY + 10; 
     if (leftY > 250) leftY = 20; 
