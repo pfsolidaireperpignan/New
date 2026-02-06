@@ -1,4 +1,4 @@
-/* js/app.js - VERSION FINALE (ANCIENNE LOGIQUE + CORRECTION AFFICHAGE) */
+/* js/app.js - VERSION MASTER (SÉCURITÉ + UI + LOGIQUE) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import { sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -8,10 +8,10 @@ import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
 // ============================================================
-// 1. SÉCURITÉ & AUTHENTIFICATION (Votre code restauré + Fix)
+// 1. SÉCURITÉ & AUTHENTIFICATION (La porte d'entrée)
 // ============================================================
 
-// Gestion du Login
+// Fonction de Connexion
 window.loginFirebase = async function() {
     const email = document.getElementById('login-email').value;
     const pass = document.getElementById('login-password').value;
@@ -22,7 +22,7 @@ window.loginFirebase = async function() {
     try {
         btn.innerText = "Connexion...";
         await signInWithEmailAndPassword(auth, email, pass);
-        // La redirection est gérée par onAuthStateChanged
+        // La redirection est gérée automatiquement par onAuthStateChanged ci-dessous
     } catch(e) { 
         console.error(e);
         btn.innerText = "SE CONNECTER";
@@ -31,7 +31,7 @@ window.loginFirebase = async function() {
     }
 };
 
-// Gestion "Mot de passe oublié"
+// Fonction Mot de Passe Oublié
 window.motDePasseOublie = async function() {
     const email = document.getElementById('login-email').value;
     if (!email) {
@@ -48,80 +48,56 @@ window.motDePasseOublie = async function() {
     }
 };
 
-// Gestion Déconnexion
+// Fonction Déconnexion
 window.logoutFirebase = async function() { 
-    if(confirm("Se déconnecter ?")) {
+    if(confirm("Se déconnecter de l'application ?")) {
         await signOut(auth); 
         window.location.reload(); 
     }
 };
 
-// SURVEILLANCE ÉTAT (Le Gardien)
+// LE GARDIEN (Surveille si on est connecté ou pas)
 onAuthStateChanged(auth, (user) => {
     const loader = document.getElementById('app-loader'); 
-    const loginScreen = document.getElementById('login-screen');
-
     if(loader) loader.style.display = 'none';
 
     if (user) {
         // --- UTILISATEUR CONNECTÉ ---
         console.log("✅ Connecté : " + user.email);
+        document.getElementById('login-screen')?.classList.add('hidden');
         
-        // --- LE CORRECTIF EST ICI ---
-        // On force la disparition car le HTML a un style="display:flex" qui bloque
-        if(loginScreen) {
-            loginScreen.style.display = 'none'; // Cette ligne force le masquage
-            loginScreen.classList.add('hidden');
-        }
-        
-        // On charge les données seulement maintenant
+        // On charge les données
         Utils.chargerLogoBase64();
-        DB.chargerBaseClients('init', true); // On force le chargement frais
+        DB.chargerBaseClients('init', true); // Charge le cache
         
-        // Initialisation de l'heure
+        // Horloge
         setInterval(() => {
             const now = new Date();
             if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
             if(document.getElementById('header-date')) document.getElementById('header-date').innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
         }, 1000);
 
-        // Init UI
+        // Initialisation de l'affichage (Onglets, etc.)
         setTimeout(() => { if(window.toggleSections) window.toggleSections(); }, 500);
 
     } else {
         // --- UTILISATEUR DÉCONNECTÉ ---
         console.log("🔒 Non connecté");
-        
-        // On force l'affichage
-        if(loginScreen) {
-            loginScreen.style.display = 'flex';
-            loginScreen.classList.remove('hidden');
-        }
-
-        // On vide les données sensibles par sécurité
+        document.getElementById('login-screen')?.classList.remove('hidden');
+        // Sécurité : on vide le tableau pour ne rien laisser visible
         const tbody = document.getElementById('clients-table-body');
         if(tbody) tbody.innerHTML = "";
     }
 });
 
-// Écouteurs d'événements (Réparation des boutons)
+// Écouteurs pour le bouton "Entrée" sur l'écran de login
 document.addEventListener("DOMContentLoaded", () => {
     const btnLogin = document.getElementById('btn-login');
     const btnForgot = document.getElementById('btn-forgot');
-    const btnLogout = document.getElementById('btn-logout'); // Récupération du bouton déconnexion
     
     if(btnLogin) btnLogin.onclick = window.loginFirebase;
     if(btnForgot) btnForgot.onclick = window.motDePasseOublie;
     
-    // Réparation du bouton Déconnexion qui était "perdu"
-    if(btnLogout) {
-        btnLogout.onclick = function(e) {
-            e.preventDefault(); 
-            window.logoutFirebase();
-        };
-    }
-    
-    // Touche Entrée pour valider
     document.getElementById('login-password')?.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') window.loginFirebase();
     });
@@ -129,47 +105,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 // ============================================================
-// 2. BRANCHEMENT DES FONCTIONS MÉTIER (Reste inchangé)
+// 2. INTERFACE UTILISATEUR (Boutons, Cases, Onglets)
 // ============================================================
 
-window.chargerBaseClients = DB.chargerBaseClients;
-window.filtrerBaseClients = DB.filtrerBaseClients;
-window.supprimerDossier = DB.supprimerDossier;
-window.viderFormulaire = DB.viderFormulaire;
-window.chargerStock = DB.chargerStock;
-window.ajouterArticleStock = DB.ajouterArticle;
-window.supprimerArticle = DB.supprimerArticle;
-window.importerClientSelectionne = DB.importerClientSelectionne;
-window.chargerSelectImport = DB.chargerSelectImport;
-
-if (PDF && PDF.genererPouvoir) {
-    window.genererPouvoir = PDF.genererPouvoir;
-    window.genererDeclaration = PDF.genererDeclaration;
-    window.genererFermeture = PDF.genererFermeture;
-    window.genererDemandeFermetureMairie = PDF.genererDemandeFermetureMairie;
-    window.genererTransport = PDF.genererTransport;
-    window.genererDemandeInhumation = PDF.genererDemandeInhumation;
-    window.genererDemandeCremation = PDF.genererDemandeCremation;
-    window.genererDemandeRapatriement = PDF.genererDemandeRapatriement;
-    window.genererDemandeOuverture = PDF.genererDemandeOuverture;
-}
-
-// ============================================================
-// 3. FONCTIONS UI & SAUVEGARDE (Vos fonctions fonctionnelles)
-// ============================================================
-
-window.toggleSections = function() {
-    const select = document.getElementById('prestation'); if(!select) return;
-    const choix = select.value;
-    ['bloc_inhumation', 'bloc_cremation', 'bloc_rapatriement'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
-    ['btn_inhumation', 'btn_cremation', 'btn_rapatriement'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
-    if (choix === 'Inhumation') { document.getElementById('bloc_inhumation')?.classList.remove('hidden'); document.getElementById('btn_inhumation')?.classList.remove('hidden'); }
-    else if (choix === 'Crémation') { document.getElementById('bloc_cremation')?.classList.remove('hidden'); document.getElementById('btn_cremation')?.classList.remove('hidden'); }
-    else if (choix === 'Rapatriement') { document.getElementById('bloc_rapatriement')?.classList.remove('hidden'); document.getElementById('btn_rapatriement')?.classList.remove('hidden'); }
+// Copie Mandant -> Témoin
+window.copierMandant = function() { 
+    const chk = document.getElementById('copy_mandant');
+    if(chk && chk.checked) { 
+        document.getElementById('f_nom_prenom').value = document.getElementById('soussigne').value; 
+        document.getElementById('f_lien').value = document.getElementById('lien').value; 
+    } 
 };
 
-window.toggleVol2 = function() { const chk = document.getElementById('check_vol2'); const bloc = document.getElementById('bloc_vol2'); if(chk && bloc) { chk.checked ? bloc.classList.remove('hidden') : bloc.classList.add('hidden'); } };
-
+// Afficher/Masquer Police vs Famille
 window.togglePolice = function() { 
     const select = document.getElementById('type_presence_select'); 
     const bP = document.getElementById('police_fields'); 
@@ -179,25 +127,46 @@ window.togglePolice = function() {
     else { bP.classList.add('hidden'); bF.classList.remove('hidden'); } 
 };
 
-window.copierMandant = function() { 
-    const chk = document.getElementById('copy_mandant'); 
-    if(chk && chk.checked) { 
-        document.getElementById('f_nom_prenom').value = document.getElementById('soussigne').value; 
-        document.getElementById('f_lien').value = document.getElementById('lien').value; 
+// Afficher les blocs selon la prestation (Inhumation, Crémation...)
+window.toggleSections = function() {
+    const select = document.getElementById('prestation'); if(!select) return;
+    const choix = select.value;
+    
+    ['bloc_inhumation', 'bloc_cremation', 'bloc_rapatriement'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    ['btn_inhumation', 'btn_cremation', 'btn_rapatriement'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    
+    if (choix === 'Inhumation') { document.getElementById('bloc_inhumation')?.classList.remove('hidden'); document.getElementById('btn_inhumation')?.classList.remove('hidden'); }
+    else if (choix === 'Crémation') { document.getElementById('bloc_cremation')?.classList.remove('hidden'); document.getElementById('btn_cremation')?.classList.remove('hidden'); }
+    else if (choix === 'Rapatriement') { document.getElementById('bloc_rapatriement')?.classList.remove('hidden'); document.getElementById('btn_rapatriement')?.classList.remove('hidden'); }
+};
+
+// Afficher le Vol 2
+window.toggleVol2 = function() { 
+    const chk = document.getElementById('check_vol2'); 
+    const bloc = document.getElementById('bloc_vol2'); 
+    if(chk && bloc) { 
+        chk.checked ? bloc.classList.remove('hidden') : bloc.classList.add('hidden'); 
     } 
 };
 
+// Navigation Onglets (Identité / Technique)
 window.switchAdminTab = function(tabName) { 
     document.getElementById('tab-content-identite').classList.add('hidden'); 
     document.getElementById('tab-content-technique').classList.add('hidden'); 
     document.getElementById('tab-btn-identite').classList.remove('active'); 
     document.getElementById('tab-btn-technique').classList.remove('active'); 
+    
     document.getElementById('tab-content-' + tabName).classList.remove('hidden'); 
     document.getElementById('tab-btn-' + tabName).classList.add('active'); 
 };
 
-window.toggleSidebar = function() { const sb = document.querySelector('.sidebar'); if(sb) sb.classList.toggle('collapsed'); };
+// Menu Mobile
+window.toggleSidebar = function() { 
+    const sb = document.querySelector('.sidebar'); 
+    if(sb) sb.classList.toggle('collapsed'); 
+};
 
+// Navigation Principale (Accueil -> Stock -> Admin...)
 window.showSection = function(id) { 
     document.querySelectorAll('.main-content > div').forEach(div => { 
         if(div.id.startsWith('view-')) div.classList.add('hidden'); 
@@ -210,7 +179,38 @@ window.showSection = function(id) {
     if(id === 'admin') DB.chargerSelectImport(); 
 };
 
-// GED
+
+// ============================================================
+// 3. BRANCHEMENT LOGIQUE (Base de données & PDF)
+// ============================================================
+
+window.chargerBaseClients = DB.chargerBaseClients;
+window.filtrerBaseClients = DB.filtrerBaseClients;
+window.supprimerDossier = DB.supprimerDossier;
+window.viderFormulaire = DB.viderFormulaire;
+window.chargerStock = DB.chargerStock;
+window.ajouterArticleStock = DB.ajouterArticle;
+window.supprimerArticle = DB.supprimerArticle;
+window.importerClientSelectionne = DB.importerClientSelectionne;
+window.chargerSelectImport = DB.chargerSelectImport;
+
+// Connexion aux générateurs PDF
+if (PDF && PDF.genererPouvoir) {
+    window.genererPouvoir = PDF.genererPouvoir;
+    window.genererDeclaration = PDF.genererDeclaration;
+    window.genererFermeture = PDF.genererFermeture;
+    window.genererDemandeFermetureMairie = PDF.genererDemandeFermetureMairie;
+    window.genererTransport = PDF.genererTransport;
+    window.genererDemandeInhumation = PDF.genererDemandeInhumation;
+    window.genererDemandeCremation = PDF.genererDemandeCremation;
+    window.genererDemandeRapatriement = PDF.genererDemandeRapatriement;
+    window.genererDemandeOuverture = PDF.genererDemandeOuverture;
+}
+
+
+// ============================================================
+// 4. GED (Gestion Électronique des Documents)
+// ============================================================
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
     const fileInput = document.getElementById('ged_input_file');
@@ -226,12 +226,14 @@ window.ajouterPieceJointe = function() {
         const base64String = e.target.result;
         const localUrl = URL.createObjectURL(file);
         if(container.innerText.includes('Aucun')) container.innerHTML = "";
+        
         const div = document.createElement('div');
         div.className = "ged-item"; 
         div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px;";
         div.setAttribute('data-name', nomDoc);
         div.setAttribute('data-b64', base64String); 
         div.setAttribute('data-status', 'new'); 
+        
         div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span><span style="font-size:0.75rem; color:#f59e0b; font-weight:bold;">À sauvegarder...</span></div></div><div style="display:flex; gap:8px;"><a href="${localUrl}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a><button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
         container.appendChild(div);
         fileInput.value = ""; nameInput.value = "";
@@ -239,23 +241,37 @@ window.ajouterPieceJointe = function() {
     reader.readAsDataURL(file);
 };
 
-// Sauvegarde
+
+// ============================================================
+// 5. SAUVEGARDE & CHARGEMENT
+// ============================================================
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
+    // Sécurité Anti-Doublon : Désactiver le bouton immédiatement
     if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...'; }
+    
     try {
         const idDossier = document.getElementById('dossier_id').value;
         const getVal = (id) => document.getElementById(id)?.value || "";
+        
         let data = {
             date_modification: new Date().toISOString(),
             defunt: { civility: getVal('civilite_defunt'), nom: getVal('nom'), prenom: getVal('prenom'), nom_jeune_fille: getVal('nom_jeune_fille'), date_deces: getVal('date_deces'), lieu_deces: getVal('lieu_deces'), heure_deces: getVal('heure_deces'), date_naiss: getVal('date_naiss'), lieu_naiss: getVal('lieu_naiss'), adresse: getVal('adresse_fr'), pere: getVal('pere'), mere: getVal('mere'), situation: getVal('matrimoniale'), conjoint: getVal('conjoint'), profession: getVal('profession_libelle') },
             mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), lien: getVal('lien'), adresse: getVal('demeurant') },
-            technique: { type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'), cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'), heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'), date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat'), temoin_nom: getVal('f_nom_prenom'), temoin_lien: getVal('f_lien'), titulaire: getVal('titulaire_concession') },
+            technique: { 
+                type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'), 
+                cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'), 
+                heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'), 
+                date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat'),
+                temoin_nom: getVal('f_nom_prenom'), temoin_lien: getVal('f_lien'), titulaire: getVal('titulaire_concession')
+            },
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), av_date_dep: getVal('av_date_dep'), av_heure_dep: getVal('av_heure_dep'), av_date_arr: getVal('av_date_arr'), av_heure_arr: getVal('av_heure_arr'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), ap_date_dep: getVal('ap_date_dep'), ap_heure_dep: getVal('ap_heure_dep'), ap_date_arr: getVal('ap_date_arr'), ap_heure_arr: getVal('ap_heure_arr'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta'), vol1_num: getVal('vol1_num'), vol1_dep_aero: getVal('vol1_dep_aero'), vol1_arr_aero: getVal('vol1_arr_aero'), vol1_dep_time: getVal('vol1_dep_time'), vol1_arr_time: getVal('vol1_arr_time'), vol2_num: getVal('vol2_num'), vol2_dep_aero: getVal('vol2_dep_aero'), vol2_arr_aero: getVal('vol2_arr_aero'), vol2_dep_time: getVal('vol2_dep_time'), vol2_arr_time: getVal('vol2_arr_time'), rap_immat: getVal('rap_immat'), rap_date_dep_route: getVal('rap_date_dep_route'), rap_ville_dep: getVal('rap_ville_dep'), rap_ville_arr: getVal('rap_ville_arr') }
         };
+
         let finalId = idDossier;
         if(idDossier) { await updateDoc(doc(db, "dossiers_admin", idDossier), data); } 
         else { data.date_creation = new Date().toISOString(); const docRef = await addDoc(collection(db, "dossiers_admin"), data); finalId = docRef.id; document.getElementById('dossier_id').value = finalId; }
+        
         const allGedItems = [];
         const elements = document.querySelectorAll('#liste_pieces_jointes .ged-item');
         for (const div of elements) {
@@ -263,6 +279,7 @@ window.sauvegarderDossier = async function() {
             const status = div.getAttribute('data-status');
             const b64 = div.getAttribute('data-b64');
             let storageId = div.getAttribute('data-storage-id');
+
             if (status === 'new' && b64) {
                 try {
                     const fileDoc = await addDoc(collection(db, "ged_files"), { nom: name, content: b64, dossier_parent: finalId, date: new Date().toISOString() });
@@ -274,20 +291,24 @@ window.sauvegarderDossier = async function() {
             else if (status === 'stored' && !storageId && !b64) allGedItems.push(name);
         }
         await updateDoc(doc(db, "dossiers_admin", finalId), { ged: allGedItems });
+        
         DB.chargerBaseClients('init', true);
         alert("✅ Sauvegarde réussie !");
         window.chargerDossier(finalId);
+
     } catch(e) { console.error(e); alert("Erreur : " + e.message); }
     if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER'; }
 };
 
 window.chargerDossier = async function(id) {
     try {
+        console.log("📂 Chargement...", id);
         const docRef = doc(db, "dossiers_admin", id);
         const docSnap = await getDoc(docRef);
         if (!docSnap.exists()) { alert("❌ Dossier introuvable."); return; }
         const data = docSnap.data();
         const set = (htmlId, val) => { const el = document.getElementById(htmlId); if(el) el.value = val || ''; };
+
         if (data.defunt) { set('civilite_defunt', data.defunt.civility); set('nom', data.defunt.nom); set('prenom', data.defunt.prenom); set('nom_jeune_fille', data.defunt.nom_jeune_fille); set('date_deces', data.defunt.date_deces); set('lieu_deces', data.defunt.lieu_deces); set('heure_deces', data.defunt.heure_deces); set('date_naiss', data.defunt.date_naiss); set('lieu_naiss', data.defunt.lieu_naiss); set('adresse_fr', data.defunt.adresse); set('pere', data.defunt.pere); set('mere', data.defunt.mere); set('matrimoniale', data.defunt.situation); set('conjoint', data.defunt.conjoint); set('profession_libelle', data.defunt.profession); }
         if (data.mandant) { set('civilite_mandant', data.mandant.civility); set('soussigne', data.mandant.nom); set('lien', data.mandant.lien); set('demeurant', data.mandant.adresse); }
         if (data.technique) { 
@@ -309,7 +330,7 @@ window.chargerDossier = async function(id) {
                     if(typeof nom === 'string' && nom.includes("Enregistré")) continue;
                     const div = document.createElement('div'); div.className = "ged-item"; div.setAttribute('data-name', nom); div.setAttribute('data-status', 'stored'); if(storageId) div.setAttribute('data-storage-id', storageId); div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px;";
                     const btnEye = isBinary ? `<a href="${lien}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a>` : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye-slash"></i></div>`;
-                    div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;"><a href="${localUrl}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a><button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
+                    div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nom}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;">${btnEye}<button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
                     container.appendChild(div);
                 }
             } else { container.innerHTML = '<div style="color:#94a3b8; font-style:italic; padding:10px;">Aucun document joint.</div>'; }
