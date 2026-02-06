@@ -1,4 +1,4 @@
-/* js/app.js - VERSION MASTER (CORRECTIF AFFICHAGE LOGIN + DÉCONNEXION) */
+/* js/app.js - VERSION CORRECTIVE (LOGIN DISPLAY FIX) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import { sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -8,7 +8,7 @@ import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
 // ============================================================
-// 1. SÉCURITÉ & AUTHENTIFICATION
+// 1. SÉCURITÉ (LOGIN / LOGOUT)
 // ============================================================
 
 window.loginFirebase = async function() {
@@ -32,25 +32,25 @@ window.loginFirebase = async function() {
 window.motDePasseOublie = async function() {
     const email = document.getElementById('login-email').value;
     if (!email) {
-        alert("Veuillez d'abord entrer votre EMAIL dans la case au-dessus, puis recliquez sur ce lien.");
+        alert("Veuillez d'abord entrer votre EMAIL dans la case au-dessus.");
         return;
     }
     if(confirm(`Envoyer un email de réinitialisation à : ${email} ?`)) {
         try {
             await sendPasswordResetEmail(auth, email);
-            alert("📧 Email envoyé ! Vérifiez votre boîte mail.");
+            alert("📧 Email envoyé !");
         } catch(e) { alert("Erreur : " + e.message); }
     }
 };
 
 window.logoutFirebase = async function() { 
-    if(confirm("Se déconnecter de l'application ?")) {
+    if(confirm("Se déconnecter ?")) {
         await signOut(auth); 
         window.location.reload(); 
     }
 };
 
-// --- LE GARDIEN (Surveillance Connexion) ---
+// --- LE GARDIEN (CORRECTION VISUELLE FORCÉE) ---
 onAuthStateChanged(auth, (user) => {
     const loader = document.getElementById('app-loader'); 
     const loginScreen = document.getElementById('login-screen');
@@ -60,16 +60,16 @@ onAuthStateChanged(auth, (user) => {
     if (user) {
         console.log("✅ Connecté : " + user.email);
         
-        // --- CORRECTIF MAJEUR ICI ---
-        // On force le style à 'none' pour surcharger le 'display:flex' du HTML
+        // ICI : ON FORCE LA DISPARITION DU BLOC LOGIN
         if (loginScreen) {
-            loginScreen.style.setProperty('display', 'none', 'important');
+            loginScreen.style.display = 'none'; // Écrase le style inline du HTML
             loginScreen.classList.add('hidden');
         }
-
-        Utils.chargerLogoBase64();
-        DB.chargerBaseClients('init', true); 
         
+        Utils.chargerLogoBase64();
+        DB.chargerBaseClients('init', true);
+        
+        // Horloge
         setInterval(() => {
             const now = new Date();
             const elTime = document.getElementById('header-time');
@@ -83,9 +83,9 @@ onAuthStateChanged(auth, (user) => {
     } else {
         console.log("🔒 Non connecté");
         
-        // On force l'affichage
+        // ICI : ON FORCE L'AFFICHAGE DU BLOC LOGIN
         if (loginScreen) {
-            loginScreen.style.display = 'flex';
+            loginScreen.style.display = 'flex'; // Rétablit le flexbox pour centrer
             loginScreen.classList.remove('hidden');
         }
         
@@ -94,8 +94,9 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// --- INIT BOUTONS (C'est ici que la déconnexion est activée) ---
+// --- ACTIVATION DES BOUTONS (Dès le chargement) ---
 document.addEventListener("DOMContentLoaded", () => {
+    
     // 1. Connexion
     const btnLogin = document.getElementById('btn-login');
     if(btnLogin) btnLogin.onclick = window.loginFirebase;
@@ -104,13 +105,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnForgot = document.getElementById('btn-forgot');
     if(btnForgot) btnForgot.onclick = window.motDePasseOublie;
 
-    // 3. DÉCONNEXION (Ajouté)
+    // 3. DÉCONNEXION (Câblage manuel)
     const btnLogout = document.getElementById('btn-logout');
     if(btnLogout) {
-        btnLogout.onclick = function(e) {
-            e.preventDefault(); // Empêche le lien de remonter en haut de page
+        btnLogout.addEventListener('click', (e) => {
+            e.preventDefault(); // Empêche le lien de remonter en haut
             window.logoutFirebase();
-        };
+        });
     }
 
     // 4. Touche Entrée
@@ -123,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ============================================================
-// 2. INTERFACE & LOGIQUE MÉTIER
+// 2. UI & LOGIQUE MÉTIER
 // ============================================================
 
 window.chargerBaseClients = DB.chargerBaseClients;
@@ -160,7 +161,7 @@ window.showSection = function(id) {
     if(id === 'admin') DB.chargerSelectImport(); 
 };
 
-// Fonctions UI
+// Fonctions UI (Onglets, Police, etc.)
 window.toggleSections = function() {
     const select = document.getElementById('prestation'); if(!select) return;
     const choix = select.value;
@@ -201,9 +202,7 @@ window.switchAdminTab = function(tabName) {
 
 window.toggleSidebar = function() { const sb = document.querySelector('.sidebar'); if(sb) sb.classList.toggle('collapsed'); };
 
-// ============================================================
-// 3. GED & SAUVEGARDE
-// ============================================================
+// GED
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
     const fileInput = document.getElementById('ged_input_file');
@@ -211,7 +210,7 @@ window.ajouterPieceJointe = function() {
 
     if (fileInput.files.length === 0) { alert("⚠️ Sélectionnez un fichier."); return; }
     const file = fileInput.files[0];
-    if (file.size > 1000 * 1024) { alert("⚠️ FICHIER TROP LOURD (>1 Mo)."); return; }
+    if (file.size > 1000 * 1024) { alert("⚠️ FICHIER TROP LOURD (>1 Mo). Compressez-le."); return; }
 
     const nomDoc = nameInput.value || file.name;
     const reader = new FileReader();
@@ -232,13 +231,13 @@ window.ajouterPieceJointe = function() {
     reader.readAsDataURL(file);
 };
 
+// Sauvegarde
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
     if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...'; }
     try {
         const idDossier = document.getElementById('dossier_id').value;
         const getVal = (id) => document.getElementById(id)?.value || "";
-        
         let data = {
             date_modification: new Date().toISOString(),
             defunt: { civility: getVal('civilite_defunt'), nom: getVal('nom'), prenom: getVal('prenom'), nom_jeune_fille: getVal('nom_jeune_fille'), date_deces: getVal('date_deces'), lieu_deces: getVal('lieu_deces'), heure_deces: getVal('heure_deces'), date_naiss: getVal('date_naiss'), lieu_naiss: getVal('lieu_naiss'), adresse: getVal('adresse_fr'), pere: getVal('pere'), mere: getVal('mere'), situation: getVal('matrimoniale'), conjoint: getVal('conjoint'), profession: getVal('profession_libelle') },
@@ -246,11 +245,9 @@ window.sauvegarderDossier = async function() {
             technique: { type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'), cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'), heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'), date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat'), temoin_nom: getVal('f_nom_prenom'), temoin_lien: getVal('f_lien'), titulaire: getVal('titulaire_concession') },
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), av_date_dep: getVal('av_date_dep'), av_heure_dep: getVal('av_heure_dep'), av_date_arr: getVal('av_date_arr'), av_heure_arr: getVal('av_heure_arr'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), ap_date_dep: getVal('ap_date_dep'), ap_heure_dep: getVal('ap_heure_dep'), ap_date_arr: getVal('ap_date_arr'), ap_heure_arr: getVal('ap_heure_arr'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta'), vol1_num: getVal('vol1_num'), vol1_dep_aero: getVal('vol1_dep_aero'), vol1_arr_aero: getVal('vol1_arr_aero'), vol1_dep_time: getVal('vol1_dep_time'), vol1_arr_time: getVal('vol1_arr_time'), vol2_num: getVal('vol2_num'), vol2_dep_aero: getVal('vol2_dep_aero'), vol2_arr_aero: getVal('vol2_arr_aero'), vol2_dep_time: getVal('vol2_dep_time'), vol2_arr_time: getVal('vol2_arr_time'), rap_immat: getVal('rap_immat'), rap_date_dep_route: getVal('rap_date_dep_route'), rap_ville_dep: getVal('rap_ville_dep'), rap_ville_arr: getVal('rap_ville_arr') }
         };
-
         let finalId = idDossier;
         if(idDossier) { await updateDoc(doc(db, "dossiers_admin", idDossier), data); } 
         else { data.date_creation = new Date().toISOString(); const docRef = await addDoc(collection(db, "dossiers_admin"), data); finalId = docRef.id; document.getElementById('dossier_id').value = finalId; }
-        
         const allGedItems = [];
         const elements = document.querySelectorAll('#liste_pieces_jointes .ged-item');
         for (const div of elements) {
@@ -269,7 +266,6 @@ window.sauvegarderDossier = async function() {
             else if (status === 'stored' && !storageId && !b64) allGedItems.push(name);
         }
         await updateDoc(doc(db, "dossiers_admin", finalId), { ged: allGedItems });
-        
         DB.chargerBaseClients('init', true);
         alert("✅ Sauvegarde réussie !");
         window.chargerDossier(finalId);
@@ -284,7 +280,6 @@ window.chargerDossier = async function(id) {
         if (!docSnap.exists()) { alert("❌ Dossier introuvable."); return; }
         const data = docSnap.data();
         const set = (htmlId, val) => { const el = document.getElementById(htmlId); if(el) el.value = val || ''; };
-
         if (data.defunt) { set('civilite_defunt', data.defunt.civility); set('nom', data.defunt.nom); set('prenom', data.defunt.prenom); set('nom_jeune_fille', data.defunt.nom_jeune_fille); set('date_deces', data.defunt.date_deces); set('lieu_deces', data.defunt.lieu_deces); set('heure_deces', data.defunt.heure_deces); set('date_naiss', data.defunt.date_naiss); set('lieu_naiss', data.defunt.lieu_naiss); set('adresse_fr', data.defunt.adresse); set('pere', data.defunt.pere); set('mere', data.defunt.mere); set('matrimoniale', data.defunt.situation); set('conjoint', data.defunt.conjoint); set('profession_libelle', data.defunt.profession); }
         if (data.mandant) { set('civilite_mandant', data.mandant.civility); set('soussigne', data.mandant.nom); set('lien', data.mandant.lien); set('demeurant', data.mandant.adresse); }
         if (data.technique) { 
@@ -306,7 +301,7 @@ window.chargerDossier = async function(id) {
                     if(typeof nom === 'string' && nom.includes("Enregistré")) continue;
                     const div = document.createElement('div'); div.className = "ged-item"; div.setAttribute('data-name', nom); div.setAttribute('data-status', 'stored'); if(storageId) div.setAttribute('data-storage-id', storageId); div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px;";
                     const btnEye = isBinary ? `<a href="${lien}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a>` : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye-slash"></i></div>`;
-                    div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nom}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;">${btnEye}<button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
+                    div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;">${btnEye}<button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
                     container.appendChild(div);
                 }
             } else { container.innerHTML = '<div style="color:#94a3b8; font-style:italic; padding:10px;">Aucun document joint.</div>'; }
