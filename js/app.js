@@ -59,12 +59,19 @@ window.logoutFirebase = async function() {
 // LE GARDIEN (Surveille si on est connecté ou pas)
 onAuthStateChanged(auth, (user) => {
     const loader = document.getElementById('app-loader'); 
+    const loginScreen = document.getElementById('login-screen');
+    
     if(loader) loader.style.display = 'none';
 
     if (user) {
         // --- UTILISATEUR CONNECTÉ ---
         console.log("✅ Connecté : " + user.email);
-        document.getElementById('login-screen')?.classList.add('hidden');
+        
+        // CORRECTION VISUELLE : On force la disparition de l'écran de login
+        if (loginScreen) {
+            loginScreen.classList.add('hidden');
+            loginScreen.style.display = 'none'; // Indispensable pour surcharger le CSS flex
+        }
         
         // On charge les données
         Utils.chargerLogoBase64();
@@ -85,14 +92,20 @@ onAuthStateChanged(auth, (user) => {
     } else {
         // --- UTILISATEUR DÉCONNECTÉ ---
         console.log("🔒 Non connecté");
-        document.getElementById('login-screen')?.classList.remove('hidden');
+        
+        // On force l'affichage de l'écran de login
+        if (loginScreen) {
+            loginScreen.classList.remove('hidden');
+            loginScreen.style.display = 'flex';
+        }
+        
         // Sécurité : on vide le tableau pour ne rien laisser visible
         const tbody = document.getElementById('clients-table-body');
         if(tbody) tbody.innerHTML = "";
     }
 });
 
-// --- BRANCHEMENT DES BOUTONS (C'est ici que ça corrige votre problème) ---
+// --- BRANCHEMENT DES BOUTONS (C'est ici que ça corrige votre problème de clic) ---
 document.addEventListener("DOMContentLoaded", () => {
     // 1. Bouton Login
     const btnLogin = document.getElementById('btn-login');
@@ -106,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnForgot.onclick = window.motDePasseOublie;
     }
 
-    // 3. Bouton Déconnexion (Réparation)
+    // 3. Bouton Déconnexion (C'est ce qui manquait)
     const btnLogout = document.getElementById('btn-logout');
     if(btnLogout) {
         btnLogout.onclick = function(e) {
@@ -350,7 +363,7 @@ window.chargerDossier = async function(id) {
                     if(typeof nom === 'string' && nom.includes("Enregistré")) continue;
                     const div = document.createElement('div'); div.className = "ged-item"; div.setAttribute('data-name', nom); div.setAttribute('data-status', 'stored'); if(storageId) div.setAttribute('data-storage-id', storageId); div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px;";
                     const btnEye = isBinary ? `<a href="${lien}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a>` : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye-slash"></i></div>`;
-                    div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nom}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;">${btnEye}<button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
+                    div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;"><a href="${localUrl}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a><button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
                     container.appendChild(div);
                 }
             } else { container.innerHTML = '<div style="color:#94a3b8; font-style:italic; padding:10px;">Aucun document joint.</div>'; }
