@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PF ERP - Gestion</title>
+    <title>ERP</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -25,75 +25,54 @@
     <datalist id="liens_list"><option value="Fils"><option value="Fille"><option value="Époux"><option value="Épouse"><option value="Père"><option value="Mère"><option value="Frère"><option value="Sœur"></datalist>
 
     <div id="app-loader" style="position:fixed; inset:0; background:white; z-index:9999; display:flex; justify-content:center; align-items:center;">
-        <div style="text-align:center;">
-            <i class="fas fa-circle-notch fa-spin" style="font-size:3rem; color:#0ea5e9;"></i>
-            <p style="margin-top:10px; color:#64748b; font-weight:600;">Chargement sécurisé...</p>
-        </div>
+        <i class="fas fa-circle-notch fa-spin" style="font-size:3rem; color:var(--primary);"></i>
     </div>
 
-    <div id="login-screen" class="hidden" style="position:fixed; inset:0; background:#f8fafc; z-index:9000; display:flex; justify-content:center; align-items:center;">
-        <div class="card" style="width:100%; max-width:400px; text-align:center; padding:40px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
-            <img src="Logo.png" alt="Logo" style="width:100px; margin-bottom:20px;">
-            <h2 style="margin-bottom:10px; color:#1e293b;">PF SOLIDAIRE</h2>
-            <p style="color:#64748b; margin-bottom:30px;">Accès réservé au personnel</p>
-            
-            <div style="text-align:left; margin-bottom:15px;">
-                <label style="font-size:0.9rem; font-weight:600; color:#334155;">Email</label>
-                <input type="email" id="login-email" placeholder="votre@email.com" style="width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:8px;">
-            </div>
-            
-            <div style="text-align:left; margin-bottom:25px;">
-                <label style="font-size:0.9rem; font-weight:600; color:#334155;">Mot de passe</label>
-                <input type="password" id="login-password" placeholder="••••••••" style="width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:8px;">
-            </div>
-
-            <button id="btn-login" class="btn btn-green" style="width:100%; justify-content:center; padding:12px; font-size:1rem; font-weight:bold;">
-                <i class="fas fa-sign-in-alt"></i> SE CONNECTER
-            </button>
-            
+    <div id="login-screen" class="hidden" style="position:fixed; inset:0; z-index:9000; display:flex; justify-content:center; align-items:center;">
+        <div class="card" style="width:100%; max-width:400px; text-align:center; padding:50px;">
+            <img src="Logo.png" alt="Logo" style="width:120px; margin-bottom:20px;">
+            <h2 style="margin-bottom:10px; color:var(--dark);">PF SOLIDAIRE</h2>
+            <p style="color:var(--gray); margin-bottom:30px;">Espace de gestion sécurisé</p>
+            <input type="email" id="login-email" placeholder="Email" style="margin-bottom:15px;">
+            <input type="password" id="login-password" placeholder="Mot de passe" style="margin-bottom:25px;">
+            <button id="btn-login" class="btn btn-green" style="width:100%; justify-content:center; padding:12px;">SE CONNECTER</button>
             <div style="margin-top:20px;">
-                <a href="#" id="btn-forgot" style="color:#0ea5e9; font-size:0.9rem; text-decoration:none; font-weight:500;">Mot de passe oublié ?</a>
+                <a href="#" id="btn-forgot" style="color:var(--secondary); font-size:0.9rem; text-decoration:none; font-weight:500;">Mot de passe oublié ?</a>
             </div>
         </div>
     </div>
 
-    <nav class="sidebar">
-        <div class="brand">
-            <i class="fas fa-dove"></i> 
-            <span class="brand-text">PF ERP</span> 
-            <span style="font-size:0.5em; color:rgba(255,255,255,0.5); font-weight:400; margin-left:5px;" class="brand-text">v18</span>
-            <button id="btn-toggle-menu" onclick="window.toggleSidebar()">
-                <i class="fas fa-bars"></i>
-            </button>
-        </div>
-        <ul class="nav-menu">
-            <li class="nav-item"><a href="#" onclick="window.showSection('home')" class="nav-link active"><i class="fas fa-home"></i> <span class="nav-text">Accueil</span></a></li>
-            <li class="nav-item"><a href="#" onclick="window.showSection('admin')" class="nav-link"><i class="fas fa-folder-open"></i> <span class="nav-text">Dossier Admin</span></a></li>
-            <li class="nav-item"><a href="#" onclick="window.showSection('base')" class="nav-link"><i class="fas fa-users"></i> <span class="nav-text">Base Clients</span></a></li>
-            <li class="nav-item"><a href="#" onclick="window.showSection('stock')" class="nav-link"><i class="fas fa-boxes"></i> <span class="nav-text">Gestion Stock</span></a></li>
-            
-            <li class="nav-item"><a href="facturation_v2.html" class="nav-link"><i class="fas fa-file-invoice-dollar"></i> <span class="nav-text">Facturation</span></a></li>
-            <li class="nav-item">
-                <a href="dossier_complet.html" class="nav-link" style="color:#f59e0b;">
-                    <i class="fas fa-layer-group"></i> <span class="nav-text">Atelier Dossier</span>
-                </a>
-            </li>
-            
-            <li class="nav-item" style="margin-top:auto;">
-                <a href="#" onclick="window.logoutFirebase()" class="nav-link text-danger">
-                    <i class="fas fa-power-off"></i> <span class="nav-text">Déconnexion</span>
-                </a>
-            </li>
-        </ul>
-    </nav>
+   <nav class="sidebar">
+    <div class="brand">
+        <i class="fas fa-dove"></i> 
+        <span class="brand-text">PF ERP</span> 
+        <span style="font-size:0.5em; color:var(--gray-text); font-weight:400; margin-left:5px;" class="brand-text">v17</span>
+        <button id="btn-toggle-menu" onclick="window.toggleSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+    <ul class="nav-menu">
+        <li class="nav-item"><a href="#" onclick="window.showSection('home')" class="nav-link active"><i class="fas fa-home"></i> <span class="nav-text">Accueil</span></a></li>
+        <li class="nav-item"><a href="#" onclick="window.showSection('admin')" class="nav-link"><i class="fas fa-folder-open"></i> <span class="nav-text">Dossier Admin</span></a></li>
+        <li class="nav-item"><a href="#" onclick="window.showSection('base')" class="nav-link"><i class="fas fa-users"></i> <span class="nav-text">Base Clients</span></a></li>
+        <li class="nav-item"><a href="#" onclick="window.showSection('stock')" class="nav-link"><i class="fas fa-boxes"></i> <span class="nav-text">Gestion Stock</span></a></li>
+        <li class="nav-item"><a href="facturation_v2.html" class="nav-link"><i class="fas fa-file-invoice-dollar"></i> <span class="nav-text">Facturation</span></a></li>
+        <li class="nav-item">
+            <a href="dossier_complet.html" class="nav-link" style="color:#f59e0b;">
+                <i class="fas fa-layer-group"></i> <span class="nav-text">Atelier Dossier</span>
+            </a>
+        </li>
+        <li class="nav-item" style="margin-top:auto;"><a href="#" id="btn-logout" class="nav-link text-danger"><i class="fas fa-power-off"></i> <span class="nav-text">Déconnexion</span></a></li>
+    </ul>
+</nav>
 
     <main class="main-content">
         
         <div id="view-home">
             <div class="welcome-banner">
                 <div class="welcome-text">
-                    <h2>Tableau de Bord <i class="fas fa-chart-line" style="color:#fcd34d;"></i></h2>
-                    <p>Gestion administrative et logistique PF Solidaire.</p>
+                    <h2>Bonjour, Mustapha <i class="fas fa-hand-paper" style="color:#fcd34d; transform: rotate(20deg); display:inline-block;"></i></h2>
+                    <p>Bienvenue sur votre espace de gestion PF Solidaire.</p>
                 </div>
                 <div class="date-badge">
                     <div id="header-time">--:--</div>
@@ -104,14 +83,14 @@
             <div class="quick-stats">
                 <div class="mini-stat" onclick="window.showSection('stock')">
                     <div class="mini-icon" style="background:#fff7ed; color:#ea580c;"><i class="fas fa-exclamation-triangle"></i></div>
-                    <div><div style="font-size:0.8rem; color:#64748b; font-weight:600;">STOCKS</div><div style="font-weight:bold;">Voir État</div></div>
+                    <div><div style="font-size:0.8rem; color:#64748b; font-weight:600;">URGENCES</div><div style="font-weight:bold;">Voir Stocks</div></div>
                 </div>
                 <div class="mini-stat" onclick="window.showSection('base')">
                     <div class="mini-icon" style="background:#eff6ff; color:#3b82f6;"><i class="fas fa-folder-open"></i></div>
-                    <div><div style="font-size:0.8rem; color:#64748b; font-weight:600;">CLIENTS</div><div style="font-weight:bold;">Rechercher</div></div>
+                    <div><div style="font-size:0.8rem; color:#64748b; font-weight:600;">EN COURS</div><div style="font-weight:bold;">Suivi Dossiers</div></div>
                 </div>
                 <div class="mini-stat" onclick="window.location.reload()">
-                    <div class="mini-icon" style="background:#f0fdf4; color:#16a34a;"><i class="fas fa-sync-alt"></i></div>
+                    <div class="mini-icon" style="background:#f0fdf4; color:#16a34a;"><i class="fas fa-check-circle"></i></div>
                     <div><div style="font-size:0.8rem; color:#64748b; font-weight:600;">SYSTÈME</div><div style="font-weight:bold;">Actualiser</div></div>
                 </div>
             </div>
@@ -130,7 +109,7 @@
                     <div class="card-icon-bg"><i class="fas fa-users"></i></div>
                     <div>
                         <div class="card-title">Base Clients</div>
-                        <div class="card-desc">Retrouver un ancien dossier, consulter l'historique.</div>
+                        <div class="card-desc">Retrouver un ancien dossier ou un client.</div>
                     </div>
                     <div class="card-arrow"><i class="fas fa-arrow-right"></i></div>
                 </div>
@@ -138,7 +117,7 @@
                     <div class="card-icon-bg"><i class="fas fa-boxes"></i></div>
                     <div>
                         <div class="card-title">Gestion Stocks</div>
-                        <div class="card-desc">Entrées, sorties et inventaire des articles.</div>
+                        <div class="card-desc">Entrées, sorties et vérification des disponibilités.</div>
                     </div>
                     <div class="card-arrow"><i class="fas fa-arrow-right"></i></div>
                 </div>
@@ -181,12 +160,15 @@
             </div>
         </div>
 
-        <div id="view-base" class="hidden">
+      <div id="view-base" class="hidden">
             <div class="page-header">
                 <h1>Base Clients</h1>
                 <div style="display:flex; gap:10px;">
-                    <input type="text" id="search-client" placeholder="Rechercher un dossier (Nom...)" style="width:250px;">
-                    <button class="btn btn-blue" onclick="window.chargerBaseClients()"><i class="fas fa-sync"></i> Actualiser</button>
+                    <input type="text" id="search-client" placeholder="Rechercher un dossier (Nom...)" style="width:250px;" onkeyup="window.filtrerBaseClients()">
+                    
+                    <button class="btn btn-blue" onclick="window.chargerBaseClients('init', true)">
+                        <i class="fas fa-sync"></i> Actualiser
+                    </button>
                 </div>
             </div>
             <div class="card" style="padding:0; overflow:hidden;">
@@ -202,7 +184,9 @@
                 <h1>Dossier Administratif</h1>
                 <div style="display:flex; gap:10px;">
                     <button class="btn btn-red" onclick="window.viderFormulaire()"><i class="fas fa-trash-alt"></i> NOUVEAU</button>
-                    <button class="btn btn-green" id="btn-save-bdd" onclick="window.sauvegarderDossier()"><i class="fas fa-save"></i> ENREGISTRER</button>
+                    <button class="btn btn-green" id="btn-save-bdd" onclick="window.sauvegarderDossier()">
+    <i class="fas fa-save"></i> ENREGISTRER
+</button>
                 </div>
             </div>
 
@@ -213,7 +197,7 @@
                         <label style="color:#0369a1;">IMPORTER DEPUIS LA FACTURATION</label>
                         <div style="display:flex; gap:10px; margin-top:5px;">
                             <select id="select-import-client" style="flex:1;"><option value="">Chargement des clients...</option></select>
-                            <button class="btn btn-blue" onclick="window.importerClientSelectionne()">Importer</button>
+                            <button class="btn btn-blue" id="btn-import">Importer</button>
                         </div>
                     </div>
                 </div>
@@ -380,7 +364,6 @@
                             <div class="form-grid">
                                 <div><label>Pays Destination</label><input id="rap_pays" list="villes_list"></div>
                                 <div><label>Ville Destination</label><input id="rap_ville" list="villes_list"></div>
-                                
                                 <div class="span-2" style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid var(--border);">
                                     <label style="font-weight:bold; color:var(--dark);"><i class="fas fa-plane-departure"></i> VOL 1 (Principal)</label>
                                     <div class="form-grid">
@@ -396,7 +379,6 @@
                                         <label for="check_vol2" style="font-weight:600; color:#ef4444; display:inline;">Ajouter un Vol de Correspondance (Vol 2)</label>
                                     </div>
                                 </div>
-
                                 <div id="bloc_vol2" class="span-2 form-grid hidden" style="background:#fff1f2; padding:15px; border-radius:8px; border:1px solid #fecaca;">
                                     <div class="span-2"><label style="font-weight:bold;"><i class="fas fa-exchange-alt"></i> VOL 2 (Correspondance)</label></div>
                                     <div><label>N° Vol 2</label><input id="vol2_num"></div>
@@ -406,7 +388,6 @@
                                     <div><label>Dép. (Date Heure)</label><input id="vol2_dep_time"></div>
                                     <div><label>Arr. (Date Heure)</label><input id="vol2_arr_time"></div>
                                 </div>
-
                                 <div class="span-2" style="background:var(--light); padding:15px; border-radius:8px;">
                                     <label style="font-weight:bold;">Transport Routier (Arrivée)</label>
                                     <div class="form-grid">
@@ -430,7 +411,7 @@
                                     <i class="fas fa-plus"></i> AJOUTER
                                 </button>
                             </div>
-                            <small style="color:#64748b; display:block; margin-bottom:10px;">⚠️ Plan B : Images légères ou PDF (Max 1 Mo).</small>
+                            <small style="color:#64748b; display:block; margin-bottom:10px;">⚠️ Plan B : Images légères ou PDF (Max 800 Ko).</small>
 
                             <div id="liste_pieces_jointes" style="display:flex; flex-direction:column; gap:8px;">
                                 <div style="color:#94a3b8; font-style:italic;">Aucun document joint.</div>
@@ -465,7 +446,7 @@
     </button>
     <div id="mobile-overlay" onclick="window.toggleSidebar()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:4000;"></div>
     
-    <script type="module" src="js/app.js?v=99"></script>
+  <script type="module" src="js/app.js?v=2"></script>
     
     <script>
         window.toggleSidebar = function() {
@@ -475,3 +456,7 @@
     </script>
 </body>
 </html>
+
+
+
+
