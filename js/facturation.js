@@ -1,11 +1,11 @@
-/* js/facturation.js - VERSION FINALE (FILTRES MOIS/ANNÉE + CATÉGORIES + DÉTAILS) */
+/* js/facturation.js - VERSION FINALE (RIB À JOUR + SECTIONS ORANGE) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- INFOS BANCAIRES ---
+// --- VOS INFOS BANCAIRES (RIB MIS À JOUR) ---
 const INFO_SOCIETE = {
     banque: "BANQUE POPULAIRE DU SUD",
-    iban: "FR76 1234 5678 9012 3456 7890 123",
+    iban: "FR76 1660 7000 0738 2217 4454 393", // Nouveau RIB
     bic: "BPOPSXXXX",
     conditions: "Paiement à réception de la facture."
 };
@@ -22,15 +22,13 @@ const currentYear = new Date().getFullYear();
 onAuthStateChanged(auth, (user) => {
     if (user) {
         chargerLogoBase64();
-        initYearFilter(); // Initialise le filtre année
+        initYearFilter();
         window.chargerListeFactures();
         window.chargerDepenses();
         chargerSuggestionsClients();
-        
-        // Date par défaut formulaire dépense
         if(document.getElementById('dep_date_fac')) document.getElementById('dep_date_fac').valueAsDate = new Date();
         
-        // Activation Drag & Drop
+        // Drag & Drop
         const el = document.getElementById('tbody_lignes');
         if(el && window.Sortable) {
             new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: window.calculTotal });
@@ -42,7 +40,6 @@ function initYearFilter() {
     const sel = document.getElementById('filter_year');
     if(sel) {
         sel.innerHTML = `<option value="">Année (Toutes)</option>`;
-        // On propose l'année en cours et les 2 précédentes
         for(let y = currentYear; y >= currentYear - 2; y--) {
             sel.innerHTML += `<option value="${y}" ${y===currentYear ? 'selected':''}>${y}</option>`;
         }
@@ -115,7 +112,7 @@ window.filtrerFactures = function() {
     });
 };
 
-// --- 2. DEPENSES (AMÉLIORÉES) ---
+// --- 2. DEPENSES ---
 window.toggleNewExpenseForm = function() { const c = document.getElementById('container-form-depense'); c.classList.toggle('open'); if(!c.classList.contains('open')) window.resetFormDepense(); };
 
 window.chargerDepenses = async function() { 
@@ -129,7 +126,6 @@ window.chargerDepenses = async function() {
             const data = docSnap.data(); 
             data.id = docSnap.id; 
             cacheDepenses.push(data); 
-            // Calcul du total global (année en cours uniquement)
             if(new Date(data.date).getFullYear() === currentYear && data.statut === 'Réglé') {
                 global_Depenses += (parseFloat(data.montant) || 0); 
             }
@@ -153,14 +149,10 @@ function updateFournisseursList(suppliers) {
     if(dl) dl.innerHTML = Array.from(suppliers).map(s => `<option value="${s}">`).join(''); 
 }
 
-// === FILTRE DÉPENSES (MOIS / ANNÉE) ===
 window.filtrerDepenses = function() { 
     const term = (document.getElementById('search_depense')?.value || "").toLowerCase();
-    
-    // Nouveaux filtres
-    const selMonth = document.getElementById('filter_month')?.value; // "0" à "11" ou ""
-    const selYear = document.getElementById('filter_year')?.value;   // "2026" ou ""
-    
+    const selMonth = document.getElementById('filter_month')?.value; 
+    const selYear = document.getElementById('filter_year')?.value;   
     const cat = document.getElementById('filter_cat')?.value;
     const statut = document.getElementById('filter_statut')?.value;
 
@@ -169,17 +161,12 @@ window.filtrerDepenses = function() {
     tbody.innerHTML = ""; 
 
     const filtered = cacheDepenses.filter(d => { 
-        // Texte
         const textMatch = (d.fournisseur + " " + (d.details||"") + " " + d.categorie).toLowerCase().includes(term);
-        // Catégorie
         const catMatch = !cat || cat === "" || d.categorie === cat;
-        // Statut
         const statutMatch = !statut || statut === "" || d.statut === statut;
         
-        // Dates (Mois/Année)
         let dateMatch = true;
         const dDate = new Date(d.date);
-        
         if (selYear && selYear !== "" && dDate.getFullYear() != selYear) dateMatch = false;
         if (selMonth && selMonth !== "" && dDate.getMonth() != selMonth) dateMatch = false;
 
@@ -190,33 +177,21 @@ window.filtrerDepenses = function() {
     const displayTotal = document.getElementById('total-filtre-display');
     if(displayTotal) displayTotal.innerText = totalFilter.toFixed(2) + " €"; 
 
-    // AFFICHAGE TABLEAU AVEC DÉTAILS
     filtered.forEach(d => { 
-        // Badge Statut
         const badge = d.statut==='Réglé' 
             ? `<span class="badge badge-regle">Réglé</span>` 
             : `<span class="badge badge-attente" onclick="window.marquerCommeRegle('${d.id}')">En attente</span>`; 
         
-        // Date Règlement (petite ligne en dessous)
         let dateRegleHtml = "";
         if (d.statut === 'Réglé' && d.date_reglement) {
             dateRegleHtml = `<br><span style="font-size:0.7rem; color:#059669;"><i class="fas fa-check"></i> Réglé le ${new Date(d.date_reglement).toLocaleDateString()}</span>`;
         }
-
-        // Détails (petite ligne sous fournisseur)
         const detailsHtml = d.details ? `<br><span style="font-size:0.8rem; color:#6b7280; font-style:italic;">${d.details}</span>` : "";
 
         const tr = document.createElement('tr'); 
         tr.innerHTML = `
-            <td>
-                <span style="font-weight:600;">${new Date(d.date).toLocaleDateString()}</span>
-                ${dateRegleHtml}
-            </td>
-            <td>
-                <strong>${d.fournisseur}</strong>
-                ${detailsHtml}
-                <br><small style="color:#d97706; font-size:0.75rem;">${d.categorie}</small>
-            </td>
+            <td><span style="font-weight:600;">${new Date(d.date).toLocaleDateString()}</span>${dateRegleHtml}</td>
+            <td><strong>${d.fournisseur}</strong>${detailsHtml}<br><small style="color:#d97706; font-size:0.75rem;">${d.categorie}</small></td>
             <td>${d.reference||'-'}</td>
             <td>${badge}</td>
             <td style="text-align:right;">-${parseFloat(d.montant).toFixed(2)} €</td>
@@ -285,7 +260,7 @@ window.chargerDocument = async (id) => {
     } 
 };
 
-// AJOUT LIGNE (2 Colonnes)
+// AJOUT LIGNE
 window.ajouterLigne = function(desc="", prix=0, type="Courant") { 
     if(type === 'Avance') type = 'Courant';
     const tr = document.createElement('tr'); 
@@ -295,7 +270,20 @@ window.ajouterLigne = function(desc="", prix=0, type="Courant") {
     window.calculTotal(); 
 };
 
-window.ajouterSection = function(titre="SECTION") { const tr = document.createElement('tr'); tr.className = "row-section"; tr.innerHTML = `<td class="drag-handle"><i class="fas fa-grip-vertical"></i></td><td colspan="4"><input type="text" class="input-cell input-section" value="${titre}" style="font-weight:bold; color:#d97706;"></td><td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; document.getElementById('tbody_lignes').appendChild(tr); };
+// AJOUT SECTION (COULEUR ORANGE DANS L'INTERFACE)
+window.ajouterSection = function(titre="SECTION") { 
+    const tr = document.createElement('tr'); 
+    tr.className = "row-section"; 
+    // STYLE BACKGROUND AJOUTÉ ICI : #fff7ed (Orange très clair)
+    tr.innerHTML = `
+        <td class="drag-handle"><i class="fas fa-grip-lines" style="color:#f97316; cursor:grab;"></i></td>
+        <td colspan="4">
+            <input type="text" class="input-cell input-section" value="${titre}" style="font-weight:bold; color:#c2410c; background-color:#ffedd5; border:1px solid #fed7aa;">
+        </td>
+        <td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; 
+    document.getElementById('tbody_lignes').appendChild(tr); 
+};
+
 window.calculTotal = function() { let total = 0; document.querySelectorAll('.val-prix').forEach(i => total += parseFloat(i.value) || 0); document.getElementById('total_general').innerText = total.toFixed(2) + " €"; let paye = paiements.reduce((s, p) => s + parseFloat(p.montant), 0); document.getElementById('total_paye').innerText = paye.toFixed(2) + " €"; document.getElementById('reste_a_payer').innerText = (total - paye).toFixed(2) + " €"; document.getElementById('total_display').innerText = total.toFixed(2); };
 
 // SAUVEGARDE
@@ -384,7 +372,10 @@ window.generatePDFFromData = function(data, saveMode = false) {
     y += 25;
     const body = [];
     data.lignes.forEach(l => {
-        if(l.type === 'section') { body.push([{ content: l.text, colSpan: 3, styles: { fillColor: [243, 244, 246], fontStyle: 'bold', halign:'left' } }]); } 
+        if(l.type === 'section') { 
+            // COULEUR SECTION PDF (ORANGE) : #ffedd5 = [255, 237, 213]
+            body.push([{ content: l.text, colSpan: 3, styles: { fillColor: [255, 237, 213], textColor:[154, 52, 18], fontStyle: 'bold', halign:'left' } }]); 
+        } 
         else { 
             let pCourant = "", pOptionnel = "";
             const prixFmt = parseFloat(l.prix).toFixed(2) + ' €';
