@@ -1,4 +1,4 @@
-/* js/app.js - VERSION FINALE (CORRECTIF IDs TRANSPORT + TOUT INCLUS) */
+/* js/app.js - VERSION FINALE (RECHERCHE CLIENTS ACTIVE + TOUT INCLUS) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import { doc, getDoc, collection, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -7,9 +7,21 @@ import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
 // ============================================================
-// 1. BRANCHEMENT DES FONCTIONS (PDF & BASE)
+// 1. BRANCHEMENT DES FONCTIONS
 // ============================================================
 
+// Connexion Base de Données
+window.chargerBaseClients = DB.chargerBaseClients;
+window.filtrerBaseClients = DB.filtrerBaseClients; // Nouvelle fonction de recherche
+window.supprimerDossier = DB.supprimerDossier;
+window.viderFormulaire = DB.viderFormulaire;
+window.chargerStock = DB.chargerStock;
+window.ajouterArticleStock = DB.ajouterArticle;
+window.supprimerArticle = DB.supprimerArticle;
+window.importerClientSelectionne = DB.importerClientSelectionne;
+window.chargerSelectImport = DB.chargerSelectImport;
+
+// Connexion PDF
 if (PDF && PDF.genererPouvoir) {
     window.genererPouvoir = PDF.genererPouvoir;
     window.genererDeclaration = PDF.genererDeclaration;
@@ -22,17 +34,17 @@ if (PDF && PDF.genererPouvoir) {
     window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 }
 
-window.chargerBaseClients = DB.chargerBaseClients;
-window.supprimerDossier = DB.supprimerDossier;
-window.viderFormulaire = DB.viderFormulaire;
-window.chargerStock = DB.chargerStock;
-window.ajouterArticleStock = DB.ajouterArticle;
-window.supprimerArticle = DB.supprimerArticle;
-window.importerClientSelectionne = DB.importerClientSelectionne;
-window.chargerSelectImport = DB.chargerSelectImport;
+// ACTIVATION AUTOMATIQUE DE LA RECHERCHE
+// Dès que le fichier est chargé, on surveille la barre de recherche
+const searchInput = document.getElementById('search-client');
+if(searchInput) {
+    searchInput.addEventListener('keyup', () => {
+        window.filtrerBaseClients();
+    });
+}
 
 // ============================================================
-// 2. GESTION GED (VALIDÉE)
+// 2. GESTION GED
 // ============================================================
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
@@ -42,7 +54,7 @@ window.ajouterPieceJointe = function() {
     if (fileInput.files.length === 0) { alert("⚠️ Sélectionnez un fichier."); return; }
     const file = fileInput.files[0];
 
-    if (file.size > 1000 * 1024) { // 1 Mo Max
+    if (file.size > 1000 * 1024) { 
         alert("⚠️ FICHIER TROP LOURD (>1 Mo). Compressez-le.");
         return;
     }
@@ -84,7 +96,7 @@ window.ajouterPieceJointe = function() {
 };
 
 // ============================================================
-// 3. SAUVEGARDE (AVEC VOS IDs HTML EXACTS)
+// 3. SAUVEGARDE COMPLÈTE
 // ============================================================
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
@@ -96,7 +108,6 @@ window.sauvegarderDossier = async function() {
         
         let data = {
             date_modification: new Date().toISOString(),
-            // --- IDENTITÉ ---
             defunt: {
                 civility: getVal('civilite_defunt'), nom: getVal('nom'), prenom: getVal('prenom'), nom_jeune_fille: getVal('nom_jeune_fille'),
                 date_deces: getVal('date_deces'), lieu_deces: getVal('lieu_deces'), heure_deces: getVal('heure_deces'),
@@ -105,45 +116,29 @@ window.sauvegarderDossier = async function() {
                 conjoint: getVal('conjoint'), profession: getVal('profession_libelle')
             },
             mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), lien: getVal('lien'), adresse: getVal('demeurant') },
-            
-            // --- TECHNIQUE ---
             technique: {
                 type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'),
                 cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'),
                 heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'),
                 date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat')
             },
-            
-            // --- TRANSPORT (CORRIGÉ AVEC VOS IDs HTML) ---
             transport: { 
-                // Avant Mise en Bière
                 av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'),
                 av_date_dep: getVal('av_date_dep'), av_heure_dep: getVal('av_heure_dep'),
                 av_date_arr: getVal('av_date_arr'), av_heure_arr: getVal('av_heure_arr'),
 
-                // Après Mise en Bière
                 ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'),
                 ap_date_dep: getVal('ap_date_dep'), ap_heure_dep: getVal('ap_heure_dep'),
                 ap_date_arr: getVal('ap_date_arr'), ap_heure_arr: getVal('ap_heure_arr'),
                 
-                // Rapatriement
                 rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta'),
-                
-                // Vol 1 (Principal)
-                vol1_num: getVal('vol1_num'),
-                vol1_dep_aero: getVal('vol1_dep_aero'), vol1_arr_aero: getVal('vol1_arr_aero'),
+                vol1_num: getVal('vol1_num'), vol1_dep_aero: getVal('vol1_dep_aero'), vol1_arr_aero: getVal('vol1_arr_aero'),
                 vol1_dep_time: getVal('vol1_dep_time'), vol1_arr_time: getVal('vol1_arr_time'),
-
-                // Vol 2 (Correspondance)
-                vol2_num: getVal('vol2_num'),
-                vol2_dep_aero: getVal('vol2_dep_aero'), vol2_arr_aero: getVal('vol2_arr_aero'),
+                vol2_num: getVal('vol2_num'), vol2_dep_aero: getVal('vol2_dep_aero'), vol2_arr_aero: getVal('vol2_arr_aero'),
                 vol2_dep_time: getVal('vol2_dep_time'), vol2_arr_time: getVal('vol2_arr_time'),
 
-                // Transport Routier
-                rap_immat: getVal('rap_immat'), // ID corrigé ici
-                rap_date_dep_route: getVal('rap_date_dep_route'), // ID corrigé ici
-                rap_ville_dep: getVal('rap_ville_dep'), // ID corrigé ici
-                rap_ville_arr: getVal('rap_ville_arr') // ID corrigé ici
+                rap_immat: getVal('rap_immat'), rap_date_dep_route: getVal('rap_date_dep_route'),
+                rap_ville_dep: getVal('rap_ville_dep'), rap_ville_arr: getVal('rap_ville_arr')
             }
         };
 
@@ -157,10 +152,8 @@ window.sauvegarderDossier = async function() {
             document.getElementById('dossier_id').value = finalId;
         }
 
-        // Sauvegarde GED
         const allGedItems = [];
         const elements = document.querySelectorAll('#liste_pieces_jointes .ged-item');
-        
         for (const div of elements) {
             const name = div.getAttribute('data-name');
             const status = div.getAttribute('data-status');
@@ -182,7 +175,7 @@ window.sauvegarderDossier = async function() {
         }
 
         await updateDoc(doc(db, "dossiers_admin", finalId), { ged: allGedItems });
-        alert("✅ Sauvegarde réussie (Transports inclus) !");
+        alert("✅ Sauvegarde réussie !");
         
         window.chargerDossier(finalId);
         if(window.chargerBaseClients) window.chargerBaseClients();
@@ -193,7 +186,7 @@ window.sauvegarderDossier = async function() {
 };
 
 // ============================================================
-// 4. CHARGEMENT (REMPLISSAGE EXACT)
+// 4. CHARGEMENT COMPLET
 // ============================================================
 window.chargerDossier = async function(id) {
     try {
@@ -229,37 +222,25 @@ window.chargerDossier = async function(id) {
             else if (op === 'Crémation') { set('date_cremation', data.technique.date_ceremonie); set('heure_cremation', data.technique.heure_ceremonie); }
         }
         if (data.transport) {
-            // Transport Avant
             set('av_lieu_depart', data.transport.av_dep); set('av_lieu_arrivee', data.transport.av_arr);
             set('av_date_dep', data.transport.av_date_dep); set('av_heure_dep', data.transport.av_heure_dep);
             set('av_date_arr', data.transport.av_date_arr); set('av_heure_arr', data.transport.av_heure_arr);
 
-            // Transport Après
             set('ap_lieu_depart', data.transport.ap_dep); set('ap_lieu_arrivee', data.transport.ap_arr);
             set('ap_date_dep', data.transport.ap_date_dep); set('ap_heure_dep', data.transport.ap_heure_dep);
             set('ap_date_arr', data.transport.ap_date_arr); set('ap_heure_arr', data.transport.ap_heure_arr);
 
-            // Rapatriement
             set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta);
-            
-            // Vol 1
             set('vol1_num', data.transport.vol1_num);
             set('vol1_dep_aero', data.transport.vol1_dep_aero); set('vol1_arr_aero', data.transport.vol1_arr_aero);
             set('vol1_dep_time', data.transport.vol1_dep_time); set('vol1_arr_time', data.transport.vol1_arr_time);
-
-            // Vol 2
             set('vol2_num', data.transport.vol2_num);
             set('vol2_dep_aero', data.transport.vol2_dep_aero); set('vol2_arr_aero', data.transport.vol2_arr_aero);
             set('vol2_dep_time', data.transport.vol2_dep_time); set('vol2_arr_time', data.transport.vol2_arr_time);
-            
-            // Route
-            set('rap_immat', data.transport.rap_immat);
-            set('rap_date_dep_route', data.transport.rap_date_dep_route);
-            set('rap_ville_dep', data.transport.rap_ville_dep);
-            set('rap_ville_arr', data.transport.rap_ville_arr);
+            set('rap_immat', data.transport.rap_immat); set('rap_date_dep_route', data.transport.rap_date_dep_route);
+            set('rap_ville_dep', data.transport.rap_ville_dep); set('rap_ville_arr', data.transport.rap_ville_arr);
         }
 
-        // --- GED ---
         const container = document.getElementById('liste_pieces_jointes');
         const rawGed = data.ged || data.pieces_jointes || [];
         
@@ -293,9 +274,7 @@ window.chargerDossier = async function(id) {
                     if(storageId) div.setAttribute('data-storage-id', storageId);
 
                     div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px;";
-                    
                     const btnEye = isBinary ? `<a href="${lien}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a>` : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye-slash"></i></div>`;
-
                     div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nom}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;">${btnEye}<button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
                     container.appendChild(div);
                 }
