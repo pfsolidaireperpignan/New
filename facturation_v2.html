@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FINANCE - Facturation</title>
+    <title>PF FINANCE - Facturation</title>
     
     <link rel="stylesheet" href="style.css">
     
@@ -119,12 +119,38 @@
 
                 <div id="advanced-filters" class="hidden" style="background:white; padding:20px; border-radius:16px; margin-bottom:24px; border:1px solid #e5e7eb; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
                     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px;">
-                        <div><label>Du</label><input type="date" id="filter_date_start" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;"></div>
-                        <div><label>Au</label><input type="date" id="filter_date_end" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;"></div>
-                        <div><label>Catégorie</label>
+                        <div>
+                            <label>Mois</label>
+                            <select id="filter_month" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                                <option value="">Tous les mois</option>
+                                <option value="0">Janvier</option><option value="1">Février</option><option value="2">Mars</option><option value="3">Avril</option>
+                                <option value="4">Mai</option><option value="5">Juin</option><option value="6">Juillet</option><option value="7">Août</option>
+                                <option value="8">Septembre</option><option value="9">Octobre</option><option value="10">Novembre</option><option value="11">Décembre</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Année</label>
+                            <select id="filter_year" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                                </select>
+                        </div>
+                        <div>
+                            <label>Catégorie</label>
                             <select id="filter_cat" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                                 <option value="">Toutes</option>
-                                <option>Cercueils & Accessoires</option><option>Urnes</option><option>Fleurs & Articles</option><option>Marbrerie</option><option>Frais de Fret</option><option>Crématorium</option><option>Chambre Funéraire</option><option>Vacation Police</option><option>Taxes & Redevances</option><option>Sous-traitance</option><option>Carburant</option><option>Frais Généraux</option><option>Personnel</option>
+                                <optgroup label="Frais Généraux">
+                                    <option>Loyer</option><option>Électricité</option><option>Eau</option><option>Internet / Tel</option><option>Assurances</option>
+                                </optgroup>
+                                <optgroup label="Opérations">
+                                    <option>Cercueils & Accessoires</option><option>Urnes</option><option>Fleurs & Articles</option><option>Marbrerie</option>
+                                    <option>Frais de Fret</option><option>Crématorium</option><option>Chambre Funéraire</option><option>Vacation Police</option>
+                                    <option>Taxes & Redevances</option><option>Sous-traitance</option>
+                                </optgroup>
+                                <optgroup label="Personnel / Structure">
+                                    <option>Carburant</option><option>Entretien Véhicules</option><option>Fournitures Bureau</option><option>Salaires</option><option>Charges Sociales</option>
+                                </optgroup>
+                                <optgroup label="Autre">
+                                    <option>Trop perçu</option><option>Remboursement</option><option>Divers</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div><label>Statut</label><select id="filter_statut" onchange="window.filtrerDepenses()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;"><option value="">Tous</option><option value="Réglé">Réglé</option><option value="En attente">En attente</option></select></div>
@@ -143,7 +169,20 @@
                             
                             <div style="grid-column: span 2;"><label>Catégorie</label>
                                 <select id="dep_cat" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;">
-                                    <option>Cercueils & Accessoires</option><option>Urnes</option><option>Fleurs & Articles</option><option>Marbrerie</option><option>Frais de Fret</option><option>Crématorium</option><option>Chambre Funéraire</option><option>Vacation Police</option><option>Taxes & Redevances</option><option>Sous-traitance</option><option>Carburant</option><option>Frais Généraux</option><option>Personnel</option>
+                                    <optgroup label="Frais Généraux">
+                                        <option>Loyer</option><option>Électricité</option><option>Eau</option><option>Internet / Tel</option><option>Assurances</option>
+                                    </optgroup>
+                                    <optgroup label="Opérations">
+                                        <option>Cercueils & Accessoires</option><option>Urnes</option><option>Fleurs & Articles</option><option>Marbrerie</option>
+                                        <option>Frais de Fret</option><option>Crématorium</option><option>Chambre Funéraire</option><option>Vacation Police</option>
+                                        <option>Taxes & Redevances</option><option>Sous-traitance</option>
+                                    </optgroup>
+                                    <optgroup label="Personnel / Structure">
+                                        <option>Carburant</option><option>Entretien Véhicules</option><option>Fournitures Bureau</option><option>Salaires</option><option>Charges Sociales</option>
+                                    </optgroup>
+                                    <optgroup label="Autre">
+                                        <option>Trop perçu</option><option>Remboursement</option><option>Divers</option>
+                                    </optgroup>
                                 </select>
                             </div>
                             <div style="grid-column: span 2;"><label>Détails / Note</label><input id="dep_details" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
@@ -161,7 +200,7 @@
 
                 <div class="card">
                     <table class="compta-table">
-                        <thead><tr><th>DATE</th><th>FOURNISSEUR</th><th>CATÉGORIE</th><th>STATUT</th><th style="text-align:right;">MONTANT</th><th style="text-align:center;">ACTION</th></tr></thead>
+                        <thead><tr><th>DATE</th><th>FOURNISSEUR & DÉTAIL</th><th>RÉF</th><th>STATUT</th><th style="text-align:right;">MONTANT</th><th style="text-align:center;">ACTION</th></tr></thead>
                         <tbody id="depenses-body"></tbody>
                     </table>
                 </div>
