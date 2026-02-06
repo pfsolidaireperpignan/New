@@ -1,18 +1,116 @@
-/* js/app.js - VERSION FINALE (RECHERCHE CLIENTS ACTIVE + TOUT INCLUS) */
+/* js/app.js - VERSION SÉCURISÉE (LOGIN + FORGOT PASSWORD) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
+import { sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"; // Ajout pour le reset
 import { doc, getDoc, collection, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import * as Utils from './utils.js';
 import * as PDF from './pdf_admin.js'; 
 import * as DB from './db_manager.js';
 
 // ============================================================
-// 1. BRANCHEMENT DES FONCTIONS
+// 1. SÉCURITÉ & AUTHENTIFICATION
+// ============================================================
+
+// Gestion du Login
+window.loginFirebase = async function() {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-password').value;
+    const btn = document.getElementById('btn-login');
+    
+    if(!email || !pass) { alert("Veuillez remplir tous les champs."); return; }
+    
+    try {
+        btn.innerText = "Connexion...";
+        await signInWithEmailAndPassword(auth, email, pass);
+        // La redirection est gérée par onAuthStateChanged
+    } catch(e) { 
+        console.error(e);
+        btn.innerText = "SE CONNECTER";
+        if(e.code === 'auth/invalid-credential') alert("Email ou mot de passe incorrect.");
+        else alert("Erreur connexion : " + e.message); 
+    }
+};
+
+// Gestion "Mot de passe oublié"
+window.motDePasseOublie = async function() {
+    const email = document.getElementById('login-email').value;
+    if (!email) {
+        alert("Veuillez d'abord entrer votre EMAIL dans la case au-dessus, puis recliquez sur ce lien.");
+        return;
+    }
+    if(confirm(`Envoyer un email de réinitialisation à : ${email} ?`)) {
+        try {
+            await sendPasswordResetEmail(auth, email);
+            alert("📧 Email envoyé ! Vérifiez votre boîte mail (et les spams) pour changer votre mot de passe.");
+        } catch(e) {
+            alert("Erreur : " + e.message);
+        }
+    }
+};
+
+// Gestion Déconnexion
+window.logoutFirebase = async function() { 
+    if(confirm("Se déconnecter ?")) {
+        await signOut(auth); 
+        window.location.reload(); 
+    }
+};
+
+// SURVEILLANCE ÉTAT (Le Gardien)
+onAuthStateChanged(auth, (user) => {
+    const loader = document.getElementById('app-loader'); 
+    if(loader) loader.style.display = 'none';
+
+    if (user) {
+        // --- UTILISATEUR CONNECTÉ ---
+        console.log("✅ Connecté : " + user.email);
+        document.getElementById('login-screen')?.classList.add('hidden');
+        
+        // On charge les données seulement maintenant
+        Utils.chargerLogoBase64();
+        DB.chargerBaseClients();
+        
+        // Initialisation de l'heure
+        setInterval(() => {
+            const now = new Date();
+            if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+            if(document.getElementById('header-date')) document.getElementById('header-date').innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+        }, 1000);
+
+        // Init UI
+        setTimeout(() => { if(window.toggleSections) window.toggleSections(); }, 500);
+
+    } else {
+        // --- UTILISATEUR DÉCONNECTÉ ---
+        console.log("🔒 Non connecté");
+        document.getElementById('login-screen')?.classList.remove('hidden');
+        // On vide les données sensibles par sécurité
+        document.getElementById('clients-table-body').innerHTML = "";
+    }
+});
+
+// Écouteurs d'événements pour les boutons Login (si présents dans le DOM)
+document.addEventListener("DOMContentLoaded", () => {
+    const btnLogin = document.getElementById('btn-login');
+    const btnForgot = document.getElementById('btn-forgot');
+    
+    if(btnLogin) btnLogin.onclick = window.loginFirebase;
+    if(btnForgot) btnForgot.onclick = window.motDePasseOublie;
+    
+    // Touche Entrée pour valider
+    document.getElementById('login-password')?.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') window.loginFirebase();
+    });
+});
+
+
+// ============================================================
+// 2. BRANCHEMENT DES FONCTIONS MÉTIER
 // ============================================================
 
 // Connexion Base de Données
 window.chargerBaseClients = DB.chargerBaseClients;
-window.filtrerBaseClients = DB.filtrerBaseClients; // Nouvelle fonction de recherche
+window.filtrerBaseClients = DB.filtrerBaseClients;
 window.supprimerDossier = DB.supprimerDossier;
 window.viderFormulaire = DB.viderFormulaire;
 window.chargerStock = DB.chargerStock;
@@ -34,17 +132,8 @@ if (PDF && PDF.genererPouvoir) {
     window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 }
 
-// ACTIVATION AUTOMATIQUE DE LA RECHERCHE
-// Dès que le fichier est chargé, on surveille la barre de recherche
-const searchInput = document.getElementById('search-client');
-if(searchInput) {
-    searchInput.addEventListener('keyup', () => {
-        window.filtrerBaseClients();
-    });
-}
-
 // ============================================================
-// 2. GESTION GED
+// 3. GESTION GED
 // ============================================================
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
@@ -96,7 +185,7 @@ window.ajouterPieceJointe = function() {
 };
 
 // ============================================================
-// 3. SAUVEGARDE COMPLÈTE
+// 4. SAUVEGARDE COMPLÈTE
 // ============================================================
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
@@ -186,7 +275,7 @@ window.sauvegarderDossier = async function() {
 };
 
 // ============================================================
-// 4. CHARGEMENT COMPLET
+// 5. CHARGEMENT COMPLET
 // ============================================================
 window.chargerDossier = async function(id) {
     try {
@@ -316,19 +405,3 @@ window.copierMandant = function() { const chk = document.getElementById('copy_ma
 window.showSection = function(id) { document.querySelectorAll('.main-content > div').forEach(div => { if(div.id.startsWith('view-')) div.classList.add('hidden'); }); const target = document.getElementById('view-' + id); if(target) target.classList.remove('hidden'); if(id === 'base') DB.chargerBaseClients(); if(id === 'stock') DB.chargerStock(); if(id === 'admin') DB.chargerSelectImport(); };
 window.switchAdminTab = function(tabName) { document.getElementById('tab-content-identite').classList.add('hidden'); document.getElementById('tab-content-technique').classList.add('hidden'); document.getElementById('tab-btn-identite').classList.remove('active'); document.getElementById('tab-btn-technique').classList.remove('active'); document.getElementById('tab-content-' + tabName).classList.remove('hidden'); document.getElementById('tab-btn-' + tabName).classList.add('active'); };
 window.toggleSidebar = function() { const sb = document.querySelector('.sidebar'); if(sb) sb.classList.toggle('collapsed'); };
-window.loginFirebase = async function() { try { await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-password').value); } catch(e) { alert("Erreur login: " + e.message); } };
-window.logoutFirebase = async function() { await signOut(auth); window.location.reload(); };
-onAuthStateChanged(auth, (user) => {
-    const loader = document.getElementById('app-loader'); if(loader) loader.style.display = 'none';
-    if(user) {
-        document.getElementById('login-screen')?.classList.add('hidden');
-        Utils.chargerLogoBase64();
-        DB.chargerBaseClients();
-        setTimeout(() => { if(window.toggleSections) window.toggleSections(); }, 500);
-        setInterval(() => {
-            const now = new Date();
-            if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-            if(document.getElementById('header-date')) document.getElementById('header-date').innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
-        }, 1000);
-    } else { document.getElementById('login-screen')?.classList.remove('hidden'); }
-});
