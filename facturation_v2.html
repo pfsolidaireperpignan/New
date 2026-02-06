@@ -79,16 +79,36 @@
             </div>
 
             <div id="tab-factures">
-                <div style="display:flex; justify-content:space-between; margin-bottom:24px; align-items:center;">
-                    <div class="search-box">
+                <div style="background:white; padding:15px; border-radius:12px; border:1px solid #e5e7eb; margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <div class="search-box" style="flex:1; min-width:200px;">
                         <i class="fas fa-search"></i>
-                        <input type="text" id="search-facture" onkeyup="window.filtrerFactures()" placeholder="Rechercher un client, n°...">
+                        <input type="text" id="search-facture" onkeyup="window.filtrerFactures()" placeholder="Rechercher...">
                     </div>
-                    <div style="display:flex; gap:10px;">
-                        <button class="btn btn-green" onclick="window.exportExcelSmart()"><i class="fas fa-file-excel"></i> EXPORT</button>
-                        <button class="btn btn-blue" onclick="document.getElementById('modal-choix').classList.remove('hidden')">
-                            <i class="fas fa-plus"></i> CRÉER
-                        </button>
+                    
+                    <select id="filter_fac_month" onchange="window.filtrerFactures()" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                        <option value="">Mois (Tous)</option>
+                        <option value="0">Janvier</option><option value="1">Février</option><option value="2">Mars</option><option value="3">Avril</option>
+                        <option value="4">Mai</option><option value="5">Juin</option><option value="6">Juillet</option><option value="7">Août</option>
+                        <option value="8">Septembre</option><option value="9">Octobre</option><option value="10">Novembre</option><option value="11">Décembre</option>
+                    </select>
+
+                    <select id="filter_fac_year" onchange="window.filtrerFactures()" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;"></select>
+
+                    <select id="filter_fac_type" onchange="window.filtrerFactures()" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                        <option value="">Type (Tous)</option>
+                        <option value="DEVIS">Devis</option>
+                        <option value="FACTURE">Facture</option>
+                    </select>
+
+                    <select id="filter_fac_statut" onchange="window.filtrerFactures()" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                        <option value="">Statut (Tous)</option>
+                        <option value="Payé">Payé (Soldé)</option>
+                        <option value="En attente">En attente / Acompte</option>
+                    </select>
+
+                    <div style="border-left:1px solid #e5e7eb; padding-left:10px; display:flex; gap:5px;">
+                        <button class="btn btn-green" onclick="window.exportExcelSmart()"><i class="fas fa-file-excel"></i></button>
+                        <button class="btn btn-blue" onclick="document.getElementById('modal-choix').classList.remove('hidden')"><i class="fas fa-plus"></i></button>
                     </div>
                 </div>
                 
@@ -108,6 +128,9 @@
                             <input id="search_depense" placeholder="Rechercher fournisseur..." onkeyup="window.filtrerDepenses()">
                         </div>
                         <button class="btn btn-grey" onclick="document.getElementById('advanced-filters').classList.toggle('hidden')"><i class="fas fa-filter"></i> FILTRES</button>
+                        
+                        <button class="btn btn-green" onclick="window.exportExcelSmart()"><i class="fas fa-file-excel"></i> EXPORT</button>
+
                         <div style="background:white; padding:10px 20px; border-radius:10px; border:1px solid #e5e7eb; font-weight:700; color:#ef4444;">
                             SÉLECTION : <span id="total-filtre-display">0.00 €</span>
                         </div>
