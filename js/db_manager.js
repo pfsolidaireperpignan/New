@@ -1,41 +1,89 @@
-/* js/db_manager.js - VERSION FINALE */
+/* js/db_manager.js - VERSION FINALE (RECHERCHE ACTIVE) */
 import { db } from './config.js';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, getDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getVal, setVal } from './utils.js';
 
 let importCache = [];
+let clientsCache = []; // Mémoire pour la recherche
 
-// --- 1. CLIENTS ---
+// --- 1. CLIENTS (CHARGEMENT + FILTRE) ---
 export async function chargerBaseClients() {
     const tbody = document.getElementById('clients-table-body');
     if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Chargement...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Chargement des dossiers...</td></tr>';
     
     try {
-        const q = query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc"), limit(50));
+        // On charge les 100 derniers dossiers pour avoir de la matière à chercher
+        const q = query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc"), limit(100));
         const snapshot = await getDocs(q);
         
-        tbody.innerHTML = "";
-        if(snapshot.empty) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Aucun dossier.</td></tr>'; return; }
+        clientsCache = []; // On vide le cache avant de remplir
+        
+        if(snapshot.empty) { 
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Aucun dossier trouvé.</td></tr>'; 
+            return; 
+        }
 
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${data.date_creation ? new Date(data.date_creation).toLocaleDateString() : '-'}</td>
-                <td><strong>${data.defunt?.nom || '?'}</strong></td>
-                <td>${data.mandant?.nom || '?'}</td>
-                <td><span class="badge badge-blue">${data.technique?.type_operation || 'Dossier'}</span></td>
-                <td style="text-align:center;">
-                    <button class="btn-icon" onclick="window.chargerDossier('${docSnap.id}')"><i class="fas fa-eye" style="color:#3b82f6;"></i></button>
-                    <button class="btn-icon" onclick="window.supprimerDossier('${docSnap.id}')"><i class="fas fa-trash" style="color:#ef4444;"></i></button>
-                </td>`;
-            tbody.appendChild(tr);
+            data.id = docSnap.id; // Important pour les boutons actions
+            clientsCache.push(data);
         });
-    } catch (e) { console.error(e); }
+
+        // On affiche tout par défaut
+        filtrerBaseClients();
+
+    } catch (e) { 
+        console.error(e); 
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Erreur de chargement.</td></tr>';
+    }
 }
 
-// --- 2. IMPORT ---
+export function filtrerBaseClients() {
+    const term = (document.getElementById('search-client')?.value || "").toLowerCase();
+    const tbody = document.getElementById('clients-table-body');
+    if(!tbody) return;
+    
+    tbody.innerHTML = "";
+
+    // On cherche dans le NOM DU DÉFUNT ou le NOM DU MANDANT
+    const resultats = clientsCache.filter(d => {
+        const defunt = (d.defunt?.nom || "").toLowerCase();
+        const mandant = (d.mandant?.nom || "").toLowerCase();
+        return defunt.includes(term) || mandant.includes(term);
+    });
+
+    if(resultats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Aucun résultat pour cette recherche.</td></tr>';
+        return;
+    }
+
+    resultats.forEach(data => {
+        const tr = document.createElement('tr');
+        
+        let dateCreation = '-';
+        if(data.date_creation) {
+            try { dateCreation = new Date(data.date_creation).toLocaleDateString(); } catch(e){}
+        }
+
+        tr.innerHTML = `
+            <td>${dateCreation}</td>
+            <td><strong>${data.defunt?.nom || 'Inconnu'}</strong></td>
+            <td>${data.mandant?.nom || '-'}</td>
+            <td><span class="badge badge-blue">${data.technique?.type_operation || 'Dossier'}</span></td>
+            <td style="text-align:center;">
+                <button class="btn-icon" onclick="window.chargerDossier('${data.id}')" title="Ouvrir le dossier">
+                    <i class="fas fa-eye" style="color:#3b82f6;"></i>
+                </button>
+                <button class="btn-icon" onclick="window.supprimerDossier('${data.id}')" title="Supprimer définitivement">
+                    <i class="fas fa-trash" style="color:#ef4444;"></i>
+                </button>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+// --- 2. IMPORT (FACTURATION -> DOSSIER) ---
 export async function chargerSelectImport() {
     const select = document.getElementById('select-import-client');
     if(!select) return;
@@ -72,12 +120,11 @@ export function importerClientSelectionne() {
             setVal('demeurant', data.client.adresse);
         }
         if(data.defunt) {
-            setVal('civilite_defunt', data.defunt.civility);
             setVal('nom', data.defunt.nom);
-            setVal('date_naiss', data.defunt.date_naiss);
-            setVal('date_deces', data.defunt.date_deces);
+            if(data.defunt.naiss) setVal('date_naiss', data.defunt.naiss);
+            if(data.defunt.deces) setVal('date_deces', data.defunt.deces);
         }
-        alert("Données importées !");
+        alert("✅ Données importées depuis la facture !");
     }
 }
 
@@ -86,44 +133,17 @@ export async function sauvegarderDossier() {
     const btn = document.getElementById('btn-save-bdd');
     if(btn) btn.innerHTML = "Sauvegarde...";
     
-    // GED : On récupère la liste visible à l'écran
     let gedList = [];
-    document.querySelectorAll('#liste_pieces_jointes div span').forEach(span => {
-        let txt = span.innerText.replace('📄 ', '').trim();
-        if(txt) gedList.push(txt);
+    document.querySelectorAll('#liste_pieces_jointes .ged-item').forEach(div => {
+        // On récupère soit le nouveau format (attribut), soit l'ancien (texte)
+        const name = div.getAttribute('data-name') || div.querySelector('span').innerText.replace('📄 ', '');
+        if(name) gedList.push(name); // Note: Ici on ne sauve que le nom pour l'affichage liste simple si besoin, mais app.js gère le complet.
     });
 
-    const data = {
-        date_modification: new Date().toISOString(),
-        defunt: {
-            civility: getVal('civilite_defunt'), nom: getVal('nom'), prenom: getVal('prenom'), nom_jeune_fille: getVal('nom_jeune_fille'),
-            date_deces: getVal('date_deces'), lieu_deces: getVal('lieu_deces'), date_naiss: getVal('date_naiss'), lieu_naiss: getVal('lieu_naiss'),
-            adresse: getVal('adresse_fr'), pere: getVal('pere'), mere: getVal('mere'), situation: getVal('matrimoniale'),
-            conjoint: getVal('conjoint'), profession: getVal('profession_libelle')
-        },
-        mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), lien: getVal('lien'), adresse: getVal('demeurant') },
-        technique: {
-            type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'),
-            cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'),
-            heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'),
-            date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat')
-        },
-        transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta') },
-        ged: gedList
-    };
-
-    const id = document.getElementById('dossier_id').value;
-    try {
-        if(id) { await updateDoc(doc(db, "dossiers_admin", id), data); alert("✅ Dossier mis à jour !"); }
-        else { 
-            data.date_creation = new Date().toISOString(); 
-            const ref = await addDoc(collection(db, "dossiers_admin"), data); 
-            document.getElementById('dossier_id').value = ref.id; 
-            alert("✅ Nouveau dossier créé !"); 
-        }
-        chargerBaseClients();
-    } catch(e) { alert("Erreur: " + e.message); }
-    if(btn) btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
+    // Note: La fonction sauvegarderDossier principale est maintenant gérée dans APP.JS pour avoir tous les champs.
+    // Cette fonction ici sert de fallback ou pour des updates partiels si nécessaire.
+    // Mais pour éviter les conflits, app.js utilise sa propre version complète.
+    // On garde celle-ci minimaliste pour ne pas casser les imports.
 }
 
 export function viderFormulaire() {
@@ -135,29 +155,17 @@ export function viderFormulaire() {
 }
 
 export async function chargerDossier(id) {
-    try {
-        const docSnap = await getDoc(doc(db, "dossiers_admin", id));
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            window.showSection('admin');
-            viderFormulaire();
-            document.getElementById('dossier_id').value = id;
-            
-            if(data.defunt) { setVal('nom', data.defunt.nom); setVal('prenom', data.defunt.prenom); /* Remplir le reste... */ }
-            // Charge la GED Visuelle
-            const gedDiv = document.getElementById('liste_pieces_jointes');
-            if(data.ged && data.ged.length > 0) {
-                gedDiv.innerHTML = "";
-                data.ged.forEach(name => {
-                    const div = document.createElement('div');
-                    div.style = "background:white; padding:8px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; border-radius:6px;";
-                    div.innerHTML = `<span>📄 ${name}</span><i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="this.parentElement.remove()"></i>`;
-                    gedDiv.appendChild(div);
-                });
-            }
-        }
-    } catch(e) { console.error(e); }
+    // Cette fonction est surchargée par app.js pour inclure tout le transport.
+    // On la garde ici pour compatibilité basique.
 }
 
-export async function supprimerDossier(id) { if(confirm("Supprimer ?")) { await deleteDoc(doc(db,"dossiers_admin",id)); chargerBaseClients(); } }
-export async function chargerStock() {} export async function ajouterArticle() {} export async function supprimerArticle(id) {}
+export async function supprimerDossier(id) { 
+    if(confirm("⚠️ Êtes-vous sûr de vouloir supprimer ce dossier définitivement ?")) { 
+        await deleteDoc(doc(db,"dossiers_admin",id)); 
+        chargerBaseClients(); // Recharge la liste après suppression
+    } 
+}
+
+export async function chargerStock() {} 
+export async function ajouterArticle() {} 
+export async function supprimerArticle(id) {}
