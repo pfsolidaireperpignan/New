@@ -1,4 +1,4 @@
-/* js/app.js - VERSION CORRECTIVE (LOGIN DISPLAY FIX) */
+/* js/app.js - VERSION FINALE (VOTRE LOGIQUE + FIX AFFICHAGE) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import { sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -8,7 +8,7 @@ import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
 // ============================================================
-// 1. SÉCURITÉ (LOGIN / LOGOUT)
+// 1. SÉCURITÉ & AUTHENTIFICATION
 // ============================================================
 
 window.loginFirebase = async function() {
@@ -19,11 +19,11 @@ window.loginFirebase = async function() {
     if(!email || !pass) { alert("Veuillez remplir tous les champs."); return; }
     
     try {
-        if(btn) btn.innerText = "Connexion...";
+        btn.innerText = "Connexion...";
         await signInWithEmailAndPassword(auth, email, pass);
     } catch(e) { 
         console.error(e);
-        if(btn) btn.innerText = "SE CONNECTER";
+        btn.innerText = "SE CONNECTER";
         if(e.code === 'auth/invalid-credential') alert("Email ou mot de passe incorrect.");
         else alert("Erreur connexion : " + e.message); 
     }
@@ -38,7 +38,7 @@ window.motDePasseOublie = async function() {
     if(confirm(`Envoyer un email de réinitialisation à : ${email} ?`)) {
         try {
             await sendPasswordResetEmail(auth, email);
-            alert("📧 Email envoyé ! Vérifiez votre boîte mail.");
+            alert("📧 Email envoyé !");
         } catch(e) { alert("Erreur : " + e.message); }
     }
 };
@@ -50,81 +50,72 @@ window.logoutFirebase = async function() {
     }
 };
 
-// --- LE GARDIEN (CORRECTION VISUELLE FORCÉE) ---
+// SURVEILLANCE ÉTAT (Le Correctif est ICI)
 onAuthStateChanged(auth, (user) => {
     const loader = document.getElementById('app-loader'); 
     const loginScreen = document.getElementById('login-screen');
-    
+
     if(loader) loader.style.display = 'none';
 
     if (user) {
+        // --- UTILISATEUR CONNECTÉ ---
         console.log("✅ Connecté : " + user.email);
         
-        // ICI : ON FORCE LA DISPARITION DU BLOC LOGIN
+        // On CACHE l'écran de login
         if (loginScreen) {
-            loginScreen.style.display = 'none'; // Écrase le style inline du HTML
+            loginScreen.style.display = 'none'; 
             loginScreen.classList.add('hidden');
         }
         
         Utils.chargerLogoBase64();
         DB.chargerBaseClients('init', true);
         
-        // Horloge
         setInterval(() => {
             const now = new Date();
-            const elTime = document.getElementById('header-time');
-            const elDate = document.getElementById('header-date');
-            if(elTime) elTime.innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-            if(elDate) elDate.innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+            if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+            if(document.getElementById('header-date')) document.getElementById('header-date').innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
         }, 1000);
 
         setTimeout(() => { if(window.toggleSections) window.toggleSections(); }, 500);
 
     } else {
+        // --- UTILISATEUR DÉCONNECTÉ ---
         console.log("🔒 Non connecté");
         
-        // ICI : ON FORCE L'AFFICHAGE DU BLOC LOGIN
+        // On AFFICHE l'écran de login (en FLEX pour le centrer)
         if (loginScreen) {
-            loginScreen.style.display = 'flex'; // Rétablit le flexbox pour centrer
+            loginScreen.style.display = 'flex';
             loginScreen.classList.remove('hidden');
         }
-        
+
         const tbody = document.getElementById('clients-table-body');
         if(tbody) tbody.innerHTML = "";
     }
 });
 
-// --- ACTIVATION DES BOUTONS (Dès le chargement) ---
 document.addEventListener("DOMContentLoaded", () => {
-    
-    // 1. Connexion
     const btnLogin = document.getElementById('btn-login');
-    if(btnLogin) btnLogin.onclick = window.loginFirebase;
-
-    // 2. Mot de passe oublié
     const btnForgot = document.getElementById('btn-forgot');
+    const btnLogout = document.getElementById('btn-logout'); // IMPORTANT
+    
+    if(btnLogin) btnLogin.onclick = window.loginFirebase;
     if(btnForgot) btnForgot.onclick = window.motDePasseOublie;
-
-    // 3. DÉCONNEXION (Câblage manuel)
-    const btnLogout = document.getElementById('btn-logout');
+    
+    // Correction du bouton déconnexion
     if(btnLogout) {
-        btnLogout.addEventListener('click', (e) => {
-            e.preventDefault(); // Empêche le lien de remonter en haut
+        btnLogout.onclick = function(e) {
+            e.preventDefault(); 
             window.logoutFirebase();
-        });
+        };
     }
-
-    // 4. Touche Entrée
-    const passInput = document.getElementById('login-password');
-    if(passInput) {
-        passInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') window.loginFirebase();
-        });
-    }
+    
+    document.getElementById('login-password')?.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') window.loginFirebase();
+    });
 });
 
 // ============================================================
-// 2. UI & LOGIQUE MÉTIER
+// 2. RESTE DU CODE (VOS FONCTIONS D'ORIGINE)
 // ============================================================
 
 window.chargerBaseClients = DB.chargerBaseClients;
@@ -149,19 +140,6 @@ if (PDF && PDF.genererPouvoir) {
     window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 }
 
-window.showSection = function(id) { 
-    document.querySelectorAll('.main-content > div').forEach(div => { 
-        if(div.id.startsWith('view-')) div.classList.add('hidden'); 
-    }); 
-    const target = document.getElementById('view-' + id); 
-    if(target) target.classList.remove('hidden'); 
-    
-    if(id === 'base') DB.chargerBaseClients('init', false); 
-    if(id === 'stock') DB.chargerStock(); 
-    if(id === 'admin') DB.chargerSelectImport(); 
-};
-
-// Fonctions UI (Onglets, Police, etc.)
 window.toggleSections = function() {
     const select = document.getElementById('prestation'); if(!select) return;
     const choix = select.value;
@@ -189,6 +167,18 @@ window.copierMandant = function() {
         document.getElementById('f_nom_prenom').value = document.getElementById('soussigne').value; 
         document.getElementById('f_lien').value = document.getElementById('lien').value; 
     } 
+};
+
+window.showSection = function(id) { 
+    document.querySelectorAll('.main-content > div').forEach(div => { 
+        if(div.id.startsWith('view-')) div.classList.add('hidden'); 
+    }); 
+    const target = document.getElementById('view-' + id); 
+    if(target) target.classList.remove('hidden'); 
+    
+    if(id === 'base') DB.chargerBaseClients('init', false); 
+    if(id === 'stock') DB.chargerStock(); 
+    if(id === 'admin') DB.chargerSelectImport(); 
 };
 
 window.switchAdminTab = function(tabName) { 
@@ -231,7 +221,6 @@ window.ajouterPieceJointe = function() {
     reader.readAsDataURL(file);
 };
 
-// Sauvegarde
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
     if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...'; }
@@ -301,7 +290,7 @@ window.chargerDossier = async function(id) {
                     if(typeof nom === 'string' && nom.includes("Enregistré")) continue;
                     const div = document.createElement('div'); div.className = "ged-item"; div.setAttribute('data-name', nom); div.setAttribute('data-status', 'stored'); if(storageId) div.setAttribute('data-storage-id', storageId); div.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px;";
                     const btnEye = isBinary ? `<a href="${lien}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a>` : `<div style="background:#e2e8f0; color:#94a3b8; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye-slash"></i></div>`;
-                    div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nomDoc}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;"><a href="${localUrl}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a><button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
+                    div.innerHTML = `<div style="display:flex; align-items:center; gap:12px;"><i class="fas fa-file-pdf" style="color:#ef4444; font-size:1.6rem;"></i><div style="display:flex; flex-direction:column;"><span style="font-weight:700; color:#334155; font-size:0.95rem;">${nom}</span><span style="font-size:0.75rem; color:${statusColor}; font-weight:600;">${statusLabel}</span></div></div><div style="display:flex; gap:8px;"><a href="${localUrl}" target="_blank" class="btn-icon" style="background:#3b82f6; color:white; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><i class="fas fa-eye"></i></a><button onclick="this.closest('.ged-item').remove()" class="btn-icon" style="background:#ef4444; color:white; width:34px; height:34px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button></div>`;
                     container.appendChild(div);
                 }
             } else { container.innerHTML = '<div style="color:#94a3b8; font-style:italic; padding:10px;">Aucun document joint.</div>'; }
