@@ -1,4 +1,4 @@
-/* js/app.js - VERSION FINALE (CORRECTIF CHAMPS MANQUANTS + SECU GED) */
+/* js/app.js - VERSION FINALE (COPIE MANDANT + UI + SECU) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import { sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -8,7 +8,117 @@ import * as PDF from './pdf_admin.js';
 import * as DB from './db_manager.js';
 
 // ============================================================
-// 1. SÉCURITÉ & AUTHENTIFICATION
+// 1. FONCTIONS UI (INTERACTION BOUTONS & CASES)
+// ============================================================
+
+// Copie Automatique Mandant -> Témoin (CORRIGÉ)
+window.copierMandant = function() { 
+    const chk = document.getElementById('copy_mandant');
+    
+    // On vérifie si la case est cochée
+    if(chk && chk.checked) { 
+        // On récupère les valeurs du Mandant (Onglet 1)
+        const nom = document.getElementById('soussigne').value;
+        const lien = document.getElementById('lien').value;
+        
+        // On les met dans les champs Témoin (Onglet 2)
+        document.getElementById('f_nom_prenom').value = nom;
+        document.getElementById('f_lien').value = lien;
+        
+        console.log("✅ Copie effectuée : " + nom);
+    } else {
+        // Optionnel : Si on décoche, on peut vider les champs ou laisser tel quel
+        // document.getElementById('f_nom_prenom').value = "";
+        // document.getElementById('f_lien').value = "";
+    }
+};
+
+// Affichage Police vs Famille
+window.togglePolice = function() { 
+    const select = document.getElementById('type_presence_select'); 
+    const bP = document.getElementById('police_fields'); 
+    const bF = document.getElementById('famille_fields'); 
+    
+    if(!select) return; 
+    
+    if(select.value === 'police') { 
+        bP.classList.remove('hidden'); 
+        bF.classList.add('hidden'); 
+    } else { 
+        bP.classList.add('hidden'); 
+        bF.classList.remove('hidden'); 
+    } 
+};
+
+// Affichage Prestations (Inhumation / Crémation...)
+window.toggleSections = function() {
+    const select = document.getElementById('prestation'); 
+    if(!select) return;
+    
+    const choix = select.value;
+    
+    // On cache tout d'abord
+    ['bloc_inhumation', 'bloc_cremation', 'bloc_rapatriement'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    ['btn_inhumation', 'btn_cremation', 'btn_rapatriement'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    
+    // On affiche le bon bloc
+    if (choix === 'Inhumation') { 
+        document.getElementById('bloc_inhumation')?.classList.remove('hidden'); 
+        document.getElementById('btn_inhumation')?.classList.remove('hidden'); 
+    }
+    else if (choix === 'Crémation') { 
+        document.getElementById('bloc_cremation')?.classList.remove('hidden'); 
+        document.getElementById('btn_cremation')?.classList.remove('hidden'); 
+    }
+    else if (choix === 'Rapatriement') { 
+        document.getElementById('bloc_rapatriement')?.classList.remove('hidden'); 
+        document.getElementById('btn_rapatriement')?.classList.remove('hidden'); 
+    }
+};
+
+// Affichage Vol 2
+window.toggleVol2 = function() { 
+    const chk = document.getElementById('check_vol2'); 
+    const bloc = document.getElementById('bloc_vol2'); 
+    if(chk && bloc) { 
+        chk.checked ? bloc.classList.remove('hidden') : bloc.classList.add('hidden'); 
+    } 
+};
+
+// Navigation Onglets
+window.switchAdminTab = function(tabName) { 
+    document.getElementById('tab-content-identite').classList.add('hidden'); 
+    document.getElementById('tab-content-technique').classList.add('hidden'); 
+    
+    document.getElementById('tab-btn-identite').classList.remove('active'); 
+    document.getElementById('tab-btn-technique').classList.remove('active'); 
+    
+    document.getElementById('tab-content-' + tabName).classList.remove('hidden'); 
+    document.getElementById('tab-btn-' + tabName).classList.add('active'); 
+};
+
+window.toggleSidebar = function() { 
+    const sb = document.querySelector('.sidebar'); 
+    if(sb) sb.classList.toggle('collapsed'); 
+};
+
+// Navigation Pages (Accueil, Dossier, Stock...)
+window.showSection = function(id) { 
+    document.querySelectorAll('.main-content > div').forEach(div => { 
+        if(div.id.startsWith('view-')) div.classList.add('hidden'); 
+    }); 
+    const target = document.getElementById('view-' + id); 
+    if(target) target.classList.remove('hidden'); 
+    
+    // Gestion intelligente du chargement
+    if(id === 'base') DB.chargerBaseClients('init', false); // Utilise le cache
+    if(id === 'stock') DB.chargerStock(); 
+    if(id === 'admin') DB.chargerSelectImport(); 
+};
+
+
+// ============================================================
+// 2. AUTHENTIFICATION (LOGIN / MDP)
 // ============================================================
 
 window.loginFirebase = async function() {
@@ -32,13 +142,13 @@ window.loginFirebase = async function() {
 window.motDePasseOublie = async function() {
     const email = document.getElementById('login-email').value;
     if (!email) {
-        alert("Veuillez d'abord entrer votre EMAIL dans la case au-dessus, puis recliquez sur ce lien.");
+        alert("Entrez votre email ci-dessus d'abord, puis recliquez ici.");
         return;
     }
-    if(confirm(`Envoyer un email de réinitialisation à : ${email} ?`)) {
+    if(confirm(`Envoyer un lien de réinitialisation à : ${email} ?`)) {
         try {
             await sendPasswordResetEmail(auth, email);
-            alert("📧 Email envoyé ! Vérifiez votre boîte mail.");
+            alert("📧 Email envoyé !");
         } catch(e) { alert("Erreur : " + e.message); }
     }
 };
@@ -50,6 +160,7 @@ window.logoutFirebase = async function() {
     }
 };
 
+// Gardien de la connexion
 onAuthStateChanged(auth, (user) => {
     const loader = document.getElementById('app-loader'); 
     if(loader) loader.style.display = 'none';
@@ -58,15 +169,16 @@ onAuthStateChanged(auth, (user) => {
         console.log("✅ Connecté : " + user.email);
         document.getElementById('login-screen')?.classList.add('hidden');
         Utils.chargerLogoBase64();
-        // Premier chargement automatique (Initialisation du cache)
-        DB.chargerBaseClients('init', true);
+        DB.chargerBaseClients('init', true); // Initialise le cache au démarrage
         
+        // Horloge
         setInterval(() => {
             const now = new Date();
             if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
             if(document.getElementById('header-date')) document.getElementById('header-date').innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
         }, 1000);
 
+        // Initialisation de l'affichage
         setTimeout(() => { if(window.toggleSections) window.toggleSections(); }, 500);
 
     } else {
@@ -86,8 +198,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
+
 // ============================================================
-// 2. BRANCHEMENT DES FONCTIONS
+// 3. BRANCHEMENT BASE DE DONNÉES & PDF
 // ============================================================
 
 window.chargerBaseClients = DB.chargerBaseClients;
@@ -112,22 +225,9 @@ if (PDF && PDF.genererPouvoir) {
     window.genererDemandeOuverture = PDF.genererDemandeOuverture;
 }
 
-window.showSection = function(id) { 
-    document.querySelectorAll('.main-content > div').forEach(div => { 
-        if(div.id.startsWith('view-')) div.classList.add('hidden'); 
-    }); 
-    const target = document.getElementById('view-' + id); 
-    if(target) target.classList.remove('hidden'); 
-    
-    // Si on va sur 'base', on utilise le cache (false) au lieu de forcer le rechargement
-    if(id === 'base') DB.chargerBaseClients('init', false); 
-    
-    if(id === 'stock') DB.chargerStock(); 
-    if(id === 'admin') DB.chargerSelectImport(); 
-};
 
 // ============================================================
-// 3. GESTION GED
+// 4. GED (GESTION FICHIERS)
 // ============================================================
 window.ajouterPieceJointe = function() {
     const container = document.getElementById('liste_pieces_jointes');
@@ -157,17 +257,13 @@ window.ajouterPieceJointe = function() {
     reader.readAsDataURL(file);
 };
 
+
 // ============================================================
-// 4. SAUVEGARDE COMPLÈTE (CORRIGÉE)
+// 5. SAUVEGARDE & CHARGEMENT
 // ============================================================
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
-    
-    // ANTI-DOUBLON : On désactive le bouton immédiatement
-    if(btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...';
-    }
+    if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...'; }
     
     try {
         const idDossier = document.getElementById('dossier_id').value;
@@ -190,10 +286,9 @@ window.sauvegarderDossier = async function() {
                 date_signature: getVal('dateSignature'), 
                 police_nom: getVal('p_nom_grade'), 
                 police_commissariat: getVal('p_commissariat'),
-                
-                // --- AJOUTS CHAMPS MANQUANTS ---
-                temoin_nom: getVal('f_nom_prenom'),
-                temoin_lien: getVal('f_lien'),
+                // Champs restaurés :
+                temoin_nom: getVal('f_nom_prenom'), 
+                temoin_lien: getVal('f_lien'), 
                 titulaire: getVal('titulaire_concession')
             },
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), av_date_dep: getVal('av_date_dep'), av_heure_dep: getVal('av_heure_dep'), av_date_arr: getVal('av_date_arr'), av_heure_arr: getVal('av_heure_arr'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), ap_date_dep: getVal('ap_date_dep'), ap_heure_dep: getVal('ap_heure_dep'), ap_date_arr: getVal('ap_date_arr'), ap_heure_arr: getVal('ap_heure_arr'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta'), vol1_num: getVal('vol1_num'), vol1_dep_aero: getVal('vol1_dep_aero'), vol1_arr_aero: getVal('vol1_arr_aero'), vol1_dep_time: getVal('vol1_dep_time'), vol1_arr_time: getVal('vol1_arr_time'), vol2_num: getVal('vol2_num'), vol2_dep_aero: getVal('vol2_dep_aero'), vol2_arr_aero: getVal('vol2_arr_aero'), vol2_dep_time: getVal('vol2_dep_time'), vol2_arr_time: getVal('vol2_arr_time'), rap_immat: getVal('rap_immat'), rap_date_dep_route: getVal('rap_date_dep_route'), rap_ville_dep: getVal('rap_ville_dep'), rap_ville_arr: getVal('rap_ville_arr') }
@@ -203,6 +298,7 @@ window.sauvegarderDossier = async function() {
         if(idDossier) { await updateDoc(doc(db, "dossiers_admin", idDossier), data); } 
         else { data.date_creation = new Date().toISOString(); const docRef = await addDoc(collection(db, "dossiers_admin"), data); finalId = docRef.id; document.getElementById('dossier_id').value = finalId; }
         
+        // GED Anti-Doublon
         const allGedItems = [];
         const elements = document.querySelectorAll('#liste_pieces_jointes .ged-item');
         for (const div of elements) {
@@ -225,17 +321,10 @@ window.sauvegarderDossier = async function() {
         
         DB.chargerBaseClients('init', true);
         alert("✅ Sauvegarde réussie !");
-        
-        // Recharge pour afficher les données confirmées
         window.chargerDossier(finalId);
 
     } catch(e) { console.error(e); alert("Erreur : " + e.message); }
-    
-    // Réactivation du bouton à la fin
-    if(btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
-    }
+    if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER'; }
 };
 
 window.chargerDossier = async function(id) {
@@ -251,31 +340,18 @@ window.chargerDossier = async function(id) {
         if (data.mandant) { set('civilite_mandant', data.mandant.civility); set('soussigne', data.mandant.nom); set('lien', data.mandant.lien); set('demeurant', data.mandant.adresse); }
         if (data.technique) { 
             const op = data.technique.type_operation || 'Inhumation'; 
-            set('prestation', op); 
-            set('lieu_mise_biere', data.technique.lieu_mise_biere); 
-            set('date_fermeture', data.technique.date_fermeture); 
-            set('cimetiere_nom', data.technique.cimetiere); 
-            set('crematorium_nom', data.technique.crematorium); 
-            set('num_concession', data.technique.num_concession); 
-            set('faita', data.technique.faita); 
-            set('dateSignature', data.technique.date_signature); 
-            set('p_nom_grade', data.technique.police_nom); 
-            set('p_commissariat', data.technique.police_commissariat); 
+            set('prestation', op); set('lieu_mise_biere', data.technique.lieu_mise_biere); set('date_fermeture', data.technique.date_fermeture); set('cimetiere_nom', data.technique.cimetiere); set('crematorium_nom', data.technique.crematorium); set('num_concession', data.technique.num_concession); set('faita', data.technique.faita); set('dateSignature', data.technique.date_signature); set('p_nom_grade', data.technique.police_nom); set('p_commissariat', data.technique.police_commissariat); 
+            // Chargement champs restaurés
+            set('f_nom_prenom', data.technique.temoin_nom); set('f_lien', data.technique.temoin_lien); set('titulaire_concession', data.technique.titulaire);
             
-            // --- CHARGEMENT CHAMPS MANQUANTS ---
-            set('f_nom_prenom', data.technique.temoin_nom);
-            set('f_lien', data.technique.temoin_lien);
-            set('titulaire_concession', data.technique.titulaire);
-
-            if (op === 'Inhumation') { set('date_inhumation', data.technique.date_ceremonie); set('heure_inhumation', data.technique.heure_ceremonie); } 
-            else if (op === 'Crémation') { set('date_cremation', data.technique.date_ceremonie); set('heure_cremation', data.technique.heure_ceremonie); } 
+            if (op === 'Inhumation') { set('date_inhumation', data.technique.date_ceremonie); set('heure_inhumation', data.technique.heure_ceremonie); } else if (op === 'Crémation') { set('date_cremation', data.technique.date_ceremonie); set('heure_cremation', data.technique.heure_ceremonie); } 
         }
         if (data.transport) { set('av_lieu_depart', data.transport.av_dep); set('av_lieu_arrivee', data.transport.av_arr); set('av_date_dep', data.transport.av_date_dep); set('av_heure_dep', data.transport.av_heure_dep); set('av_date_arr', data.transport.av_date_arr); set('av_heure_arr', data.transport.av_heure_arr); set('ap_lieu_depart', data.transport.ap_dep); set('ap_lieu_arrivee', data.transport.ap_arr); set('ap_date_dep', data.transport.ap_date_dep); set('ap_heure_dep', data.transport.ap_heure_dep); set('ap_date_arr', data.transport.ap_date_arr); set('ap_heure_arr', data.transport.ap_heure_arr); set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta); set('vol1_num', data.transport.vol1_num); set('vol1_dep_aero', data.transport.vol1_dep_aero); set('vol1_arr_aero', data.transport.vol1_arr_aero); set('vol1_dep_time', data.transport.vol1_dep_time); set('vol1_arr_time', data.transport.vol1_arr_time); set('vol2_num', data.transport.vol2_num); set('vol2_dep_aero', data.transport.vol2_dep_aero); set('vol2_arr_aero', data.transport.vol2_arr_aero); set('vol2_dep_time', data.transport.vol2_dep_time); set('vol2_arr_time', data.transport.vol2_arr_time); set('rap_immat', data.transport.rap_immat); set('rap_date_dep_route', data.transport.rap_date_dep_route); set('rap_ville_dep', data.transport.rap_ville_dep); set('rap_ville_arr', data.transport.rap_ville_arr); }
         
         const container = document.getElementById('liste_pieces_jointes');
         const rawGed = data.ged || data.pieces_jointes || [];
         if (container) { 
-            container.innerHTML = ""; // <-- NETTOYAGE CRITIQUE AVANT AFFICHAGE
+            container.innerHTML = ""; 
             if (Array.isArray(rawGed) && rawGed.length > 0) {
                 for (const item of rawGed) {
                     let nom = "", lien = "#", isBinary = false, storageId = null, statusLabel = "", statusColor = "#64748b";
@@ -294,6 +370,3 @@ window.chargerDossier = async function(id) {
         if(window.toggleSections) window.toggleSections(); if(window.togglePolice) window.togglePolice(); if(window.toggleVol2) window.toggleVol2(); window.showSection('admin');
     } catch (e) { console.error(e); alert("Erreur : " + e.message); }
 };
-
-window.switchAdminTab = function(tabName) { document.getElementById('tab-content-identite').classList.add('hidden'); document.getElementById('tab-content-technique').classList.add('hidden'); document.getElementById('tab-btn-identite').classList.remove('active'); document.getElementById('tab-btn-technique').classList.remove('active'); document.getElementById('tab-content-' + tabName).classList.remove('hidden'); document.getElementById('tab-btn-' + tabName).classList.add('active'); };
-window.toggleSidebar = function() { const sb = document.querySelector('.sidebar'); if(sb) sb.classList.toggle('collapsed'); };
