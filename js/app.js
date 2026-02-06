@@ -1,4 +1,4 @@
-/* js/app.js - VERSION MASTER (SÉCURITÉ + UI + LOGIQUE) */
+/* js/app.js - VERSION MASTER (SÉCURITÉ RÉPARÉE + UI + LOGIQUE) */
 
 import { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './config.js';
 import { sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -20,12 +20,12 @@ window.loginFirebase = async function() {
     if(!email || !pass) { alert("Veuillez remplir tous les champs."); return; }
     
     try {
-        btn.innerText = "Connexion...";
+        if(btn) btn.innerText = "Connexion...";
         await signInWithEmailAndPassword(auth, email, pass);
-        // La redirection est gérée automatiquement par onAuthStateChanged ci-dessous
+        // La redirection est gérée automatiquement par onAuthStateChanged
     } catch(e) { 
         console.error(e);
-        btn.innerText = "SE CONNECTER";
+        if(btn) btn.innerText = "SE CONNECTER";
         if(e.code === 'auth/invalid-credential') alert("Email ou mot de passe incorrect.");
         else alert("Erreur connexion : " + e.message); 
     }
@@ -73,8 +73,10 @@ onAuthStateChanged(auth, (user) => {
         // Horloge
         setInterval(() => {
             const now = new Date();
-            if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-            if(document.getElementById('header-date')) document.getElementById('header-date').innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+            const elTime = document.getElementById('header-time');
+            const elDate = document.getElementById('header-date');
+            if(elTime) elTime.innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+            if(elDate) elDate.innerText = now.toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
         }, 1000);
 
         // Initialisation de l'affichage (Onglets, etc.)
@@ -90,17 +92,36 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// Écouteurs pour le bouton "Entrée" sur l'écran de login
+// --- BRANCHEMENT DES BOUTONS (C'est ici que ça corrige votre problème) ---
 document.addEventListener("DOMContentLoaded", () => {
+    // 1. Bouton Login
     const btnLogin = document.getElementById('btn-login');
+    if(btnLogin) {
+        btnLogin.onclick = window.loginFirebase;
+    }
+
+    // 2. Bouton Mot de passe oublié
     const btnForgot = document.getElementById('btn-forgot');
-    
-    if(btnLogin) btnLogin.onclick = window.loginFirebase;
-    if(btnForgot) btnForgot.onclick = window.motDePasseOublie;
-    
-    document.getElementById('login-password')?.addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') window.loginFirebase();
-    });
+    if(btnForgot) {
+        btnForgot.onclick = window.motDePasseOublie;
+    }
+
+    // 3. Bouton Déconnexion (Réparation)
+    const btnLogout = document.getElementById('btn-logout');
+    if(btnLogout) {
+        btnLogout.onclick = function(e) {
+            e.preventDefault(); // Empêche le lien # de remonter la page
+            window.logoutFirebase();
+        };
+    }
+
+    // 4. Touche Entrée pour se connecter
+    const inputPass = document.getElementById('login-password');
+    if(inputPass) {
+        inputPass.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') window.loginFirebase();
+        });
+    }
 });
 
 
@@ -247,7 +268,6 @@ window.ajouterPieceJointe = function() {
 // ============================================================
 window.sauvegarderDossier = async function() {
     const btn = document.getElementById('btn-save-bdd');
-    // Sécurité Anti-Doublon : Désactiver le bouton immédiatement
     if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...'; }
     
     try {
