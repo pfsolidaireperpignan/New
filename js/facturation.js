@@ -1,4 +1,4 @@
-/* js/facturation.js - VERSION FINALE (NUMÉROTATION SÉPARÉE + MODIFICATION LIBRE) */
+/* js/facturation.js - VERSION FINALE (CYCLE DE VIE DEVIS CORRIGÉ) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -52,7 +52,7 @@ function chargerLogoBase64() {
     } 
 }
 
-// --- 1. FACTURES ---
+// --- 1. FACTURES / DEVIS ---
 window.chargerListeFactures = async function() {
     const tbody = document.getElementById('list-body');
     if(!tbody) return;
@@ -73,6 +73,7 @@ window.chargerListeFactures = async function() {
             d.finalDefunt = d.defunt_nom || d.defunt?.nom || "";
             d.finalPaiements = d.paiements || [];
             
+            // Initialisation statut si vide
             if(d.finalType === 'DEVIS' && !d.statut_doc) d.statut_doc = 'En cours';
             
             cacheFactures.push(d);
@@ -115,10 +116,11 @@ window.filtrerFactures = function() {
             }
             else if (d.finalType === 'DEVIS') {
                 if (fStatut === "Payé" || fStatut === "En attente") statutMatch = false;
-                if (fStatut === "Devis En cours" && d.statut_doc === "Sans suite") statutMatch = false;
+                if (fStatut === "Devis En cours" && (d.statut_doc === "Sans suite" || d.statut_doc === "Validé")) statutMatch = false;
                 if (fStatut === "Devis Sans suite" && d.statut_doc !== "Sans suite") statutMatch = false;
             }
         } else {
+            // Par défaut, on masque les "Sans suite"
             if (d.finalType === 'DEVIS' && d.statut_doc === "Sans suite") statutMatch = false;
         }
 
@@ -143,13 +145,24 @@ window.filtrerFactures = function() {
         let classerBtn = "";
         let statutText = d.finalType;
 
+        // GESTION DES STATUTS DEVIS
         if (d.finalType === 'DEVIS') {
-            if (d.statut_doc === 'Sans suite') {
+            if (d.statut_doc === 'Validé') {
+                // CAS 1 : DEVIS TRANSFORMÉ EN FACTURE
+                statutText = "FACTURÉ";
+                badgeClass = "badge-regle"; // Vert
+                // Pas de bouton "Sans suite", juste une info visuelle
+                classerBtn = `<div style="width:34px; text-align:center; color:#10b981;" title="Ce devis a été facturé"><i class="fas fa-check-circle"></i></div>`;
+            } 
+            else if (d.statut_doc === 'Sans suite') {
+                // CAS 2 : DEVIS SANS SUITE
                 rowStyle = "background-color:#f3f4f6; color:#9ca3af; text-decoration:line-through;";
                 badgeClass = "badge-gris"; 
                 statutText = "SANS SUITE";
-                classerBtn = `<button class="btn-icon" style="color:#10b981;" onclick="window.classerSansSuite('${d.id}', 'En cours')" title="Réactiver le devis"><i class="fas fa-undo"></i></button>`;
-            } else {
+                classerBtn = `<button class="btn-icon" style="color:#10b981;" onclick="window.classerSansSuite('${d.id}', 'En cours')" title="Réactiver"><i class="fas fa-undo"></i></button>`;
+            } 
+            else {
+                // CAS 3 : DEVIS EN COURS
                 classerBtn = `<button class="btn-icon" style="color:#6b7280;" onclick="window.classerSansSuite('${d.id}', 'Sans suite')" title="Classer Sans Suite"><i class="fas fa-archive"></i></button>`;
             }
         }
@@ -354,20 +367,15 @@ window.ajouterSection = function(titre="SECTION") {
 
 window.calculTotal = function() { let total = 0; document.querySelectorAll('.val-prix').forEach(i => total += parseFloat(i.value) || 0); document.getElementById('total_general').innerText = total.toFixed(2) + " €"; let paye = paiements.reduce((s, p) => s + parseFloat(p.montant), 0); document.getElementById('total_paye').innerText = paye.toFixed(2) + " €"; document.getElementById('reste_a_payer').innerText = (total - paye).toFixed(2) + " €"; document.getElementById('total_display').innerText = total.toFixed(2); };
 
-// ============================================================
-// ⚠️ SAUVEGARDE AVEC NUMÉROTATION SÉPARÉE (DEVIS / FACTURE)
-// ============================================================
+// SAUVEGARDE
 window.sauvegarderDocument = async function() { 
     const lignes = []; 
     document.querySelectorAll('#tbody_lignes tr').forEach(tr => { 
         if(tr.classList.contains('row-section')) lignes.push({ type: 'section', text: tr.querySelector('input').value }); 
         else lignes.push({ type: 'item', desc: tr.querySelector('.val-desc').value, cat: tr.querySelector('.val-type').value, prix: parseFloat(tr.querySelector('.val-prix').value)||0 }); 
     }); 
-    
     const docData = { 
-        type: document.getElementById('doc_type').value, 
-        numero: document.getElementById('doc_numero').value, 
-        date: document.getElementById('doc_date').value, 
+        type: document.getElementById('doc_type').value, numero: document.getElementById('doc_numero').value, date: document.getElementById('doc_date').value, 
         client_nom: document.getElementById('client_nom').value, client_adresse: document.getElementById('client_adresse').value, 
         defunt_nom: document.getElementById('defunt_nom').value, defunt_date_naiss: document.getElementById('defunt_date_naiss').value, defunt_date_deces: document.getElementById('defunt_date_deces').value,
         total: parseFloat(document.getElementById('total_display').innerText), lignes: lignes, paiements: paiements, date_creation: new Date().toISOString(),
@@ -381,23 +389,17 @@ window.sauvegarderDocument = async function() {
             await updateDoc(doc(db, "factures_v2", id), docData); 
         } 
         else { 
-            // 💡 LOGIQUE DE COMPTEUR INTELLIGENT 💡
-            // Si le numéro est "Auto" ou vide, on calcule. Sinon on garde ce que l'utilisateur a tapé.
             if(docData.numero === "" || docData.numero === "Auto") {
                 const q = query(collection(db, "factures_v2")); 
                 const snap = await getDocs(q); 
-                
-                // On compte combien de documents DE CE TYPE existent déjà pour l'année en cours
                 let compteurType = 0;
                 snap.forEach(d => {
                     const dType = d.data().type || d.data().info?.type;
                     if(dType === docData.type) compteurType++;
                 });
-                
                 const prefix = docData.type === 'DEVIS' ? 'D' : 'F';
                 docData.numero = `${prefix}-${currentYear}-${String(compteurType + 1).padStart(3, '0')}`;
             }
-            
             await addDoc(collection(db, "factures_v2"), docData); 
         } 
         alert("✅ Enregistré !"); window.showDashboard(); 
@@ -408,7 +410,27 @@ window.ajouterPaiement = () => { const p = { date: document.getElementById('pay_
 window.supprimerPaiement = (i) => { paiements.splice(i, 1); window.renderPaiements(); window.calculTotal(); };
 window.renderPaiements = () => { const div = document.getElementById('liste_paiements'); div.innerHTML = ""; paiements.forEach((p, i) => { div.innerHTML += `<div>${p.date} - ${p.mode}: <strong>${p.montant}€</strong> <i class="fas fa-trash" style="color:red;cursor:pointer;margin-left:10px;" onclick="window.supprimerPaiement(${i})"></i></div>`; }); };
 window.supprimerDocument = async (id) => { if(confirm("Supprimer ?")) { await deleteDoc(doc(db,"factures_v2",id)); window.chargerListeFactures(); } };
-window.transformerEnFacture = async function() { if(confirm("Créer une FACTURE à partir de ce devis ?")) { document.getElementById('doc_type').value = "FACTURE"; document.getElementById('doc_date').valueAsDate = new Date(); document.getElementById('current_doc_id').value = ""; document.getElementById('doc_numero').value = "Auto"; window.sauvegarderDocument(); } };
+
+// === TRANSFORMATION CORRIGÉE ===
+window.transformerEnFacture = async function() { 
+    if(confirm("Créer une FACTURE à partir de ce devis ?")) { 
+        const idDevis = document.getElementById('current_doc_id').value;
+        
+        // 1. On marque l'ancien devis comme "Validé" (pour enlever le bouton Sans Suite)
+        if(idDevis) {
+            try { await updateDoc(doc(db, "factures_v2", idDevis), { statut_doc: 'Validé' }); }
+            catch(e) { console.log("Erreur maj devis source", e); }
+        }
+
+        // 2. On prépare la nouvelle facture
+        document.getElementById('doc_type').value = "FACTURE"; 
+        document.getElementById('doc_date').valueAsDate = new Date(); 
+        document.getElementById('current_doc_id').value = ""; // On vide l'ID pour créer un nouveau doc
+        document.getElementById('doc_numero').value = "Auto"; 
+        
+        window.sauvegarderDocument(); 
+    } 
+};
 
 // EXPORT EXCEL
 window.exportExcelSmart = function() { 
