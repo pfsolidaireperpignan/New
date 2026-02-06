@@ -1,4 +1,4 @@
-/* js/facturation.js - VERSION FINALE (COMPATIBLE ANCIENS & NOUVEAUX DOSSIERS) */
+/* js/facturation.js - VERSION FINALE (COMPATIBLE & SÉCURISÉE) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -17,8 +17,15 @@ let global_Depenses = 0;
 let logoBase64 = null; 
 const currentYear = new Date().getFullYear();
 
-// --- INIT ---
+// --- INIT (AVEC SÉCURITÉ AJOUTÉE) ---
 onAuthStateChanged(auth, (user) => {
+    if (!user) {
+        // AJOUT : Si pas connecté, redirection immédiate
+        window.location.href = "index.html";
+        return;
+    }
+
+    // Si connecté, on lance tout
     if (user) {
         chargerLogoBase64();
         initYearFilter();
