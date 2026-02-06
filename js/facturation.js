@@ -1,13 +1,13 @@
-/* js/facturation.js - VERSION FINALE (RIB À JOUR + SECTIONS ORANGE) */
+/* js/facturation.js - VERSION FINALE (RIB OPTIMISÉ + MISE EN PAGE COMPACTE) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- VOS INFOS BANCAIRES (RIB MIS À JOUR) ---
+// --- INFOS BANCAIRES ---
 const INFO_SOCIETE = {
     banque: "BANQUE POPULAIRE DU SUD",
-    iban: "FR76 1660 7000 0738 2217 4454 393", // Nouveau RIB
-    bic: "BPOPSXXXX",
-    conditions: "Paiement à réception de la facture."
+    iban: "FR76 1660 7000 0738 2217 4454 393",
+    // BIC supprimé pour gagner de la place
+    conditions: "Paiement à réception."
 };
 
 let paiements = []; 
@@ -274,7 +274,6 @@ window.ajouterLigne = function(desc="", prix=0, type="Courant") {
 window.ajouterSection = function(titre="SECTION") { 
     const tr = document.createElement('tr'); 
     tr.className = "row-section"; 
-    // STYLE BACKGROUND AJOUTÉ ICI : #fff7ed (Orange très clair)
     tr.innerHTML = `
         <td class="drag-handle"><i class="fas fa-grip-lines" style="color:#f97316; cursor:grab;"></i></td>
         <td colspan="4">
@@ -335,7 +334,7 @@ window.loadTemplate = function(type) {
     window.calculTotal(); 
 };
 
-// IMPRESSION PDF
+// IMPRESSION PDF (LAYOUT OPTIMISÉ)
 window.genererPDFFacture = function() {
     const data = {
         client: { nom: document.getElementById('client_nom').value, adresse: document.getElementById('client_adresse').value, civility: document.getElementById('client_civility').value },
@@ -373,7 +372,6 @@ window.generatePDFFromData = function(data, saveMode = false) {
     const body = [];
     data.lignes.forEach(l => {
         if(l.type === 'section') { 
-            // COULEUR SECTION PDF (ORANGE) : #ffedd5 = [255, 237, 213]
             body.push([{ content: l.text, colSpan: 3, styles: { fillColor: [255, 237, 213], textColor:[154, 52, 18], fontStyle: 'bold', halign:'left' } }]); 
         } 
         else { 
@@ -384,24 +382,65 @@ window.generatePDFFromData = function(data, saveMode = false) {
         }
     });
     doc.autoTable({ startY: y, head: [['Description', 'Prestations\nCourantes', 'Prestations\nOptionnelles']], body: body, theme: 'grid', styles: { fontSize: 9, cellPadding: 3 }, headStyles: { fillColor: [16, 185, 129], textColor: 255, halign: 'center', valign: 'middle' }, columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 35 }, 2: { halign: 'right', cellWidth: 35 } } });
-    let finalY = doc.lastAutoTable.finalY + 10;
+    
+    // --- TOTAUX & PIED DE PAGE OPTIMISÉ (SUR LA MÊME PAGE) ---
+    let footerY = doc.lastAutoTable.finalY + 10;
+    // Si on est trop bas, on ajoute une page, sinon on utilise l'espace
+    if (footerY > 250) { doc.addPage(); footerY = 20; }
+
+    // COLONNE DROITE : TOTAUX
+    const rightLabelX = 165;
+    const rightValueX = 195;
     const totalTTC = data.info.total;
     const totalPaye = data.paiements.reduce((sum, p) => sum + parseFloat(p.montant), 0);
     const resteAPayer = totalTTC - totalPaye;
+
     doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(0);
-    doc.text(`Total TTC :`, 150, finalY); doc.setFont("helvetica", "bold"); doc.text(`${totalTTC.toFixed(2)} €`, 195, finalY, { align: 'right' }); finalY += 6;
-    if (data.paiements.length > 0) { doc.setFont("helvetica", "normal"); doc.text(`Déjà réglé (Acomptes) :`, 150, finalY); doc.text(`- ${totalPaye.toFixed(2)} €`, 195, finalY, { align: 'right' }); finalY += 6; }
-    doc.setLineWidth(0.5); doc.line(140, finalY, 195, finalY); finalY += 6;
-    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text(`Net à Payer :`, 150, finalY); doc.text(`${resteAPayer.toFixed(2)} €`, 195, finalY, { align: 'right' }); finalY += 20;
-    if (data.info.type === 'DEVIS') {
-        if(finalY > 230) { doc.addPage(); finalY = 20; }
-        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("Bon pour accord,", 15, finalY); doc.text("Le client (Signature précédée de la mention 'Lu et approuvé')", 15, finalY + 5); doc.rect(15, finalY + 10, 80, 30); doc.text("L'entreprise,", 120, finalY); doc.rect(120, finalY + 10, 80, 30);
-    } else {
-        if(finalY > 240) { doc.addPage(); finalY = 20; }
-        doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.text("CONDITIONS DE RÈGLEMENT :", 15, finalY); doc.setFont("helvetica", "normal"); doc.text(INFO_SOCIETE.conditions, 15, finalY + 5); finalY += 15;
-        doc.setFillColor(248, 250, 252); doc.rect(15, finalY, 180, 25, 'F'); doc.setDrawColor(226, 232, 240); doc.rect(15, finalY, 180, 25);
-        doc.setFont("helvetica", "bold"); doc.setTextColor(0); doc.text("COORDONNÉES BANCAIRES (RIB)", 20, finalY + 6);
-        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text(`Banque : ${INFO_SOCIETE.banque}`, 20, finalY + 14); doc.text(`IBAN : ${INFO_SOCIETE.iban}`, 20, finalY + 20); doc.text(`BIC : ${INFO_SOCIETE.bic}`, 120, finalY + 20);
+    doc.text(`Total TTC :`, rightLabelX, footerY, { align: 'right' }); 
+    doc.setFont("helvetica", "bold"); 
+    doc.text(`${totalTTC.toFixed(2)} €`, rightValueX, footerY, { align: 'right' });
+    footerY += 6;
+
+    if (totalPaye > 0) { 
+        doc.setFont("helvetica", "normal"); 
+        doc.text(`Déjà réglé :`, rightLabelX, footerY, { align: 'right' }); // Corrigé ici
+        doc.text(`- ${totalPaye.toFixed(2)} €`, rightValueX, footerY, { align: 'right' }); 
+        footerY += 6; 
     }
+    
+    doc.setLineWidth(0.5); doc.line(120, footerY, 195, footerY); footerY += 6;
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); 
+    doc.text(`Net à Payer :`, rightLabelX, footerY, { align: 'right' }); 
+    doc.text(`${resteAPayer.toFixed(2)} €`, rightValueX, footerY, { align: 'right' });
+
+    // COLONNE GAUCHE : RIB OU SIGNATURE (Au même niveau que les totaux)
+    const leftX = 15;
+    let leftY = doc.lastAutoTable.finalY + 10; // On reprend la hauteur initiale
+    if (leftY > 250) leftY = 20; // Gérer nouvelle page si besoin
+
+    if (data.info.type === 'DEVIS') {
+        doc.setFontSize(9); doc.setFont("helvetica", "normal");
+        doc.text("Bon pour accord (Date & Signature) :", leftX, leftY);
+        doc.rect(leftX, leftY + 3, 80, 25);
+    } else {
+        // RIB COMPACT A GAUCHE
+        doc.setFontSize(8); doc.setFont("helvetica", "bold");
+        doc.text("RÈGLEMENT :", leftX, leftY);
+        doc.setFont("helvetica", "normal");
+        doc.text(INFO_SOCIETE.conditions, leftX + 25, leftY);
+        
+        leftY += 5;
+        doc.setFillColor(248, 250, 252);
+        doc.rect(leftX, leftY, 90, 18, 'F');
+        doc.setDrawColor(200);
+        doc.rect(leftX, leftY, 90, 18);
+        
+        doc.setFont("helvetica", "bold"); 
+        doc.text("COORDONNÉES BANCAIRES", leftX + 2, leftY + 4);
+        doc.setFont("helvetica", "normal"); 
+        doc.text(`Banque : ${INFO_SOCIETE.banque}`, leftX + 2, leftY + 9);
+        doc.text(`IBAN : ${INFO_SOCIETE.iban}`, leftX + 2, leftY + 14);
+    }
+
     if(saveMode) doc.save(`${data.info.type}_${data.info.numero}.pdf`); else window.open(doc.output('bloburl'), '_blank');
 };
