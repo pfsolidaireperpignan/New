@@ -1,6 +1,6 @@
-/* js/facturation.js - VERSION SÉCURISÉE */
+/* js/facturation.js - VERSION FINALE (COMPATIBLE ANCIENS & NOUVEAUX DOSSIERS) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"; // Correction import signOut
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // --- INFOS BANCAIRES ---
 const INFO_SOCIETE = {
@@ -17,11 +17,9 @@ let global_Depenses = 0;
 let logoBase64 = null; 
 const currentYear = new Date().getFullYear();
 
-// --- SÉCURITÉ AU CHARGEMENT ---
+// --- INIT ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // L'utilisateur est connecté, on charge tout
-        console.log("Facturation : Connecté");
         chargerLogoBase64();
         initYearFilter();
         window.chargerListeFactures();
@@ -33,10 +31,6 @@ onAuthStateChanged(auth, (user) => {
         if(el && window.Sortable) {
             new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: window.calculTotal });
         }
-    } else {
-        // Pas connecté -> Retour à l'accueil pour se loguer
-        console.log("Facturation : Non connecté -> Redirection");
-        window.location.href = "index.html"; 
     }
 });
 
@@ -71,10 +65,12 @@ window.chargerListeFactures = async function() {
         
         snap.forEach((docSnap) => {
             const d = docSnap.data(); d.id = docSnap.id;
+            
+            // COMPATIBILITÉ (Ancien vs Nouveau format pour la liste)
             d.finalNumero = d.numero || d.info?.numero || "BROUILLON";
             d.finalDate = d.date || d.info?.date || d.date_document || d.date_creation;
             d.finalType = d.type || d.info?.type || "DEVIS";
-            d.finalTotal = parseFloat(d.total || d.info?.total || d.total_ttc || 0);
+            d.finalTotal = parseFloat((d.total !== undefined) ? d.total : (d.info?.total || 0));
             d.finalClient = d.client_nom || d.client?.nom || "Inconnu";
             d.finalDefunt = d.defunt_nom || d.defunt?.nom || "";
             d.finalPaiements = d.paiements || [];
@@ -195,20 +191,43 @@ window.classerSansSuite = async function(id, etat) {
     } catch(e) { alert("Erreur: " + e.message); }
 };
 
+// --- APERÇU DOCUMENT (AVEC CORRECTIF COMPATIBILITÉ) ---
 window.apercuDocument = async function(id) {
     try {
         const docSnap = await getDoc(doc(db, "factures_v2", id));
         if (!docSnap.exists()) { alert("Document introuvable."); return; }
         const data = docSnap.data();
 
+        // ⚠️ LOGIQUE DE RÉCUPÉRATION HYBRIDE (NOUVEAU || ANCIEN)
         const pdfData = {
-            client: { nom: data.client_nom, adresse: data.client_adresse, civility: data.client_civility || '' },
-            defunt: { nom: data.defunt_nom, naiss: data.defunt_date_naiss, deces: data.defunt_date_deces },
-            info: { type: data.type, date: data.date, numero: data.numero, total: parseFloat(data.total) },
-            lignes: data.lignes || [], paiements: data.paiements || []
+            client: { 
+                // Cherche 'client_nom' (nouveau) OU 'client.nom' (ancien)
+                nom: data.client_nom || data.client?.nom || "Inconnu", 
+                adresse: data.client_adresse || data.client?.adresse || "", 
+                civility: data.client_civility || data.client?.civility || '' 
+            },
+            defunt: { 
+                nom: data.defunt_nom || data.defunt?.nom || "", 
+                naiss: data.defunt_date_naiss || data.defunt?.naiss || "", 
+                deces: data.defunt_date_deces || data.defunt?.deces || "" 
+            },
+            info: { 
+                type: data.type || data.info?.type || "DOC", 
+                date: data.date || data.info?.date || new Date().toISOString(), 
+                numero: data.numero || data.info?.numero || "Brouillon", 
+                // Calcul du total sécurisé pour éviter le NaN
+                total: parseFloat((data.total !== undefined) ? data.total : (data.info?.total || 0)) 
+            },
+            lignes: data.lignes || [],
+            paiements: data.paiements || []
         };
+
         window.generatePDFFromData(pdfData, false);
-    } catch (e) { console.error(e); alert("Erreur lors de l'aperçu : " + e.message); }
+
+    } catch (e) {
+        console.error(e);
+        alert("Erreur lors de l'aperçu : " + e.message);
+    }
 };
 
 // --- 2. DEPENSES ---
@@ -342,17 +361,24 @@ window.chargerDocument = async (id) => {
     if(d.exists()) { 
         const data = d.data(); 
         document.getElementById('current_doc_id').value = id; 
+        
+        // COMPATIBILITÉ CHARGEMENT
         document.getElementById('doc_numero').value = data.numero || data.info?.numero; 
         document.getElementById('client_nom').value = data.client_nom || data.client?.nom; 
         document.getElementById('client_adresse').value = data.client_adresse || data.client?.adresse; 
-        document.getElementById('client_civility').value = data.client_civility || data.client?.civility || 'M.';
+        const civility = data.client_civility || data.client?.civility || 'M.';
+        document.getElementById('client_civility').value = civility;
+
         document.getElementById('defunt_nom').value = data.defunt_nom || data.defunt?.nom;
         document.getElementById('defunt_date_naiss').value = data.defunt_date_naiss || data.defunt?.date_naiss || "";
         document.getElementById('defunt_date_deces').value = data.defunt_date_deces || data.defunt?.date_deces || "";
+        
         document.getElementById('doc_type').value = data.type || data.info?.type; 
         document.getElementById('doc_date').value = data.date || data.info?.date; 
         document.getElementById('tbody_lignes').innerHTML = ""; 
+        
         if(data.lignes) data.lignes.forEach(l => { if(l.type==='section') window.ajouterSection(l.text); else window.ajouterLigne(l.desc, l.prix, l.cat); }); 
+        
         paiements = data.paiements || []; 
         window.renderPaiements(); window.calculTotal(); 
         document.getElementById('btn-transform').style.display = (document.getElementById('doc_type').value === 'DEVIS') ? 'block' : 'none'; 
@@ -401,13 +427,19 @@ window.sauvegarderDocument = async function() {
     }; 
     const id = document.getElementById('current_doc_id').value; 
     try { 
-        if(id) await updateDoc(doc(db, "factures_v2", id), docData); 
+        if(id) {
+            await updateDoc(doc(db, "factures_v2", id), docData); 
+        } 
         else { 
             if(docData.numero === "" || docData.numero === "Auto") {
                 const q = query(collection(db, "factures_v2")); 
                 const snap = await getDocs(q); 
                 let compteurType = 0;
-                snap.forEach(d => { if(d.data().type === docData.type) compteurType++; });
+                snap.forEach(d => { 
+                    // Compatibilité type
+                    const dType = d.data().type || d.data().info?.type;
+                    if(dType === docData.type) compteurType++; 
+                });
                 const prefix = docData.type === 'DEVIS' ? 'D' : 'F';
                 docData.numero = `${prefix}-${currentYear}-${String(compteurType + 1).padStart(3, '0')}`;
             }
