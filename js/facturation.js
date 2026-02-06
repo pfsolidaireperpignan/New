@@ -1,4 +1,4 @@
-/* js/facturation.js - VERSION FINALE (FILTRES VENTES + EXPORT ACHATS) */
+/* js/facturation.js - VERSION FINALE (LOGIQUE INCHANGÉE) */
 import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -27,7 +27,6 @@ onAuthStateChanged(auth, (user) => {
         chargerSuggestionsClients();
         if(document.getElementById('dep_date_fac')) document.getElementById('dep_date_fac').valueAsDate = new Date();
         
-        // Drag & Drop
         const el = document.getElementById('tbody_lignes');
         if(el && window.Sortable) {
             new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: window.calculTotal });
@@ -36,7 +35,6 @@ onAuthStateChanged(auth, (user) => {
 });
 
 function initYearFilter() {
-    // Initialise les filtres Année pour ACHATS et VENTES
     const opts = `<option value="">Année (Toutes)</option>` + 
                  [0,1,2].map(i => `<option value="${currentYear-i}" ${i===0?'selected':''}>${currentYear-i}</option>`).join('');
     
@@ -54,7 +52,7 @@ function chargerLogoBase64() {
     } 
 }
 
-// --- 1. FACTURES (AVEC NOUVEAUX FILTRES) ---
+// --- 1. FACTURES ---
 window.chargerListeFactures = async function() {
     const tbody = document.getElementById('list-body');
     if(!tbody) return;
@@ -84,7 +82,6 @@ window.chargerListeFactures = async function() {
 window.filtrerFactures = function() {
     const term = (document.getElementById('search-facture')?.value || "").toLowerCase();
     
-    // NOUVEAUX FILTRES VENTES
     const fMonth = document.getElementById('filter_fac_month')?.value;
     const fYear = document.getElementById('filter_fac_year')?.value;
     const fType = document.getElementById('filter_fac_type')?.value;
@@ -93,25 +90,19 @@ window.filtrerFactures = function() {
     const tbody = document.getElementById('list-body'); tbody.innerHTML = "";
     
     const results = cacheFactures.filter(d => {
-        // Recherche Texte
         const textMatch = (d.finalNumero.toLowerCase().includes(term)) || (d.finalClient.toLowerCase().includes(term));
-        
-        // Type (Devis/Facture)
         const typeMatch = !fType || fType === "" || d.finalType === fType;
 
-        // Date (Mois/Année)
         let dateMatch = true;
         const dDate = new Date(d.finalDate);
         if (fYear && fYear !== "" && dDate.getFullYear() != fYear) dateMatch = false;
         if (fMonth && fMonth !== "" && dDate.getMonth() != fMonth) dateMatch = false;
 
-        // Statut (Payé/En attente)
         let statutMatch = true;
         if (fStatut && fStatut !== "") {
             const paye = d.finalPaiements.reduce((s, p) => s + parseFloat(p.montant), 0);
             const reste = d.finalTotal - paye;
-            const isPaye = reste < 0.1; // Considéré payé si reste < 10 centimes
-            
+            const isPaye = reste < 0.1; 
             if (fStatut === "Payé" && !isPaye) statutMatch = false;
             if (fStatut === "En attente" && isPaye) statutMatch = false;
         }
@@ -131,7 +122,7 @@ window.filtrerFactures = function() {
         try { dateAffiche = new Date(d.finalDate).toLocaleDateString(); } catch(e){}
         
         let badgeClass = d.finalType === 'FACTURE' ? 'badge-facture' : 'badge-devis';
-        let statusColor = reste > 0.1 ? '#ef4444' : '#10b981'; // Rouge si reste, Vert si payé
+        let statusColor = reste > 0.1 ? '#ef4444' : '#10b981'; 
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -350,11 +341,11 @@ window.renderPaiements = () => { const div = document.getElementById('liste_paie
 window.supprimerDocument = async (id) => { if(confirm("Supprimer ?")) { await deleteDoc(doc(db,"factures_v2",id)); window.chargerListeFactures(); } };
 window.transformerEnFacture = async function() { if(confirm("Créer une FACTURE à partir de ce devis ?")) { document.getElementById('doc_type').value = "FACTURE"; document.getElementById('doc_date').valueAsDate = new Date(); document.getElementById('current_doc_id').value = ""; window.sauvegarderDocument(); } };
 
-// EXPORT EXCEL (VENTES & ACHATS)
+// EXPORT EXCEL
 window.exportExcelSmart = function() { 
     let csvContent = "data:text/csv;charset=utf-8,"; 
     
-    // EXPORT VENTES (SI ONGLETS VENTES ACTIF)
+    // EXPORT VENTES
     if(!document.getElementById('tab-factures').classList.contains('hidden')) { 
         csvContent += "Numero;Date;Type;Client;Defunt;Total TTC;Reste a Payer\n"; 
         cacheFactures.forEach(d => { 
@@ -366,7 +357,7 @@ window.exportExcelSmart = function() {
         const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "export_ventes.csv"); 
         document.body.appendChild(link); link.click(); 
     } 
-    // EXPORT ACHATS (SI ONGLET ACHATS ACTIF)
+    // EXPORT ACHATS
     else { 
         csvContent += "Date;Fournisseur;Reference;Categorie;Montant;Statut\n"; 
         cacheDepenses.forEach(d => { 
