@@ -160,20 +160,20 @@ window.refreshPilotageFinancier = function() {
     });
 
     // 4) Dépenses réglées sur période
-    const depensesReglees = cacheDepenses
-        .filter(x => {
-            // Pilotage trésorerie: on se base d'abord sur la date de règlement (si présente),
-            // sinon on retombe sur la date facture pour compatibilité anciens enregistrements.
-            const cashDate = x?.date_reglement || x?.date || "";
-            return dateInPeriod(cashDate, year, month);
-        })
-        .reduce((s, x) => {
-            const montant = parseFloat(x?.montant) || 0;
-            const avance = parseFloat(x?.avance_versee) || 0;
-            if (x?.statut === "Réglé") return s + montant;
-            if (avance > 0) return s + Math.min(avance, montant);
+    const depensesReglees = cacheDepenses.reduce((s, x) => {
+        const montant = parseFloat(x?.montant) || 0;
+        const avance = parseFloat(x?.avance_versee) || 0;
+        if (x?.statut === "Réglé") {
+            const dRegle = x?.date_reglement || x?.date || "";
+            if (dateInPeriod(dRegle, year, month)) return s + montant;
             return s;
-        }, 0);
+        }
+        if (avance > 0) {
+            const dAvance = x?.date_avance || x?.date_reglement || x?.date || "";
+            if (dateInPeriod(dAvance, year, month)) return s + Math.min(avance, montant);
+        }
+        return s;
+    }, 0);
 
     // 5) Résultat trésorerie
     const resultatTreso = caEncaisse - depensesReglees;
@@ -679,6 +679,7 @@ window.filtrerDepenses = function() {
             dateRegleHtml = `<br><span style="font-size:0.7rem; color:#059669;"><i class="fas fa-check"></i> Réglé le ${new Date(d.date_reglement).toLocaleDateString()}</span>`;
         }
         const detailsHtml = d.details ? `<br><span style="font-size:0.8rem; color:#6b7280; font-style:italic;">${escapeHtml(d.details)}</span>` : "";
+        const avanceDateTxt = d.date_avance ? `<br><span style="font-size:0.72rem; color:#0f766e;">Avance le ${new Date(d.date_avance).toLocaleDateString()}</span>` : "";
         const avance = Math.max(0, parseFloat(d.avance_versee) || 0);
         const montant = Math.max(0, parseFloat(d.montant) || 0);
         const reste = Math.max(0, (parseFloat(d.reste_a_payer) || (montant - avance)));
@@ -690,10 +691,10 @@ window.filtrerDepenses = function() {
             <td>${escapeHtml(d.reference||'-')}</td>
             <td>${badge}</td>
             <td style="text-align:right;">-${montant.toFixed(2)} €</td>
-            <td style="text-align:right; color:#0f766e; font-weight:700;">${avance > 0 ? `-${avance.toFixed(2)} €` : '-'}</td>
+            <td style="text-align:right; color:#0f766e; font-weight:700;">${avance > 0 ? `-${avance.toFixed(2)} €${avanceDateTxt}` : '-'}</td>
             <td style="text-align:right; color:${reste > 0 ? '#b45309' : '#16a34a'}; font-weight:700;">${reste.toFixed(2)} €</td>
             <td style="text-align:center;">
-                <button class="btn-icon" onclick="window.preparerModification('${d.id}')"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon" onclick="window.openDepenseEditModal('${d.id}')" title="Modifier"><i class="fas fa-edit"></i></button>
                 <button class="btn-icon" onclick="window.supprimerDepense('${d.id}')"><i class="fas fa-trash"></i></button>
             </td>`; 
         tbody.appendChild(tr); 
@@ -722,7 +723,7 @@ window.gererDepense = async function() {
         date: document.getElementById('dep_date_fac').value, reference: document.getElementById('dep_ref').value, fournisseur: document.getElementById('dep_fourn').value, 
         details: document.getElementById('dep_details').value, categorie: document.getElementById('dep_cat').value, mode: document.getElementById('dep_mode').value, 
         statut: statutFinal, montant: montant, date_reglement: document.getElementById('dep_date_reg').value,
-        avance_versee: avance, reste_a_payer: reste
+        avance_versee: avance, date_avance: document.getElementById('dep_date_avance')?.value || "", reste_a_payer: reste
     }; 
     if(!data.date) return alert("Date requise"); 
     try { 
@@ -744,12 +745,95 @@ window.preparerModification = function(id) {
         document.getElementById('dep_edit_id').value=id; document.getElementById('dep_date_fac').value=d.date; document.getElementById('dep_ref').value=d.reference; 
         document.getElementById('dep_fourn').value=d.fournisseur; document.getElementById('dep_montant').value=d.montant; document.getElementById('dep_cat').value=d.categorie; 
         if (document.getElementById('dep_avance')) document.getElementById('dep_avance').value = (parseFloat(d.avance_versee) || 0).toFixed(2);
+        if (document.getElementById('dep_date_avance')) document.getElementById('dep_date_avance').value = d.date_avance || "";
         document.getElementById('dep_details').value = d.details || ""; 
         document.getElementById('dep_mode').value=d.mode; document.getElementById('dep_statut').value=d.statut; 
         if (document.getElementById('dep_reste')) document.getElementById('dep_reste').value = (Math.max(0, parseFloat(d.reste_a_payer) || ((parseFloat(d.montant) || 0) - (parseFloat(d.avance_versee) || 0)))).toFixed(2);
         document.getElementById('btn-action-depense').innerHTML="MODIFIER"; document.getElementById('container-form-depense').classList.add('open'); 
     } 
 };
+window.closeDepenseEditModal = function() {
+    document.getElementById('modal-edit-depense')?.classList.add('hidden');
+};
+
+window.calculerResteDepenseModal = function() {
+    const montant = parseFloat(document.getElementById('dep_modal_montant')?.value) || 0;
+    let avance = parseFloat(document.getElementById('dep_modal_avance')?.value) || 0;
+    if (avance < 0) avance = 0;
+    if (avance > montant) avance = montant;
+    const reste = Math.max(0, montant - avance);
+    const resteEl = document.getElementById('dep_modal_reste');
+    if (resteEl) resteEl.value = reste.toFixed(2);
+};
+
+window.openDepenseEditModal = function(id) {
+    const d = cacheDepenses.find(x => x.id === id);
+    if (!d) return;
+
+    // Reprend les mêmes options que le formulaire principal
+    const copyOptions = (fromId, toId) => {
+        const from = document.getElementById(fromId);
+        const to = document.getElementById(toId);
+        if (!from || !to) return;
+        to.innerHTML = from.innerHTML;
+    };
+    copyOptions('dep_cat', 'dep_modal_cat');
+    copyOptions('dep_mode', 'dep_modal_mode');
+    copyOptions('dep_statut', 'dep_modal_statut');
+
+    document.getElementById('dep_modal_id').value = d.id;
+    document.getElementById('dep_modal_date').value = d.date || "";
+    document.getElementById('dep_modal_fournisseur').value = d.fournisseur || "";
+    document.getElementById('dep_modal_ref').value = d.reference || "";
+    document.getElementById('dep_modal_montant').value = parseFloat(d.montant || 0).toFixed(2);
+    document.getElementById('dep_modal_cat').value = d.categorie || "";
+    document.getElementById('dep_modal_details').value = d.details || "";
+    document.getElementById('dep_modal_statut').value = d.statut || "En attente";
+    document.getElementById('dep_modal_mode').value = d.mode || "Virement";
+    document.getElementById('dep_modal_date_reglement').value = d.date_reglement || "";
+    document.getElementById('dep_modal_avance').value = parseFloat(d.avance_versee || 0).toFixed(2);
+    document.getElementById('dep_modal_date_avance').value = d.date_avance || "";
+    window.calculerResteDepenseModal();
+    document.getElementById('modal-edit-depense')?.classList.remove('hidden');
+};
+
+window.saveDepenseFromModal = async function() {
+    const id = document.getElementById('dep_modal_id')?.value;
+    if (!id) return;
+    const montant = parseFloat(document.getElementById('dep_modal_montant')?.value) || 0;
+    let avance = parseFloat(document.getElementById('dep_modal_avance')?.value) || 0;
+    if (avance < 0) avance = 0;
+    if (avance > montant) avance = montant;
+    const reste = Math.max(0, montant - avance);
+    const statutChoisi = document.getElementById('dep_modal_statut')?.value || "En attente";
+    const statutFinal = (reste <= 0.001) ? "Réglé" : statutChoisi;
+
+    const data = {
+        date: document.getElementById('dep_modal_date')?.value || "",
+        reference: document.getElementById('dep_modal_ref')?.value || "",
+        fournisseur: document.getElementById('dep_modal_fournisseur')?.value || "",
+        details: document.getElementById('dep_modal_details')?.value || "",
+        categorie: document.getElementById('dep_modal_cat')?.value || "",
+        mode: document.getElementById('dep_modal_mode')?.value || "Virement",
+        statut: statutFinal,
+        montant: montant,
+        date_reglement: document.getElementById('dep_modal_date_reglement')?.value || "",
+        avance_versee: avance,
+        date_avance: document.getElementById('dep_modal_date_avance')?.value || "",
+        reste_a_payer: reste
+    };
+
+    if (!data.date) return alert("Date requise");
+    try {
+        await updateDoc(doc(db, "depenses", id), data);
+        alert("✅ Dépense modifiée");
+        window.closeDepenseEditModal();
+        await window.chargerDepenses();
+    } catch (e) {
+        alert("Erreur modification dépense : " + (e?.message || e));
+    }
+};
+
 window.marquerCommeRegle = async function(id) {
     if(confirm("Valider paiement ?")) {
         const d = cacheDepenses.find(x => x.id === id) || {};
@@ -758,6 +842,7 @@ window.marquerCommeRegle = async function(id) {
             statut: "Réglé",
             date_reglement: new Date().toISOString().split('T')[0],
             avance_versee: montant,
+            date_avance: new Date().toISOString().split('T')[0],
             reste_a_payer: 0
         });
         window.chargerDepenses();
@@ -1086,9 +1171,9 @@ window.exportExcelSmart = function() {
         document.body.appendChild(link); link.click(); 
     } 
     else { 
-        csvContent += "Date;Fournisseur;Reference;Categorie;Montant;Avance Versee;Reste a Payer;Statut\n"; 
+        csvContent += "Date;Fournisseur;Reference;Categorie;Montant;Avance Versee;Date Avance;Reste a Payer;Statut\n"; 
         cacheDepenses.forEach(d => { 
-            csvContent += `${d.date};${d.fournisseur};${d.reference};${d.categorie};${d.montant};${(parseFloat(d.avance_versee)||0).toFixed(2)};${(Math.max(0, parseFloat(d.reste_a_payer)||((parseFloat(d.montant)||0)-(parseFloat(d.avance_versee)||0)))).toFixed(2)};${d.statut}\n`; 
+            csvContent += `${d.date};${d.fournisseur};${d.reference};${d.categorie};${d.montant};${(parseFloat(d.avance_versee)||0).toFixed(2)};${d.date_avance || ""};${(Math.max(0, parseFloat(d.reste_a_payer)||((parseFloat(d.montant)||0)-(parseFloat(d.avance_versee)||0)))).toFixed(2)};${d.statut}\n`; 
         }); 
         const encodedUri = encodeURI(csvContent); 
         const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "export_achats.csv"); 
