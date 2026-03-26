@@ -127,7 +127,6 @@
                                 <option value="">Type (Tous)</option>
                                 <option value="DEVIS">Devis</option>
                                 <option value="FACTURE">Facture</option>
-                                <option value="AVOIR">Avoir</option>
                             </select>
                         </div>
                         <div>
@@ -171,6 +170,24 @@
                     <button id="btn-load-more-factures" class="btn btn-grey hidden" onclick="window.chargerPlusFactures()">
                         <i class="fas fa-chevron-down"></i> CHARGER PLUS
                     </button>
+                </div>
+                <div class="card" style="margin-top:18px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h3 style="margin:0;">À ENCAISSER (IMPAYÉS)</h3>
+                        <button class="btn btn-green" onclick="window.exportAEncaisserCSV()"><i class="fas fa-file-export"></i> EXPORT IMPAYÉS</button>
+                    </div>
+                    <table class="compta-table">
+                        <thead>
+                            <tr>
+                                <th>NUMÉRO</th>
+                                <th>CLIENT</th>
+                                <th>ÉCHÉANCE</th>
+                                <th style="text-align:right;">RESTE DÛ</th>
+                                <th>STATUT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="encaisser-body"></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -291,7 +308,6 @@
                     <button class="btn btn-grey" onclick="window.genererPDFFacture()"><i class="fas fa-print"></i> IMPRIMER</button>
                     <button class="btn btn-blue" id="btn-transform" onclick="window.transformerEnFacture()" style="display:none;"><i class="fas fa-magic"></i> FACTURER</button>
                     <button class="btn btn-red" id="btn-annuler-doc" onclick="window.annulerDocument()" style="display:none;"><i class="fas fa-ban"></i> ANNULER</button>
-                    <button class="btn btn-purple" id="btn-avoir-doc" onclick="window.creerAvoir()" style="display:none;"><i class="fas fa-receipt"></i> AVOIR</button>
                 </div>
             </div>
             
@@ -320,7 +336,7 @@
                         <input id="dossier_numero" placeholder="Numéro dossier (ex: DA-2026-001)" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb; width:100%;">
                         <input id="dossier_id" placeholder="ID dossier (optionnel)" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb; width:100%;">
                     </div>
-                    <input id="defunt_nom" list="defunts_suggestions" placeholder="Concerne le défunt (Nom Prénom)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                    <input id="defunt_nom" list="defunts_suggestions" onchange="window.checkDefuntAuto()" placeholder="Concerne le défunt (Nom Prénom)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     
                     <div style="display:flex; gap:10px; margin-top:10px;">
                         <div style="flex:1;">
@@ -355,6 +371,10 @@
                         <select id="pay_mode" style="padding:8px; border-radius:6px; border:1px solid #84cc16;"><option>Virement</option><option>Chèque</option><option>Espèces</option><option>CB</option></select>
                         <input type="number" id="pay_amount" placeholder="€" step="0.01" style="padding:8px; border-radius:6px; border:1px solid #84cc16; font-weight:bold;">
                         <button class="btn btn-green" onclick="window.ajouterPaiement()">+</button>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <input type="file" id="pay_receipt" accept="image/*,application/pdf" style="padding:8px; border-radius:6px; border:1px solid #84cc16; background:white;">
+                        <small style="color:#3f6212; align-self:center;">Justificatif optionnel (image/PDF)</small>
                     </div>
                     <div id="liste_paiements" style="font-size:0.9rem; color:#3f6212;"></div>
                 </div>
