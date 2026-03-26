@@ -205,20 +205,14 @@
             <div class="page-header">
                 <h1>Base Clients</h1>
                 <div style="display:flex; gap:10px;">
-                    <input type="text" id="search-client" placeholder="Rechercher un dossier (Nom...)" style="width:250px;">
+                    <input type="text" id="search-client" placeholder="Rechercher une fiche client..." style="width:250px;">
                     <button class="btn btn-blue" onclick="window.chargerBaseClients()"><i class="fas fa-sync"></i> Actualiser</button>
                 </div>
             </div>
             <div class="card" style="padding:0; overflow:hidden;">
-                <table class="history-table">
-                    <thead><tr><th>Date</th><th>Défunt</th><th>Mandant</th><th>Opération</th><th style="text-align:center;">Actions</th></tr></thead>
-                    <tbody id="clients-table-body"></tbody>
-                </table>
-            </div>
-            <div class="card" style="padding:0; overflow:hidden;">
                 <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; font-weight:700; color:#0f172a;">Fiches Clients (Facturation)</div>
                 <table class="history-table">
-                    <thead><tr><th>Nom</th><th>Téléphone</th><th>Email</th><th>Type</th><th>Adresse</th><th>Notes</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Type</th><th>Adresse</th><th>Notes</th></tr></thead>
                     <tbody id="clients-ref-table-body"></tbody>
                 </table>
             </div>
@@ -231,6 +225,20 @@
                     <button class="btn btn-red" onclick="window.viderFormulaire()"><i class="fas fa-trash-alt"></i> NOUVEAU</button>
                     <button class="btn btn-green" id="btn-save-bdd" onclick="window.sauvegarderDossier()"><i class="fas fa-save"></i> ENREGISTRER</button>
                 </div>
+            </div>
+
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <strong style="color:#0f172a;">Dossiers Administratifs</strong>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="search-dossier-admin" placeholder="Rechercher dossier (défunt/mandant/code)..." oninput="window.filtrerDossiersAdmin()" style="width:320px;">
+                        <button class="btn btn-blue" onclick="window.chargerDossiersAdminList()"><i class="fas fa-sync"></i> Actualiser</button>
+                    </div>
+                </div>
+                <table class="history-table">
+                    <thead><tr><th>Date</th><th>Code Dossier</th><th>Défunt</th><th>Mandant</th><th>Opération</th><th style="text-align:center;">Actions</th></tr></thead>
+                    <tbody id="dossiers-admin-table-body"></tbody>
+                </table>
             </div>
 
             <div class="card" style="background:#f0f9ff; border:1px solid #bae6fd; margin-bottom:20px;">
