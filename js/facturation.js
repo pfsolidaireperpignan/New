@@ -123,7 +123,7 @@ function getAEncaisserRows() {
             const reste = (parseFloat(d.finalTotal) || 0) - paye;
             return { ...d, reste };
         })
-        .filter(d => d.reste > 0.01 && !["PAYE", "ANNULE", "AVOIR"].includes(String(d.finalStatut || "").toUpperCase()))
+        .filter(d => d.reste > 0.01 && !["PAYE", "ANNULE"].includes(String(d.finalStatut || "").toUpperCase()))
         .sort((a, b) => {
             const da = a.finalEcheance ? new Date(a.finalEcheance).getTime() : Number.MAX_SAFE_INTEGER;
             const db = b.finalEcheance ? new Date(b.finalEcheance).getTime() : Number.MAX_SAFE_INTEGER;
@@ -295,7 +295,7 @@ window.filtrerFactures = function() {
     
     function isOverdue(d) {
         const statut = String(d.finalStatut || "").toUpperCase();
-        if (statut === "PAYE" || statut === "ANNULE" || statut === "AVOIR") return false;
+        if (statut === "PAYE" || statut === "ANNULE") return false;
         const e = d.finalEcheance || d.date_echeance || "";
         if (!e) return false;
         try {
@@ -360,7 +360,6 @@ window.filtrerFactures = function() {
         if (s === "PARTIEL") return { cls: "badge-statut badge-statut-partiel", label: "PARTIEL" };
         if (s === "EMIS") return { cls: "badge-statut badge-statut-emis", label: "ÉMIS" };
         if (s === "ANNULE") return { cls: "badge-statut badge-statut-annule", label: "ANNULÉ" };
-        if (s === "AVOIR") return { cls: "badge-statut badge-statut-avoir", label: "AVOIR" };
         return { cls: "badge-statut badge-statut-brouillon", label: "BROUILLON" };
     }
 
@@ -778,7 +777,7 @@ window.sauvegarderDocument = async function() {
     const resteCalc = lettrage.reste;
     const existingStatut = String(currentDocSnapshot?.statut || "").trim().toUpperCase();
     let statut = existingStatut || (docType === 'FACTURE' ? 'EMIS' : 'BROUILLON');
-    if (statut !== 'ANNULE' && statut !== 'AVOIR') {
+    if (statut !== 'ANNULE') {
         if (docType === 'FACTURE') {
             if (totalPayeCalc <= 0) statut = 'EMIS';
             else if (resteCalc > 0.01) statut = 'PARTIEL';
@@ -946,6 +945,18 @@ function applyDossierToForm(dossier) {
     if (dossierNumeroEl) dossierNumeroEl.value = dossier.numero || "";
     const addr = dossier?.data?.mandant?.adresse || "";
     if (addr && document.getElementById('client_adresse')) document.getElementById('client_adresse').value = addr;
+}
+
+function applyDefuntFromDossierToForm(dossier) {
+    if (!dossier?.data) return;
+    const defunt = dossier.data.defunt || {};
+    const nomEl = document.getElementById('defunt_nom');
+    const naissEl = document.getElementById('defunt_date_naiss');
+    const decesEl = document.getElementById('defunt_date_deces');
+
+    if (nomEl && defunt.nom) nomEl.value = defunt.nom;
+    if (naissEl && (defunt.date_naiss || defunt.naiss)) naissEl.value = defunt.date_naiss || defunt.naiss || "";
+    if (decesEl && (defunt.date_deces || defunt.deces)) decesEl.value = defunt.date_deces || defunt.deces || "";
 }
 
 function applyClientToForm(clientDoc) {
@@ -1332,7 +1343,10 @@ window.checkClientAuto = function() {
     const foundClient = findClientByName(val);
     if (foundClient) applyClientToForm(foundClient);
     const dossier = findDossierByClientName(val);
-    if (dossier) applyDossierToForm(dossier);
+    if (dossier) {
+        applyDossierToForm(dossier);
+        applyDefuntFromDossierToForm(dossier);
+    }
     else {
         const client = cacheFactures.find(f => f.finalClient === val);
         if(client) document.getElementById('client_adresse').value = client.client_adresse || client.client?.adresse || '';
@@ -1344,6 +1358,7 @@ window.checkDefuntAuto = function() {
     const dossier = findDossierByDefuntName(val);
     if (dossier) {
         applyDossierToForm(dossier);
+        applyDefuntFromDossierToForm(dossier);
         // si client vide, on propose le mandant du dossier
         const clientNomEl = document.getElementById('client_nom');
         if (clientNomEl && !clientNomEl.value) {
