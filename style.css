@@ -2,19 +2,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-    --primary: #10b981;       /* Vert Succès */
-    --primary-dark: #059669;
-    --secondary: #3b82f6;     /* Bleu Info */
-    --danger: #ef4444;        /* Rouge Alerte */
-    --warning: #f59e0b;       /* Orange Attention */
-    --purple: #8b5cf6;        /* Violet Admin */
-    --dark: #111827;          /* Noir Profond */
-    --gray: #6b7280;          /* Gris Texte */
-    --light: #f3f4f6;         /* Fond Gris Clair */
+    --primary: #0f766e;       /* Vert premium */
+    --primary-dark: #115e59;
+    --secondary: #2563eb;     /* Bleu premium */
+    --danger: #dc2626;        /* Rouge alerte */
+    --warning: #d97706;       /* Orange attention */
+    --purple: #7c3aed;        /* Violet admin */
+    --dark: #0f172a;          /* Slate 900 */
+    --gray: #64748b;          /* Slate 500 */
+    --light: #f1f5f9;         /* Fond premium clair */
     --surface: #ffffff;       /* Blanc Pur */
-    --border: #e5e7eb;        /* Bordure Subtile */
-    --radius: 12px;           /* Arrondis */
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --border: #e2e8f0;        /* Bordure subtile */
+    --radius: 14px;           /* Arrondis premium */
+    --shadow: 0 8px 24px -18px rgba(15, 23, 42, 0.35), 0 6px 10px -8px rgba(15, 23, 42, 0.18);
+    --focus-ring: 0 0 0 4px rgba(59, 130, 246, 0.14);
 }
 
 body { 
@@ -44,7 +45,7 @@ body {
     color: var(--gray); text-decoration: none; border-radius: var(--radius); 
     font-weight: 500; transition: all 0.2s;
 }
-.nav-link:hover, .nav-link.active { background-color: #ecfdf5; color: var(--primary-dark); }
+.nav-link:hover, .nav-link.active { background-color: #f0fdfa; color: var(--primary-dark); }
 .nav-link i { width: 24px; text-align: center; font-size: 1.1rem; }
 
 /* Menu Réduit (Mobile/PC) */
@@ -59,13 +60,16 @@ body {
    2. CONTENU PRINCIPAL & LAYOUT
    ============================================================ */
 .main-content { flex: 1; overflow-y: auto; padding: 32px; background-color: var(--light); }
+.ui-toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
 h1 { font-size: 1.8rem; font-weight: 700; color: var(--dark); margin: 0; letter-spacing: -0.025em; }
 
 .card { 
-    background: white; border-radius: 16px; border: 1px solid var(--border); 
+    background: white; border-radius: 18px; border: 1px solid var(--border); 
     box-shadow: var(--shadow); overflow: hidden; margin-bottom: 24px; padding: 24px;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
+.card:hover { box-shadow: 0 10px 22px -12px rgba(15, 23, 42, 0.28); }
 
 /* Grilles */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
@@ -78,7 +82,7 @@ h1 { font-size: 1.8rem; font-weight: 700; color: var(--dark); margin: 0; letter-
    3. STYLE ACCUEIL (DASHBOARD) - C'EST CE QUI MANQUAIT !
    ============================================================ */
 .welcome-banner {
-    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     color: white; padding: 30px 40px; border-radius: 16px; margin-bottom: 30px;
     display: flex; justify-content: space-between; align-items: center;
     box-shadow: 0 10px 20px -5px rgba(0,0,0,0.2);
@@ -93,7 +97,7 @@ h1 { font-size: 1.8rem; font-weight: 700; color: var(--dark); margin: 0; letter-
 .quick-stats { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
 .mini-stat {
     flex: 1; background: white; padding: 15px 20px; border-radius: 14px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.03); display: flex; align-items: center; gap: 15px;
+    box-shadow: 0 8px 18px -16px rgba(15,23,42,0.35); display: flex; align-items: center; gap: 15px;
     cursor: pointer; border: 1px solid var(--border); min-width: 200px; transition: transform 0.2s;
 }
 .mini-stat:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
@@ -103,11 +107,11 @@ h1 { font-size: 1.8rem; font-weight: 700; color: var(--dark); margin: 0; letter-
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-top: 15px; }
 .action-card {
     background: white; padding: 25px; border-radius: 16px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.04); border: 1px solid var(--border);
+    box-shadow: 0 10px 22px -18px rgba(15,23,42,0.35); border: 1px solid var(--border);
     cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; height: 160px;
     position: relative; overflow: hidden;
 }
-.action-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
+.action-card:hover { transform: translateY(-5px); box-shadow: 0 18px 30px -18px rgba(15,23,42,0.5); }
 
 /* Couleurs Cartes Dashboard */
 .ac-blue:hover { border-bottom: 4px solid var(--secondary); }
@@ -129,13 +133,14 @@ h1 { font-size: 1.8rem; font-weight: 700; color: var(--dark); margin: 0; letter-
 /* ============================================================
    4. INPUTS & BOUTONS
    ============================================================ */
-label { display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 6px; }
+label { display: block; font-size: 0.84rem; font-weight: 700; color: #475569; margin-bottom: 7px; letter-spacing: 0.01em; }
 input, select, textarea { 
-    width: 100%; padding: 12px 15px; border: 1px solid #d1d5db; 
-    border-radius: 10px; background: #f9fafb; box-sizing: border-box; 
-    font-size: 0.95rem; transition: 0.2s; 
+    width: 100%; padding: 12px 14px; border: 1px solid #cfd8e3;
+    border-radius: 12px; background: #f8fafc; box-sizing: border-box;
+    font-size: 0.95rem; color: #0f172a; transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
-input:focus, select:focus { border-color: var(--secondary); background: white; outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+input::placeholder, textarea::placeholder { color: #94a3b8; }
+input:focus, select:focus, textarea:focus { border-color: var(--secondary); background: white; outline: none; box-shadow: var(--focus-ring); }
 
 /* Recherche avec icône */
 .search-box { position: relative; width: 100%; max-width: 350px; }
@@ -143,14 +148,16 @@ input:focus, select:focus { border-color: var(--secondary); background: white; o
 .search-box input { padding-left: 42px; }
 
 .btn { 
-    padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; border: none; 
-    display: inline-flex; align-items: center; gap: 8px; transition: opacity 0.2s; text-decoration: none; 
+    padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; border: none;
+    display: inline-flex; align-items: center; gap: 8px; transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s; text-decoration: none;
 }
-.btn:hover { opacity: 0.9; transform: translateY(-1px); }
-.btn-primary, .btn-green { background: var(--primary); color: white; }
-.btn-red { background: var(--danger); color: white; }
-.btn-blue { background: var(--secondary); color: white; }
-.btn-purple { background: var(--purple); color: white; }
+.btn:hover { opacity: 0.95; transform: translateY(-1px); box-shadow: 0 8px 18px -10px rgba(15, 23, 42, 0.35); }
+.btn:active { transform: translateY(0); box-shadow: none; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-primary, .btn-green { background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%); color: white; }
+.btn-red { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: white; }
+.btn-blue { background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); color: white; }
+.btn-purple { background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%); color: white; }
 .btn-grey { background: white; border: 1px solid var(--border); color: var(--dark); }
 .btn-icon { background: #f3f4f6; width: 35px; height: 35px; border-radius: 8px; border: none; cursor: pointer; color: var(--gray); display: inline-flex; align-items: center; justify-content: center; transition: 0.2s; }
 .btn-icon:hover { background: #e2e8f0; color: var(--dark); }
@@ -195,14 +202,67 @@ input:focus, select:focus { border-color: var(--secondary); background: white; o
 
 /* Onglets Admin */
 .tabs-container { display: flex; gap: 10px; margin-bottom: 20px; }
-.tab-btn { flex: 1; padding: 15px; border: 1px solid var(--border); background: white; border-radius: 12px; cursor: pointer; font-weight: bold; color: var(--gray); display: flex; align-items: center; justify-content: center; gap: 10px; }
-.tab-btn.active { border-color: var(--secondary); color: var(--secondary); background: #eff6ff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+.tab-btn {
+    flex: 1; min-height: 50px; padding: 12px 14px; border: 1px solid #dbe3ee; background: #ffffff;
+    border-radius: 14px; cursor: pointer; font-weight: 700; color: #64748b;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.2s ease;
+}
+.tab-btn:hover { border-color: #bfdbfe; background: #f8fbff; color: #334155; }
+.tab-btn.active {
+    border-color: var(--secondary); color: var(--secondary); background: #eff6ff;
+    box-shadow: inset 0 0 0 1px rgba(59,130,246,0.12), 0 6px 14px -10px rgba(59,130,246,0.55);
+}
+
+/* ============================================================
+   7. MODE COMPACT
+   ============================================================ */
+body.compact .main-content { padding: 22px; }
+body.compact .page-header { margin-bottom: 18px; }
+body.compact h1 { font-size: 1.45rem; }
+body.compact .card { padding: 16px; margin-bottom: 16px; border-radius: 14px; }
+body.compact .form-grid { gap: 12px; margin-bottom: 8px; }
+body.compact label { font-size: 0.78rem; margin-bottom: 4px; }
+body.compact input,
+body.compact select,
+body.compact textarea { padding: 9px 11px; font-size: 0.88rem; border-radius: 10px; }
+body.compact .btn { padding: 8px 14px; font-size: 0.83rem; border-radius: 10px; }
+body.compact .tabs-container { margin-bottom: 12px; }
+body.compact .tab-btn { min-height: 42px; padding: 9px 10px; font-size: 0.82rem; border-radius: 11px; gap: 6px; }
+body.compact .history-table th,
+body.compact .history-table td,
+body.compact .compta-table th,
+body.compact .compta-table td { padding: 10px 12px; font-size: 0.84rem; }
+body.compact .quick-stats { gap: 12px; margin-bottom: 16px; }
+body.compact .mini-stat { padding: 10px 12px; border-radius: 12px; min-width: 170px; }
+body.compact .mini-icon { width: 38px; height: 38px; font-size: 1rem; }
+body.compact .welcome-banner { padding: 18px 22px; margin-bottom: 16px; border-radius: 14px; }
+body.compact .welcome-text h2 { font-size: 1.35rem; }
+body.compact .dashboard-grid { gap: 12px; }
+body.compact .action-card { height: 132px; padding: 16px; border-radius: 14px; }
+
+/* Micro-animations douces */
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#view-home, #view-stock, #view-base, #view-admin {
+    animation: fadeSlideIn 0.25s ease;
+}
 
 /* ============================================================
    6. MOBILE & MODALES
    ============================================================ */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; justify-content: center; align-items: center; }
 #mobile-menu-btn { display: none; }
+#btn-compact-toggle {
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid #dbe3ee;
+    box-shadow: 0 10px 18px -14px rgba(15, 23, 42, 0.6);
+}
 
 @media (max-width: 768px) {
     .sidebar { position: fixed; transform: translateX(-100%); height: 100%; box-shadow: 5px 0 15px rgba(0,0,0,0.1); }
@@ -212,4 +272,10 @@ input:focus, select:focus { border-color: var(--secondary); background: white; o
     .grid-2, .grid-3, .grid-4, .stats-grid, .dashboard-grid, .form-grid { grid-template-columns: 1fr; }
     .welcome-banner { flex-direction: column; text-align: center; gap: 15px; }
     .date-badge { width: 100%; }
+    .main-content { padding: 18px; }
+    .card { padding: 16px; border-radius: 16px; }
+    .ui-toolbar { margin-bottom: 10px; }
+    .tabs-container { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 6px; scrollbar-width: thin; }
+    .tab-btn { flex: 0 0 auto; min-width: 220px; white-space: nowrap; }
+    #btn-compact-toggle { padding: 9px 12px; font-size: 0.78rem; }
 }

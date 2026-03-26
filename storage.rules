@@ -1,0 +1,40 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAllowedContentType() {
+      return request.resource.contentType.matches('image/.*')
+        || request.resource.contentType == 'application/pdf'
+        || request.resource.contentType == 'application/x-pdf';
+    }
+
+    // Taille max recommandée pour limiter les abus (10 Mo)
+    function isAllowedSize() {
+      return request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    // Dossier GED principal
+    match /ged_files/{fileId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isAllowedContentType() && isAllowedSize();
+      allow update: if isSignedIn() && isAllowedContentType() && isAllowedSize();
+      allow delete: if isSignedIn();
+    }
+
+    // Variante sous-dossier par dossier administratif
+    match /ged_files/{dossierId}/{fileName} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isAllowedContentType() && isAllowedSize();
+      allow update: if isSignedIn() && isAllowedContentType() && isAllowedSize();
+      allow delete: if isSignedIn();
+    }
+
+    // Tout le reste bloqué
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

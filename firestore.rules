@@ -1,0 +1,215 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function onlyKeys(allowed) {
+      return request.resource.data.keys().hasOnly(allowed);
+    }
+
+    function isString(v) {
+      return v is string;
+    }
+
+    function isNumber(v) {
+      return v is int || v is float;
+    }
+
+    function isMap(v) {
+      return v is map;
+    }
+
+    function validTimestampString(field) {
+      return !(field in request.resource.data) || (request.resource.data[field] is string);
+    }
+
+    // -------------------------------
+    // dossiers_admin
+    // -------------------------------
+    function validDossierAdmin() {
+      return onlyKeys([
+        'date_creation',
+        'date_modification',
+        'defunt',
+        'mandant',
+        'technique',
+        'transport',
+        'details_op',
+        'protocole',
+        'ged',
+        'pieces_jointes'
+      ])
+      && (!('defunt' in request.resource.data) || isMap(request.resource.data.defunt))
+      && (!('mandant' in request.resource.data) || isMap(request.resource.data.mandant))
+      && (!('technique' in request.resource.data) || isMap(request.resource.data.technique))
+      && (!('transport' in request.resource.data) || isMap(request.resource.data.transport))
+      && (!('details_op' in request.resource.data) || isMap(request.resource.data.details_op))
+      && (!('protocole' in request.resource.data) || isMap(request.resource.data.protocole))
+      && (!('ged' in request.resource.data) || request.resource.data.ged is list)
+      && (!('pieces_jointes' in request.resource.data) || request.resource.data.pieces_jointes is list)
+      && validTimestampString('date_creation')
+      && validTimestampString('date_modification');
+    }
+
+    match /dossiers_admin/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && validDossierAdmin();
+      allow delete: if isSignedIn();
+    }
+
+    // -------------------------------
+    // factures_v2
+    // -------------------------------
+    function validFactureV2() {
+      return onlyKeys([
+        'numero',
+        'type',
+        'date',
+        'date_creation',
+        'date_emission',
+        'date_echeance',
+        'created_at',
+        'client',
+        'client_id',
+        'client_nom',
+        'client_adresse',
+        'client_civility',
+        'client_info',
+        'defunt',
+        'defunt_nom',
+        'defunt_date_naiss',
+        'defunt_date_deces',
+        'type_obseques',
+        'lignes',
+        'total',
+        'total_ttc',
+        'total_paye',
+        'reste_a_payer',
+        'acompte',
+        'paiements',
+        'statut',
+        'statut_doc',
+        'reference_devis',
+        'info'
+      ])
+      && (!('numero' in request.resource.data) || isString(request.resource.data.numero))
+      && (!('type' in request.resource.data) || isString(request.resource.data.type))
+      && (!('statut' in request.resource.data) || isString(request.resource.data.statut))
+      && (!('date_emission' in request.resource.data) || isString(request.resource.data.date_emission))
+      && (!('date_echeance' in request.resource.data) || isString(request.resource.data.date_echeance))
+      && (!('client' in request.resource.data) || isMap(request.resource.data.client))
+      && (!('client_info' in request.resource.data) || isString(request.resource.data.client_info))
+      && (!('defunt' in request.resource.data) || isMap(request.resource.data.defunt))
+      && (!('lignes' in request.resource.data) || request.resource.data.lignes is list)
+      && (!('paiements' in request.resource.data) || request.resource.data.paiements is list)
+      && (!('total' in request.resource.data) || isNumber(request.resource.data.total))
+      && (!('total_ttc' in request.resource.data) || isNumber(request.resource.data.total_ttc))
+      && (!('total_paye' in request.resource.data) || isNumber(request.resource.data.total_paye))
+      && (!('reste_a_payer' in request.resource.data) || isNumber(request.resource.data.reste_a_payer))
+      && (!('acompte' in request.resource.data) || isNumber(request.resource.data.acompte));
+    }
+
+    match /factures_v2/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && validFactureV2();
+      allow delete: if isSignedIn();
+    }
+
+    // -------------------------------
+    // depenses
+    // -------------------------------
+    function validDepense() {
+      return onlyKeys([
+        'date',
+        'reference',
+        'fournisseur',
+        'details',
+        'categorie',
+        'mode',
+        'statut',
+        'montant',
+        'date_reglement'
+      ])
+      && (!('date' in request.resource.data) || isString(request.resource.data.date))
+      && (!('reference' in request.resource.data) || isString(request.resource.data.reference))
+      && (!('fournisseur' in request.resource.data) || isString(request.resource.data.fournisseur))
+      && (!('details' in request.resource.data) || isString(request.resource.data.details))
+      && (!('categorie' in request.resource.data) || isString(request.resource.data.categorie))
+      && (!('mode' in request.resource.data) || isString(request.resource.data.mode))
+      && (!('statut' in request.resource.data) || isString(request.resource.data.statut))
+      && (!('montant' in request.resource.data) || isNumber(request.resource.data.montant))
+      && (!('date_reglement' in request.resource.data) || isString(request.resource.data.date_reglement));
+    }
+
+    match /depenses/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && validDepense();
+      allow delete: if isSignedIn();
+    }
+
+    // -------------------------------
+    // stock_articles
+    // -------------------------------
+    function validStockArticle() {
+      return onlyKeys([
+        'nom',
+        'categorie',
+        'qte',
+        'prix_achat',
+        'prix_vente',
+        'fournisseur',
+        'date_ajout'
+      ])
+      && (!('nom' in request.resource.data) || isString(request.resource.data.nom))
+      && (!('categorie' in request.resource.data) || isString(request.resource.data.categorie))
+      && (!('qte' in request.resource.data) || request.resource.data.qte is int)
+      && (!('prix_achat' in request.resource.data) || isNumber(request.resource.data.prix_achat))
+      && (!('prix_vente' in request.resource.data) || isNumber(request.resource.data.prix_vente))
+      && (!('fournisseur' in request.resource.data) || isString(request.resource.data.fournisseur))
+      && (!('date_ajout' in request.resource.data) || isString(request.resource.data.date_ajout));
+    }
+
+    match /stock_articles/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && validStockArticle();
+      allow delete: if isSignedIn();
+    }
+
+    // -------------------------------
+    // ged_files
+    // -------------------------------
+    function validGedFile() {
+      return onlyKeys([
+        'nom',
+        'content',
+        'url',
+        'storage_path',
+        'dossier_parent',
+        'date'
+      ])
+      && ('nom' in request.resource.data)
+      && ('dossier_parent' in request.resource.data)
+      && isString(request.resource.data.nom)
+      && (
+        ('content' in request.resource.data && isString(request.resource.data.content))
+        || ('url' in request.resource.data && isString(request.resource.data.url))
+      )
+      && (!('storage_path' in request.resource.data) || isString(request.resource.data.storage_path))
+      && isString(request.resource.data.dossier_parent)
+      && (!('date' in request.resource.data) || isString(request.resource.data.date));
+    }
+
+    match /ged_files/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && validGedFile();
+      allow delete: if isSignedIn();
+    }
+
+    // Deny by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

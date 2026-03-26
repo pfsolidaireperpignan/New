@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PF FINANCE - Facturation</title>
+    <link rel="icon" href="logo.png" type="image/png">
     
     <link rel="stylesheet" href="style.css">
     
@@ -17,7 +18,7 @@
     </style>
 </head>
 <body>
-    <img id="logo-source" src="Logo.png" style="display: none;" crossorigin="anonymous">
+    <img id="logo-source" src="logo.png" alt="" style="display: none;" crossorigin="anonymous">
     
     <datalist id="clients_suggestions"></datalist>
     <datalist id="defunts_suggestions"></datalist>
@@ -142,6 +143,11 @@
                         <thead><tr><th>NUMÉRO</th><th>DATE</th><th>TYPE</th><th>CLIENT</th><th>DÉFUNT</th><th style="text-align:right;">TOTAL TTC</th><th style="text-align:right;">RESTE DÛ</th><th style="text-align:center;">ACTIONS</th></tr></thead>
                         <tbody id="list-body"></tbody>
                     </table>
+                </div>
+                <div style="display:flex; justify-content:center; margin-top:14px;">
+                    <button id="btn-load-more-factures" class="btn btn-grey hidden" onclick="window.chargerPlusFactures()">
+                        <i class="fas fa-chevron-down"></i> CHARGER PLUS
+                    </button>
                 </div>
             </div>
 
@@ -272,6 +278,7 @@
                         <input id="client_nom" list="clients_suggestions" onchange="window.checkClientAuto()" placeholder="Nom Prénom" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
                     <input id="client_adresse" placeholder="Adresse complète" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                    <input id="client_info" placeholder="Téléphone ou lien de parenté (optionnel)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb; margin-top:10px;">
                 </div>
                 <div class="card" style="padding:24px; margin-bottom:0;">
                     <h3 style="margin-top:0; color:#111827; border-bottom:1px solid #eee; padding-bottom:10px;">INFOS DOCUMENT</h3>
@@ -279,6 +286,10 @@
                         <select id="doc_type" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;"><option>DEVIS</option><option>FACTURE</option></select>
                         <input id="doc_numero" placeholder="Numéro Auto (Laisser vide pour auto)" style="background:#f3f4f6; font-weight:bold; width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                         <input type="date" id="doc_date" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input id="doc_statut" placeholder="Statut" readonly style="background:#f8fafc; font-weight:700; width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                        <input type="date" id="doc_echeance" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
                     <input id="defunt_nom" list="defunts_suggestions" placeholder="Concerne le défunt (Nom Prénom)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     
