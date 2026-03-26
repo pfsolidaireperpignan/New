@@ -87,26 +87,43 @@
             <div class="page-header">
                 <div>
                     <h1>Pilotage Financier</h1>
-                    <div style="color:#6b7280; margin-top:5px;">Suivi de l'activité en temps réel</div>
+                    <div id="pilotage-period-label" style="color:#6b7280; margin-top:5px;">Suivi de l'activité (période en cours)</div>
                 </div>
-                <div class="btn-tab-container">
-                    <button class="btn-tab active" onclick="window.switchTab('factures')" id="btn-tab-factures">VENTES</button>
-                    <button class="btn-tab" onclick="window.switchTab('achats')" id="btn-tab-achats">ACHATS</button>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <select id="pilotage_month" onchange="window.refreshPilotageFinancier()" style="width:170px;">
+                        <option value="">Mois (Tous)</option>
+                        <option value="0">Janvier</option><option value="1">Février</option><option value="2">Mars</option><option value="3">Avril</option>
+                        <option value="4">Mai</option><option value="5">Juin</option><option value="6">Juillet</option><option value="7">Août</option>
+                        <option value="8">Septembre</option><option value="9">Octobre</option><option value="10">Novembre</option><option value="11">Décembre</option>
+                    </select>
+                    <select id="pilotage_year" onchange="window.refreshPilotageFinancier()" style="width:150px;"></select>
+                    <div class="btn-tab-container">
+                        <button class="btn-tab active" onclick="window.switchTab('factures')" id="btn-tab-factures">VENTES</button>
+                        <button class="btn-tab" onclick="window.switchTab('achats')" id="btn-tab-achats">ACHATS</button>
+                    </div>
                 </div>
             </div>
 
             <div class="stats-grid">
                 <div class="stat-card card-ca">
-                    <div class="stat-label">CHIFFRE D'AFFAIRES (HT)</div>
-                    <div class="stat-value" id="stat-ca">0.00 €</div>
+                    <div class="stat-label">CA FACTURÉ (TTC)</div>
+                    <div class="stat-value" id="stat-ca-facture">0.00 €</div>
+                </div>
+                <div class="stat-card card-ca">
+                    <div class="stat-label">CA ENCAISSÉ</div>
+                    <div class="stat-value" id="stat-ca-encaisse">0.00 €</div>
                 </div>
                 <div class="stat-card card-depense">
-                    <div class="stat-label">DÉPENSES TOTALES</div>
-                    <div class="stat-value" id="stat-depenses">0.00 €</div>
+                    <div class="stat-label">DÉPENSES RÉGLÉES</div>
+                    <div class="stat-value" id="stat-depenses-reglees">0.00 €</div>
                 </div>
                 <div class="stat-card card-result">
-                    <div class="stat-label">RÉSULTAT NET</div>
-                    <div class="stat-value" id="stat-resultat">0.00 €</div>
+                    <div class="stat-label">RÉSULTAT TRÉSORERIE</div>
+                    <div class="stat-value" id="stat-resultat-treso">0.00 €</div>
+                </div>
+                <div class="stat-card card-result">
+                    <div class="stat-label">À ENCAISSER</div>
+                    <div class="stat-value" id="stat-a-encaisser">0.00 €</div>
                 </div>
             </div>
 
