@@ -123,11 +123,9 @@
                             <button class="quick-filter" onclick="window.setQuickFilter('PAYE')">Payé</button>
                             <button class="quick-filter" onclick="window.setQuickFilter('PARTIEL')">Partiel</button>
                             <button class="quick-filter" onclick="window.setQuickFilter('EMIS')">Émis</button>
-                            <button class="quick-filter" onclick="window.setQuickFilter('BROUILLON')">Brouillon</button>
                         </div>
                         <button class="btn btn-grey" onclick="document.getElementById('fac-advanced-filters').classList.toggle('hidden')"><i class="fas fa-filter"></i> FILTRES</button>
                         <button class="btn btn-green" onclick="window.exportExcelSmart()"><i class="fas fa-file-excel"></i> EXPORT</button>
-                        <button class="btn btn-purple" onclick="window.runMigrationDouce()"><i class="fas fa-wrench"></i> MIGRATION DOUCE</button>
                     </div>
                     <button class="btn btn-blue" onclick="document.getElementById('modal-choix').classList.remove('hidden')">
                         <i class="fas fa-plus"></i> CRÉER
@@ -135,7 +133,7 @@
                 </div>
 
                 <div id="fac-advanced-filters" class="hidden" style="background:white; padding:15px; border-radius:16px; margin-bottom:24px; border:1px solid #e5e7eb; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
-                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px;">
+                    <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:15px;">
                         <div>
                             <label>Mois</label>
                             <select id="filter_fac_month" onchange="window.filtrerFactures()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
@@ -171,6 +169,15 @@
                                 </optgroup>
                             </select>
                         </div>
+                        <div>
+                            <label>Tri</label>
+                            <select id="filter_fac_sort" onchange="window.filtrerFactures()" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                                <option value="date_desc">Date (récent -> ancien)</option>
+                                <option value="date_asc">Date (ancien -> récent)</option>
+                                <option value="numero_asc">Numéro (A -> Z)</option>
+                                <option value="numero_desc">Numéro (Z -> A)</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 
@@ -178,12 +185,11 @@
                     <table class="compta-table">
                         <thead>
                             <tr>
-                                <th>NUMÉRO</th>
-                                <th>DATE</th>
+                                <th id="th-sort-numero" onclick="window.sortFacturesBy('numero')" style="cursor:pointer; user-select:none;">NUMÉRO</th>
+                                <th id="th-sort-date" onclick="window.sortFacturesBy('date')" style="cursor:pointer; user-select:none;">DATE</th>
                                 <th>TYPE</th>
                                 <th>STATUT</th>
                                 <th>ÉCHÉANCE</th>
-                                <th>DOSSIER</th>
                                 <th>CLIENT</th>
                                 <th>DÉFUNT</th>
                                 <th style="text-align:right;">TOTAL TTC</th>
