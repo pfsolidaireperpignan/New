@@ -12,6 +12,27 @@ const escapeHtml = (value) => String(value ?? "")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+function renderClientsRefRows(refBody, rows) {
+    if (!refBody) return;
+    if (!rows || !rows.length) {
+        refBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Aucune fiche client.</td></tr>';
+        return;
+    }
+    refBody.innerHTML = "";
+    rows.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${escapeHtml(c.nom || '-')}</strong></td>
+            <td>${escapeHtml(c.telephone || '-')}</td>
+            <td>${escapeHtml(c.email || '-')}</td>
+            <td><span class="badge badge-blue">${escapeHtml(c.type || 'particulier')}</span></td>
+            <td>${escapeHtml(c.adresse || '-')}</td>
+            <td>${escapeHtml(c.notes || '-')}</td>
+        `;
+        refBody.appendChild(tr);
+    });
+}
+
 // --- 1. CLIENTS (CHARGEMENT + FILTRE) ---
 export async function chargerBaseClients() {
     const tbody = document.getElementById('clients-table-body');
@@ -44,28 +65,25 @@ export async function chargerBaseClients() {
         // Chargement collection clients (référentiel facturation)
         if (refBody) {
             try {
+                // 1) Tentative standard: tri par nom
                 const cQ = query(collection(db, "clients"), orderBy("nom"), limit(300));
                 const cSnap = await getDocs(cQ);
-                if (cSnap.empty) {
-                    refBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Aucune fiche client.</td></tr>';
-                } else {
-                    refBody.innerHTML = "";
-                    cSnap.forEach(docSnap => {
-                        const c = docSnap.data() || {};
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td><strong>${escapeHtml(c.nom || '-')}</strong></td>
-                            <td>${escapeHtml(c.telephone || '-')}</td>
-                            <td>${escapeHtml(c.email || '-')}</td>
-                            <td><span class="badge badge-blue">${escapeHtml(c.type || 'particulier')}</span></td>
-                            <td>${escapeHtml(c.adresse || '-')}</td>
-                            <td>${escapeHtml(c.notes || '-')}</td>
-                        `;
-                        refBody.appendChild(tr);
-                    });
-                }
+                const rows = [];
+                cSnap.forEach(docSnap => rows.push(docSnap.data() || {}));
+                renderClientsRefRows(refBody, rows);
             } catch (e) {
-                refBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#ef4444;">Erreur chargement fiches clients.</td></tr>';
+                // 2) Fallback robuste: sans orderBy (évite certains blocages d'index/règles)
+                try {
+                    const fallbackSnap = await getDocs(query(collection(db, "clients"), limit(300)));
+                    const rows = [];
+                    fallbackSnap.forEach(docSnap => rows.push(docSnap.data() || {}));
+                    rows.sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), 'fr'));
+                    renderClientsRefRows(refBody, rows);
+                } catch (e2) {
+                    console.error("Erreur chargement collection clients:", e2);
+                    const msg = (e2?.code || e?.code || "inconnue").toString();
+                    refBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#ef4444;">Erreur chargement fiches clients (${escapeHtml(msg)}).</td></tr>`;
+                }
             }
         }
 

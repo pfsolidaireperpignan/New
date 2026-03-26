@@ -19,7 +19,9 @@ let lastFactureCursor = null;
 let hasMoreFactures = true;
 const FACTURES_PAGE_SIZE = 60;
 let currentDocSnapshot = null;
-let quickFilter = "ALL"; // ALL | EN_RETARD | PAYE | PARTIEL | EMIS | BROUILLON
+let quickFilter = "ALL"; // ALL | EN_RETARD | PAYE | PARTIEL | EMIS
+let tableSortKey = "date"; // date | numero
+let tableSortDir = "desc"; // asc | desc
 let global_CA = 0; 
 let global_Depenses = 0; 
 let logoBase64 = null; 
@@ -77,8 +79,8 @@ function computeFactureStatut(d) {
     if ((d.finalType || d.type || d.info?.type) === "DEVIS") {
         const legacy = String(d.statut_doc || "").toLowerCase();
         if (legacy.includes("sans suite")) return "ANNULE";
-        if (legacy) return "BROUILLON";
-        return "BROUILLON";
+        if (legacy) return "EMIS";
+        return "EMIS";
     }
 
     const total = Number.isFinite(d.finalTotal) ? d.finalTotal : parseFloat(d.total || d.info?.total || 0);
@@ -114,6 +116,35 @@ function formatDateFR(value) {
     if (!value) return "-";
     try { return new Date(value).toLocaleDateString('fr-FR'); } catch(_) { return String(value); }
 }
+
+function updateFactureSortHeaders() {
+    const thNumero = document.getElementById('th-sort-numero');
+    const thDate = document.getElementById('th-sort-date');
+    if (!thNumero || !thDate) return;
+    const arrowNumero = (tableSortKey === "numero") ? (tableSortDir === "asc" ? " ↑" : " ↓") : "";
+    const arrowDate = (tableSortKey === "date") ? (tableSortDir === "asc" ? " ↑" : " ↓") : "";
+    thNumero.textContent = `NUMÉRO${arrowNumero}`;
+    thDate.textContent = `DATE${arrowDate}`;
+}
+
+window.sortFacturesBy = function(key) {
+    const k = String(key || "").toLowerCase();
+    if (k !== "date" && k !== "numero") return;
+    if (tableSortKey === k) {
+        tableSortDir = tableSortDir === "asc" ? "desc" : "asc";
+    } else {
+        tableSortKey = k;
+        tableSortDir = (k === "date") ? "desc" : "asc";
+    }
+
+    // Synchronise le sélecteur avancé si présent
+    const sel = document.getElementById('filter_fac_sort');
+    if (sel) {
+        sel.value = `${tableSortKey}_${tableSortDir}`;
+    }
+    updateFactureSortHeaders();
+    window.filtrerFactures();
+};
 
 function getAEncaisserRows() {
     return cacheFactures
@@ -210,7 +241,7 @@ function summarizePaiements(list, total) {
 window.chargerListeFactures = async function(reset = true) {
     const tbody = document.getElementById('list-body');
     if(!tbody) return;
-    if (reset) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center">Chargement...</td></tr>';
+    if (reset) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">Chargement...</td></tr>';
     
     try {
         if (reset) {
@@ -226,7 +257,7 @@ window.chargerListeFactures = async function(reset = true) {
 
         if (snap.empty) {
             hasMoreFactures = false;
-            if (reset) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#94a3b8;">Aucun document.</td></tr>';
+            if (reset) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#94a3b8;">Aucun document.</td></tr>';
             updateLoadMoreButton();
             return;
         }
@@ -255,6 +286,7 @@ window.chargerListeFactures = async function(reset = true) {
             
             if (d.finalType === "FACTURE" && new Date(d.date_creation).getFullYear() === currentYear) global_CA += d.finalTotal;
         });
+        updateFactureSortHeaders();
         updateLoadMoreButton();
         window.filtrerFactures();
         window.chargerDepenses();
@@ -274,8 +306,7 @@ window.setQuickFilter = function(value) {
         EN_RETARD: 1,
         PAYE: 2,
         PARTIEL: 3,
-        EMIS: 4,
-        BROUILLON: 5
+        EMIS: 4
     };
     const idx = map[quickFilter];
     const list = document.querySelectorAll('.quick-filter');
@@ -290,6 +321,16 @@ window.filtrerFactures = function() {
     const fYear = document.getElementById('filter_fac_year')?.value;
     const fType = document.getElementById('filter_fac_type')?.value;
     const fStatut = document.getElementById('filter_fac_statut')?.value;
+    const fSortSelect = document.getElementById('filter_fac_sort')?.value || "";
+    if (fSortSelect.includes("_")) {
+        const [k, d] = fSortSelect.split("_");
+        if ((k === "date" || k === "numero") && (d === "asc" || d === "desc")) {
+            tableSortKey = k;
+            tableSortDir = d;
+        }
+    }
+    const fSort = `${tableSortKey}_${tableSortDir}`;
+    updateFactureSortHeaders();
 
     const tbody = document.getElementById('list-body'); tbody.innerHTML = "";
     
@@ -348,9 +389,21 @@ window.filtrerFactures = function() {
 
         return textMatch && typeMatch && dateMatch && statutMatch && quickMatch;
     });
+
+    results.sort((a, b) => {
+        const dateA = new Date(a.finalDate || a.date_creation || 0).getTime() || 0;
+        const dateB = new Date(b.finalDate || b.date_creation || 0).getTime() || 0;
+        const numA = String(a.finalNumero || "");
+        const numB = String(b.finalNumero || "");
+
+        if (fSort === "date_asc") return dateA - dateB;
+        if (fSort === "numero_asc") return numA.localeCompare(numB, 'fr', { numeric: true, sensitivity: 'base' });
+        if (fSort === "numero_desc") return numB.localeCompare(numA, 'fr', { numeric: true, sensitivity: 'base' });
+        return dateB - dateA; // date_desc (défaut)
+    });
     
     if(results.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#94a3b8;">Aucun document trouvé.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#94a3b8;">Aucun document trouvé.</td></tr>';
         return;
     }
 
@@ -414,7 +467,6 @@ window.filtrerFactures = function() {
             <td><span class="badge ${badgeClass}">${escapeHtml(statutText)}</span></td>
             <td><span class="${st.cls}">${escapeHtml(st.label)}</span></td>
             <td><span class="${overdue ? 'echeance echeance-retard' : 'echeance'}">${escapeHtml(echeanceFR)}</span></td>
-            <td>${escapeHtml(dossierLabel)}</td>
             <td><strong>${escapeHtml(d.finalClient)}</strong></td>
             <td>${escapeHtml(d.finalDefunt)}</td>
             <td style="text-align:right;">${d.finalTotal.toFixed(2)} €</td>
@@ -609,7 +661,7 @@ window.nouveauDocument = function() {
     if(document.getElementById('client_info')) document.getElementById('client_info').value = "";
     document.getElementById('defunt_nom').value = "";
     document.getElementById('doc_type').value = "DEVIS";
-    if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = "BROUILLON";
+    if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = "EMIS";
     if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = "";
     if(document.getElementById('dossier_numero')) document.getElementById('dossier_numero').value = "";
     if(document.getElementById('dossier_id')) document.getElementById('dossier_id').value = "";
@@ -776,7 +828,7 @@ window.sauvegarderDocument = async function() {
     const totalPayeCalc = lettrage.totalPaye;
     const resteCalc = lettrage.reste;
     const existingStatut = String(currentDocSnapshot?.statut || "").trim().toUpperCase();
-    let statut = existingStatut || (docType === 'FACTURE' ? 'EMIS' : 'BROUILLON');
+    let statut = existingStatut || 'EMIS';
     if (statut !== 'ANNULE') {
         if (docType === 'FACTURE') {
             if (totalPayeCalc <= 0) statut = 'EMIS';
@@ -1116,133 +1168,6 @@ window.saveClientSheet = async function() {
         alert("✅ Fiche client enregistrée.");
     } catch (e) {
         alert("Erreur fiche client : " + (e?.message || e));
-    }
-};
-
-window.runMigrationDouce = async function() {
-    const ok = confirm("Lancer la migration douce des anciennes factures ?\n\nCette action enrichit les champs manquants (client_id, dossier, lettrage, échéance/statut) sans casser l'historique.");
-    if (!ok) return;
-
-    let scanned = 0;
-    let updated = 0;
-    let skipped = 0;
-    let errors = 0;
-    const startTs = Date.now();
-
-    try {
-        // Précharge caches utiles
-        await chargerSuggestionsClients();
-
-        // Recharge référentiel clients (au cas où)
-        try {
-            cacheClients = [];
-            const cSnap = await getDocs(query(collection(db, "clients"), orderBy("nom")));
-            cSnap.forEach(x => cacheClients.push({ id: x.id, ...(x.data() || {}) }));
-        } catch (_) {}
-
-        let lastDoc = null;
-        while (true) {
-            let q = query(collection(db, "factures_v2"), orderBy("date_creation", "desc"), limit(100));
-            if (lastDoc) q = query(collection(db, "factures_v2"), orderBy("date_creation", "desc"), startAfter(lastDoc), limit(100));
-            const snap = await getDocs(q);
-            if (snap.empty) break;
-
-            for (const docSnap of snap.docs) {
-                scanned += 1;
-                const data = docSnap.data() || {};
-                const patch = {};
-
-                const type = data.type || data.info?.type || "DOC";
-                const clientNom = data.client_nom || data.client?.nom || "";
-                const defuntNom = data.defunt_nom || data.defunt?.nom || "";
-                const total = parseFloat((data.total !== undefined) ? data.total : (data.info?.total || 0)) || 0;
-                const paiements = Array.isArray(data.paiements) ? data.paiements : [];
-                const lettrage = summarizePaiements(paiements, total);
-
-                // client_id manquant -> liaison/creation douce
-                if (!data.client_id && clientNom) {
-                    let found = findClientByName(clientNom);
-                    if (!found) {
-                        try {
-                            const created = await addDoc(collection(db, "clients"), {
-                                nom: clientNom,
-                                adresse: data.client_adresse || data.client?.adresse || "",
-                                telephone: "",
-                                email: "",
-                                type: "particulier",
-                                notes: data.client_info || "",
-                                created_at: new Date().toISOString(),
-                                updated_at: new Date().toISOString()
-                            });
-                            found = { id: created.id, nom: clientNom };
-                            cacheClients.push(found);
-                        } catch (_) {}
-                    }
-                    if (found?.id) patch.client_id = found.id;
-                }
-
-                // dossier_id / dossier_numero manquants
-                if (!data.dossier_id || !data.dossier_numero) {
-                    const dossier = findDossierByNamesForMigration(clientNom, defuntNom);
-                    if (dossier) {
-                        if (!data.dossier_id) patch.dossier_id = dossier.id;
-                        if (!data.dossier_numero) patch.dossier_numero = dossier.numero || dossier.id;
-                    }
-                }
-
-                // Lettrage manquant
-                if (data.total_paye === undefined) patch.total_paye = lettrage.totalPaye;
-                if (data.reste_a_payer === undefined) patch.reste_a_payer = lettrage.reste;
-                if (!data.date_dernier_paiement && lettrage.lastDate !== "-") patch.date_dernier_paiement = lettrage.lastDate;
-                if (!data.mode_paiement_principal && lettrage.mainMode !== "-") patch.mode_paiement_principal = lettrage.mainMode;
-
-                // Statut / dates facture manquants
-                if (!data.statut) {
-                    patch.statut = computeFactureStatut({
-                        ...data,
-                        finalType: type,
-                        finalTotal: total,
-                        finalPaiements: paiements
-                    });
-                }
-                if (type === "FACTURE") {
-                    if (!data.date_emission) {
-                        const d = (data.date || data.info?.date || data.date_creation || "").toString();
-                        patch.date_emission = d.includes("T") ? d.split("T")[0] : d;
-                    }
-                    if (!data.date_echeance) {
-                        const baseStr = patch.date_emission || data.date_emission || data.date || data.info?.date || "";
-                        if (baseStr) {
-                            try {
-                                const dt = new Date(baseStr);
-                                dt.setDate(dt.getDate() + 30);
-                                patch.date_echeance = dt.toISOString().split("T")[0];
-                            } catch (_) {}
-                        }
-                    }
-                }
-
-                if (Object.keys(patch).length) {
-                    try {
-                        await updateDoc(doc(db, "factures_v2", docSnap.id), patch);
-                        updated += 1;
-                    } catch (_) {
-                        errors += 1;
-                    }
-                } else {
-                    skipped += 1;
-                }
-            }
-
-            lastDoc = snap.docs[snap.docs.length - 1];
-            if (!lastDoc) break;
-        }
-
-        await window.chargerListeFactures(true);
-        const elapsed = Math.round((Date.now() - startTs) / 1000);
-        alert(`Migration terminée.\n\nScannés: ${scanned}\nMis à jour: ${updated}\nSans changement: ${skipped}\nErreurs: ${errors}\nDurée: ${elapsed}s`);
-    } catch (e) {
-        alert("Erreur migration: " + (e?.message || e));
     }
 };
 
