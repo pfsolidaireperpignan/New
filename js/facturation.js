@@ -58,6 +58,7 @@ function initYearFilter() {
     
     if(document.getElementById('filter_year')) document.getElementById('filter_year').innerHTML = opts;
     if(document.getElementById('filter_fac_year')) document.getElementById('filter_fac_year').innerHTML = opts;
+    if(document.getElementById('pilotage_year')) document.getElementById('pilotage_year').innerHTML = opts;
 }
 
 function chargerLogoBase64() { 
@@ -73,7 +74,7 @@ function chargerLogoBase64() {
 // --- 1. FACTURES / DEVIS ---
 function computeFactureStatut(d) {
     const raw = String(d.statut || "").trim().toUpperCase();
-    if (raw) return raw;
+    if (raw) return raw === "BROUILLON" ? "EMIS" : raw;
 
     // Compat ancien
     if ((d.finalType || d.type || d.info?.type) === "DEVIS") {
@@ -98,6 +99,81 @@ function updateLoadMoreButton() {
     if (hasMoreFactures) btn.classList.remove('hidden');
     else btn.classList.add('hidden');
 }
+
+function formatMoney(v) {
+    return `${(parseFloat(v) || 0).toFixed(2)} €`;
+}
+
+function getPilotagePeriod() {
+    const year = document.getElementById('pilotage_year')?.value || "";
+    const month = document.getElementById('pilotage_month')?.value || "";
+    return { year, month };
+}
+
+function dateInPeriod(dateStr, year, month) {
+    if (!dateStr) return false;
+    const dt = new Date(dateStr);
+    if (Number.isNaN(dt.getTime())) return false;
+    if (year && String(dt.getFullYear()) !== String(year)) return false;
+    if (month !== "" && String(dt.getMonth()) !== String(month)) return false;
+    return true;
+}
+
+window.refreshPilotageFinancier = function() {
+    const period = getPilotagePeriod();
+    const year = period.year;
+    const month = period.month;
+
+    const moisLabels = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+    const periodTxt = `${month !== "" ? moisLabels[parseInt(month,10)] + " " : ""}${year || "Toutes années"}`;
+    const lbl = document.getElementById('pilotage-period-label');
+    if (lbl) lbl.textContent = `Suivi de l'activité - ${periodTxt}`;
+
+    // 1) CA facturé (factures non annulées, sur date document)
+    let caFacture = 0;
+    // 2) CA encaissé (somme paiements datés sur période, sur factures non annulées)
+    let caEncaisse = 0;
+    // 3) À encaisser (reste dû des factures ouvertes, sur période doc)
+    let aEncaisser = 0;
+
+    cacheFactures.forEach(d => {
+        const type = String(d.finalType || "").toUpperCase();
+        const statut = String(d.finalStatut || "").toUpperCase();
+        if (type !== "FACTURE" || statut === "ANNULE") return;
+
+        const docDate = d.finalDate || d.date_creation || "";
+        const inDocPeriod = dateInPeriod(docDate, year, month);
+        const total = parseFloat(d.finalTotal || 0) || 0;
+        const totalPaye = (d.finalPaiements || []).reduce((s, p) => s + (parseFloat(p?.montant) || 0), 0);
+        const reste = Math.max(0, total - totalPaye);
+
+        if (inDocPeriod) {
+            caFacture += total;
+            aEncaisser += reste;
+        }
+
+        (d.finalPaiements || []).forEach(p => {
+            if (dateInPeriod(p?.date || "", year, month)) {
+                caEncaisse += (parseFloat(p?.montant) || 0);
+            }
+        });
+    });
+
+    // 4) Dépenses réglées sur période
+    const depensesReglees = cacheDepenses
+        .filter(x => x?.statut === "Réglé" && dateInPeriod(x?.date || "", year, month))
+        .reduce((s, x) => s + (parseFloat(x?.montant) || 0), 0);
+
+    // 5) Résultat trésorerie
+    const resultatTreso = caEncaisse - depensesReglees;
+
+    const setText = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = formatMoney(val); };
+    setText('stat-ca-facture', caFacture);
+    setText('stat-ca-encaisse', caEncaisse);
+    setText('stat-depenses-reglees', depensesReglees);
+    setText('stat-resultat-treso', resultatTreso);
+    setText('stat-a-encaisser', aEncaisser);
+};
 
 function setEditorActionButtonsVisibility() {
     const type = document.getElementById('doc_type')?.value;
@@ -283,13 +359,11 @@ window.chargerListeFactures = async function(reset = true) {
             if(d.finalType === 'DEVIS' && !d.statut_doc) d.statut_doc = 'En cours';
             
             cacheFactures.push(d);
-            
-            if (d.finalType === "FACTURE" && new Date(d.date_creation).getFullYear() === currentYear) global_CA += d.finalTotal;
         });
         updateFactureSortHeaders();
         updateLoadMoreButton();
         window.filtrerFactures();
-        window.chargerDepenses();
+        window.refreshPilotageFinancier();
         renderAEncaisserTable();
     } catch(e) { console.error(e); }
 };
@@ -542,23 +616,14 @@ window.chargerDepenses = async function() {
             const data = docSnap.data(); 
             data.id = docSnap.id; 
             cacheDepenses.push(data); 
-            if(new Date(data.date).getFullYear() === currentYear && data.statut === 'Réglé') {
-                global_Depenses += (parseFloat(data.montant) || 0); 
-            }
             if(data.fournisseur) suppliers.add(data.fournisseur); 
         }); 
         
-        updateFinancialDashboard(); 
+        window.refreshPilotageFinancier();
         window.filtrerDepenses(); 
         updateFournisseursList(suppliers); 
     } catch(e) {} 
 };
-
-function updateFinancialDashboard() { 
-    document.getElementById('stat-ca').innerText = global_CA.toFixed(2) + " €"; 
-    document.getElementById('stat-depenses').innerText = global_Depenses.toFixed(2) + " €"; 
-    document.getElementById('stat-resultat').innerText = (global_CA - global_Depenses).toFixed(2) + " €"; 
-}
 
 function updateFournisseursList(suppliers) { 
     const dl = document.getElementById('fournisseurs_list'); 
@@ -700,7 +765,7 @@ window.chargerDocument = async (id) => {
         document.getElementById('defunt_nom').value = data.defunt_nom || data.defunt?.nom;
         document.getElementById('defunt_date_naiss').value = data.defunt_date_naiss || data.defunt?.date_naiss || "";
         document.getElementById('defunt_date_deces').value = data.defunt_date_deces || data.defunt?.date_deces || "";
-        if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = (data.statut || computeFactureStatut({ ...data, finalType: (data.type || data.info?.type), finalTotal: parseFloat(data.total || data.info?.total || 0), finalPaiements: (data.paiements || []) }) || "BROUILLON");
+        if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = (data.statut === "BROUILLON" ? "EMIS" : (data.statut || computeFactureStatut({ ...data, finalType: (data.type || data.info?.type), finalTotal: parseFloat(data.total || data.info?.total || 0), finalPaiements: (data.paiements || []) }) || "EMIS"));
         if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = data.date_echeance || "";
         if(document.getElementById('dossier_numero')) document.getElementById('dossier_numero').value = data.dossier_numero || "";
         if(document.getElementById('dossier_id')) document.getElementById('dossier_id').value = data.dossier_id || "";
