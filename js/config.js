@@ -2,12 +2,13 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 // AJOUT DE 'getDoc' DANS LA LIGNE CI-DESSOUS :
-import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, limit, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, limit, startAfter, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDmsIkTjW2IFkIks5BUAnxLLnc7pnj2e0w",
     authDomain: "pf-solidaire.firebaseapp.com",
     projectId: "pf-solidaire",
+    // Doit correspondre au bucket par défaut dans Firebase Console (ex. .firebasestorage.app)
     storageBucket: "pf-solidaire.firebasestorage.app",
     messagingSenderId: "485465343242",
     appId: "1:485465343242:web:46d2a49f851a95907b26f3",
@@ -25,8 +26,9 @@ try {
 }
 
 export { 
+    app,
     auth, db, collection, addDoc, getDocs, 
-    getDoc, // <--- C'EST L'AJOUT CRUCIAL QUI MANQUAIT
-    query, orderBy, limit, doc, updateDoc, deleteDoc, 
+    getDoc,
+    query, orderBy, limit, startAfter, doc, updateDoc, deleteDoc, 
     onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail 
 };

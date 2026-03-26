@@ -1,6 +1,12 @@
 /* js/stock_manager.js */
 import { db } from './config.js';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+const escapeHtml = (value) => String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 // --- CHARGER LE STOCK ---
 export async function chargerStock() {
@@ -25,8 +31,8 @@ export async function chargerStock() {
             
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><strong>${data.nom}</strong><br><small style="color:#64748b;">${data.fournisseur || ''}</small></td>
-                <td>${data.categorie}</td>
+                <td><strong>${escapeHtml(data.nom)}</strong><br><small style="color:#64748b;">${escapeHtml(data.fournisseur || '')}</small></td>
+                <td>${escapeHtml(data.categorie)}</td>
                 <td>${data.prix_achat || 0} €</td>
                 <td><strong>${data.prix_vente || 0} €</strong></td>
                 <td>
@@ -42,7 +48,7 @@ export async function chargerStock() {
         });
 
     } catch (e) {
-        container.innerHTML = `<tr><td colspan="6" style="color:red">Erreur : ${e.message}</td></tr>`;
+        container.innerHTML = `<tr><td colspan="6" style="color:red">Erreur : ${escapeHtml(e.message)}</td></tr>`;
     }
 }
 

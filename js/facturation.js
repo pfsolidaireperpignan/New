@@ -1,5 +1,5 @@
-/* js/facturation.js - VERSION FINALE (COMPATIBLE & SÉCURISÉE) */
-import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, auth } from "./config.js";
+/* js/facturation.js - VERSION FINALE (COMPATIBLE ANCIENS & NOUVEAUX DOSSIERS) */
+import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit, startAfter, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // --- INFOS BANCAIRES ---
@@ -12,20 +12,23 @@ const INFO_SOCIETE = {
 let paiements = []; 
 let cacheDepenses = []; 
 let cacheFactures = []; 
+let lastFactureCursor = null;
+let hasMoreFactures = true;
+const FACTURES_PAGE_SIZE = 60;
+let currentDocSnapshot = null;
 let global_CA = 0; 
 let global_Depenses = 0; 
 let logoBase64 = null; 
 const currentYear = new Date().getFullYear();
+const escapeHtml = (value) => String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
-// --- INIT (AVEC SÉCURITÉ AJOUTÉE) ---
+// --- INIT ---
 onAuthStateChanged(auth, (user) => {
-    if (!user) {
-        // AJOUT : Si pas connecté, redirection immédiate
-        window.location.href = "index.html";
-        return;
-    }
-
-    // Si connecté, on lance tout
     if (user) {
         chargerLogoBase64();
         initYearFilter();
@@ -60,15 +63,60 @@ function chargerLogoBase64() {
 }
 
 // --- 1. FACTURES / DEVIS ---
-window.chargerListeFactures = async function() {
+function computeFactureStatut(d) {
+    const raw = String(d.statut || "").trim().toUpperCase();
+    if (raw) return raw;
+
+    // Compat ancien
+    if ((d.finalType || d.type || d.info?.type) === "DEVIS") {
+        const legacy = String(d.statut_doc || "").toLowerCase();
+        if (legacy.includes("sans suite")) return "ANNULE";
+        if (legacy) return "BROUILLON";
+        return "BROUILLON";
+    }
+
+    const total = Number.isFinite(d.finalTotal) ? d.finalTotal : parseFloat(d.total || d.info?.total || 0);
+    const paye = (d.finalPaiements || d.paiements || []).reduce((s, p) => s + parseFloat(p.montant), 0);
+    const reste = total - paye;
+
+    if (paye <= 0) return "EMIS";
+    if (reste > 0.01) return "PARTIEL";
+    return "PAYE";
+}
+
+function updateLoadMoreButton() {
+    const btn = document.getElementById('btn-load-more-factures');
+    if (!btn) return;
+    if (hasMoreFactures) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+}
+
+window.chargerListeFactures = async function(reset = true) {
     const tbody = document.getElementById('list-body');
     if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center">Chargement...</td></tr>';
+    if (reset) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center">Chargement...</td></tr>';
     
     try {
-        const q = query(collection(db, "factures_v2"), orderBy("date_creation", "desc"));
+        if (reset) {
+            global_CA = 0;
+            cacheFactures = [];
+            lastFactureCursor = null;
+            hasMoreFactures = true;
+        }
+
+        let q = query(collection(db, "factures_v2"), orderBy("date_creation", "desc"), limit(FACTURES_PAGE_SIZE));
+        if (!reset && lastFactureCursor) q = query(collection(db, "factures_v2"), orderBy("date_creation", "desc"), startAfter(lastFactureCursor), limit(FACTURES_PAGE_SIZE));
         const snap = await getDocs(q);
-        global_CA = 0; cacheFactures = [];
+
+        if (snap.empty) {
+            hasMoreFactures = false;
+            if (reset) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8;">Aucun document.</td></tr>';
+            updateLoadMoreButton();
+            return;
+        }
+
+        lastFactureCursor = snap.docs[snap.docs.length - 1] || lastFactureCursor;
+        hasMoreFactures = snap.size === FACTURES_PAGE_SIZE;
         
         snap.forEach((docSnap) => {
             const d = docSnap.data(); d.id = docSnap.id;
@@ -81,6 +129,7 @@ window.chargerListeFactures = async function() {
             d.finalClient = d.client_nom || d.client?.nom || "Inconnu";
             d.finalDefunt = d.defunt_nom || d.defunt?.nom || "";
             d.finalPaiements = d.paiements || [];
+            d.finalStatut = computeFactureStatut(d);
             
             if(d.finalType === 'DEVIS' && !d.statut_doc) d.statut_doc = 'En cours';
             
@@ -88,8 +137,14 @@ window.chargerListeFactures = async function() {
             
             if (d.finalType === "FACTURE" && new Date(d.date_creation).getFullYear() === currentYear) global_CA += d.finalTotal;
         });
-        window.filtrerFactures(); window.chargerDepenses();
+        updateLoadMoreButton();
+        window.filtrerFactures();
+        window.chargerDepenses();
     } catch(e) { console.error(e); }
+};
+
+window.chargerPlusFactures = async function() {
+    await window.chargerListeFactures(false);
 };
 
 window.filtrerFactures = function() {
@@ -103,7 +158,10 @@ window.filtrerFactures = function() {
     const tbody = document.getElementById('list-body'); tbody.innerHTML = "";
     
     const results = cacheFactures.filter(d => {
-        const textMatch = (d.finalNumero.toLowerCase().includes(term)) || (d.finalClient.toLowerCase().includes(term));
+        const numero = (d.finalNumero || "").toLowerCase();
+        const client = (d.finalClient || "").toLowerCase();
+        const defunt = (d.finalDefunt || "").toLowerCase();
+        const textMatch = numero.includes(term) || client.includes(term) || defunt.includes(term);
         const typeMatch = !fType || fType === "" || d.finalType === fType;
 
         let dateMatch = true;
@@ -174,11 +232,11 @@ window.filtrerFactures = function() {
         const tr = document.createElement('tr');
         tr.style = rowStyle;
         tr.innerHTML = `
-            <td class="link-doc" onclick="window.chargerDocument('${d.id}')" style="cursor:pointer; color:#3b82f6;"><strong>${d.finalNumero}</strong></td>
+            <td class="link-doc" onclick="window.chargerDocument('${d.id}')" style="cursor:pointer; color:#3b82f6;"><strong>${escapeHtml(d.finalNumero)}</strong></td>
             <td>${dateAffiche}</td>
-            <td><span class="badge ${badgeClass}">${statutText}</span></td>
-            <td><strong>${d.finalClient}</strong></td>
-            <td>${d.finalDefunt}</td>
+            <td><span class="badge ${badgeClass}">${escapeHtml(statutText)}</span></td>
+            <td><strong>${escapeHtml(d.finalClient)}</strong></td>
+            <td>${escapeHtml(d.finalDefunt)}</td>
             <td style="text-align:right;">${d.finalTotal.toFixed(2)} €</td>
             <td style="text-align:right; font-weight:bold; color:${statusColor};">${reste.toFixed(2)} €</td>
             <td style="text-align:center; display:flex; justify-content:center; gap:5px;">
@@ -311,13 +369,13 @@ window.filtrerDepenses = function() {
         if (d.statut === 'Réglé' && d.date_reglement) {
             dateRegleHtml = `<br><span style="font-size:0.7rem; color:#059669;"><i class="fas fa-check"></i> Réglé le ${new Date(d.date_reglement).toLocaleDateString()}</span>`;
         }
-        const detailsHtml = d.details ? `<br><span style="font-size:0.8rem; color:#6b7280; font-style:italic;">${d.details}</span>` : "";
+        const detailsHtml = d.details ? `<br><span style="font-size:0.8rem; color:#6b7280; font-style:italic;">${escapeHtml(d.details)}</span>` : "";
 
         const tr = document.createElement('tr'); 
         tr.innerHTML = `
             <td><span style="font-weight:600;">${new Date(d.date).toLocaleDateString()}</span>${dateRegleHtml}</td>
-            <td><strong>${d.fournisseur}</strong>${detailsHtml}<br><small style="color:#d97706; font-size:0.75rem;">${d.categorie}</small></td>
-            <td>${d.reference||'-'}</td>
+            <td><strong>${escapeHtml(d.fournisseur)}</strong>${detailsHtml}<br><small style="color:#d97706; font-size:0.75rem;">${escapeHtml(d.categorie)}</small></td>
+            <td>${escapeHtml(d.reference||'-')}</td>
             <td>${badge}</td>
             <td style="text-align:right;">-${parseFloat(d.montant).toFixed(2)} €</td>
             <td style="text-align:center;">
@@ -360,25 +418,48 @@ window.supprimerDepense = async (id) => { if(confirm("Supprimer ?")) { await del
 // --- 3. UI GENERALE ---
 window.showDashboard = function() { document.getElementById('view-editor').classList.add('hidden'); document.getElementById('view-dashboard').classList.remove('hidden'); window.chargerListeFactures(); };
 window.switchTab = function(tab) { document.getElementById('tab-factures').classList.add('hidden'); document.getElementById('tab-achats').classList.add('hidden'); document.getElementById('btn-tab-factures').classList.remove('active'); document.getElementById('btn-tab-achats').classList.remove('active'); if(tab === 'factures') { document.getElementById('tab-factures').classList.remove('hidden'); document.getElementById('btn-tab-factures').classList.add('active'); } else { document.getElementById('tab-achats').classList.remove('hidden'); document.getElementById('btn-tab-achats').classList.add('active'); window.chargerDepenses(); } };
-window.nouveauDocument = function() { document.getElementById('current_doc_id').value = ""; document.getElementById('doc_numero').value = "Auto"; document.getElementById('client_nom').value = ""; document.getElementById('client_adresse').value = ""; document.getElementById('defunt_nom').value = ""; document.getElementById('doc_type').value = "DEVIS"; document.getElementById('tbody_lignes').innerHTML = ""; paiements = []; window.renderPaiements(); window.calculTotal(); document.getElementById('btn-transform').style.display = 'none'; document.getElementById('view-dashboard').classList.add('hidden'); document.getElementById('view-editor').classList.remove('hidden'); };
+window.nouveauDocument = function() {
+    currentDocSnapshot = null;
+    document.getElementById('current_doc_id').value = "";
+    document.getElementById('doc_numero').value = "Auto";
+    document.getElementById('client_nom').value = "";
+    document.getElementById('client_adresse').value = "";
+    if(document.getElementById('client_info')) document.getElementById('client_info').value = "";
+    document.getElementById('defunt_nom').value = "";
+    document.getElementById('doc_type').value = "DEVIS";
+    if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = "BROUILLON";
+    if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = "";
+    document.getElementById('tbody_lignes').innerHTML = "";
+    paiements = [];
+    window.renderPaiements();
+    window.calculTotal();
+    document.getElementById('btn-transform').style.display = 'none';
+    document.getElementById('view-dashboard').classList.add('hidden');
+    document.getElementById('view-editor').classList.remove('hidden');
+};
 
 // CHARGEMENT DOCUMENT
 window.chargerDocument = async (id) => { 
     const d = await getDoc(doc(db,"factures_v2",id)); 
     if(d.exists()) { 
         const data = d.data(); 
+        currentDocSnapshot = data;
         document.getElementById('current_doc_id').value = id; 
         
         // COMPATIBILITÉ CHARGEMENT
         document.getElementById('doc_numero').value = data.numero || data.info?.numero; 
         document.getElementById('client_nom').value = data.client_nom || data.client?.nom; 
         document.getElementById('client_adresse').value = data.client_adresse || data.client?.adresse; 
+        const clientInfoEl = document.getElementById('client_info');
+        if (clientInfoEl) clientInfoEl.value = data.client_info || data.client?.info || "";
         const civility = data.client_civility || data.client?.civility || 'M.';
         document.getElementById('client_civility').value = civility;
 
         document.getElementById('defunt_nom').value = data.defunt_nom || data.defunt?.nom;
         document.getElementById('defunt_date_naiss').value = data.defunt_date_naiss || data.defunt?.date_naiss || "";
         document.getElementById('defunt_date_deces').value = data.defunt_date_deces || data.defunt?.date_deces || "";
+        if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = (data.statut || computeFactureStatut({ ...data, finalType: (data.type || data.info?.type), finalTotal: parseFloat(data.total || data.info?.total || 0), finalPaiements: (data.paiements || []) }) || "BROUILLON");
+        if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = data.date_echeance || "";
         
         document.getElementById('doc_type').value = data.type || data.info?.type; 
         document.getElementById('doc_date').value = data.date || data.info?.date; 
@@ -398,7 +479,7 @@ window.ajouterLigne = function(desc="", prix=0, type="Courant") {
     if(type === 'Avance') type = 'Courant';
     const tr = document.createElement('tr'); 
     tr.className = "row-item"; 
-    tr.innerHTML = `<td class="drag-handle"><i class="fas fa-grip-lines" style="color:#cbd5e1; cursor:grab;"></i></td><td><input type="text" class="input-cell val-desc" value="${desc}"></td><td><select class="input-cell val-type"><option value="Courant" ${type==='Courant'?'selected':''}>Courant</option><option value="Optionnel" ${type==='Optionnel'?'selected':''}>Optionnel</option></select></td><td style="text-align:right;"><input type="number" class="input-cell val-prix" value="${prix}" step="0.01" oninput="window.calculTotal()"></td><td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; 
+    tr.innerHTML = `<td class="drag-handle"><i class="fas fa-grip-lines" style="color:#cbd5e1; cursor:grab;"></i></td><td><input type="text" class="input-cell val-desc" value="${escapeHtml(desc)}"></td><td><select class="input-cell val-type"><option value="Courant" ${type==='Courant'?'selected':''}>Courant</option><option value="Optionnel" ${type==='Optionnel'?'selected':''}>Optionnel</option></select></td><td style="text-align:right;"><input type="number" class="input-cell val-prix" value="${prix}" step="0.01" oninput="window.calculTotal()"></td><td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; 
     document.getElementById('tbody_lignes').appendChild(tr); 
     window.calculTotal(); 
 };
@@ -410,7 +491,7 @@ window.ajouterSection = function(titre="SECTION") {
     tr.innerHTML = `
         <td class="drag-handle"><i class="fas fa-grip-lines" style="color:#f97316; cursor:grab;"></i></td>
         <td colspan="4">
-            <input type="text" class="input-cell input-section" value="${titre}" style="font-weight:bold; color:#c2410c; background-color:#ffedd5; border:1px solid #fed7aa;">
+            <input type="text" class="input-cell input-section" value="${escapeHtml(titre)}" style="font-weight:bold; color:#c2410c; background-color:#ffedd5; border:1px solid #fed7aa;">
         </td>
         <td style="text-align:center;"><i class="fas fa-trash" style="color:red;cursor:pointer;" onclick="this.closest('tr').remove(); window.calculTotal();"></i></td>`; 
     document.getElementById('tbody_lignes').appendChild(tr); 
@@ -425,11 +506,44 @@ window.sauvegarderDocument = async function() {
         if(tr.classList.contains('row-section')) lignes.push({ type: 'section', text: tr.querySelector('input').value }); 
         else lignes.push({ type: 'item', desc: tr.querySelector('.val-desc').value, cat: tr.querySelector('.val-type').value, prix: parseFloat(tr.querySelector('.val-prix').value)||0 }); 
     }); 
+
+    const docType = document.getElementById('doc_type').value;
+    const docDate = document.getElementById('doc_date').value;
+    const totalValue = parseFloat(document.getElementById('total_display').innerText);
+    const totalPayeCalc = paiements.reduce((sum, p) => sum + parseFloat(p.montant), 0);
+    const resteCalc = totalValue - totalPayeCalc;
+    const existingStatut = String(currentDocSnapshot?.statut || "").trim().toUpperCase();
+    let statut = existingStatut || (docType === 'FACTURE' ? 'EMIS' : 'BROUILLON');
+    if (statut !== 'ANNULE' && statut !== 'AVOIR') {
+        if (docType === 'FACTURE') {
+            if (totalPayeCalc <= 0) statut = 'EMIS';
+            else if (resteCalc > 0.01) statut = 'PARTIEL';
+            else statut = 'PAYE';
+        }
+    }
+
+    // Émission / échéance (sans relances)
+    let dateEmission = currentDocSnapshot?.date_emission || "";
+    if (!dateEmission && docType === 'FACTURE') dateEmission = docDate || new Date().toISOString().split('T')[0];
+    let dateEcheance = (document.getElementById('doc_echeance') ? document.getElementById('doc_echeance').value : "") || (currentDocSnapshot?.date_echeance || "");
+    if (!dateEcheance && docType === 'FACTURE' && dateEmission) {
+        try {
+            const base = new Date(dateEmission);
+            base.setDate(base.getDate() + 30);
+            dateEcheance = base.toISOString().split('T')[0];
+        } catch(e) {}
+    }
+
     const docData = { 
-        type: document.getElementById('doc_type').value, numero: document.getElementById('doc_numero').value, date: document.getElementById('doc_date').value, 
+        type: docType, numero: document.getElementById('doc_numero').value, date: docDate, 
         client_nom: document.getElementById('client_nom').value, client_adresse: document.getElementById('client_adresse').value, client_civility: document.getElementById('client_civility').value,
+        client_info: document.getElementById('client_info') ? document.getElementById('client_info').value : "",
         defunt_nom: document.getElementById('defunt_nom').value, defunt_date_naiss: document.getElementById('defunt_date_naiss').value, defunt_date_deces: document.getElementById('defunt_date_deces').value,
-        total: parseFloat(document.getElementById('total_display').innerText), lignes: lignes, paiements: paiements, date_creation: new Date().toISOString(),
+        statut,
+        date_emission: dateEmission,
+        date_echeance: dateEcheance,
+        total: totalValue, total_paye: totalPayeCalc, reste_a_payer: resteCalc,
+        lignes: lignes, paiements: paiements, date_creation: new Date().toISOString(),
         statut_doc: document.getElementById('doc_type').value === 'DEVIS' ? 'En cours' : 'Validé'
     }; 
     const id = document.getElementById('current_doc_id').value; 
@@ -516,7 +630,7 @@ window.loadTemplate = function(type) {
 // IMPRESSION PDF (LAYOUT OPTIMISÉ)
 window.genererPDFFacture = function() {
     const data = {
-        client: { nom: document.getElementById('client_nom').value, adresse: document.getElementById('client_adresse').value, civility: document.getElementById('client_civility').value },
+        client: { nom: document.getElementById('client_nom').value, adresse: document.getElementById('client_adresse').value, info: document.getElementById('client_info') ? document.getElementById('client_info').value : "", civility: document.getElementById('client_civility').value },
         defunt: { nom: document.getElementById('defunt_nom').value, naiss: document.getElementById('defunt_date_naiss').value, deces: document.getElementById('defunt_date_deces').value },
         info: { type: document.getElementById('doc_type').value, date: document.getElementById('doc_date').value, numero: document.getElementById('doc_numero').value, total: parseFloat(document.getElementById('total_display').innerText) },
         lignes: [], paiements: paiements
@@ -535,19 +649,31 @@ window.generatePDFFromData = function(data, saveMode = false) {
     const greenColor = [16, 185, 129]; 
     if (logoBase64) { try { doc.addImage(logoBase64,'PNG', 15, 10, 25, 25); } catch(e){} }
     doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.setTextColor(...greenColor);
-    doc.text("PF SOLIDAIRE", 15, 40); doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.setTextColor(80); doc.text("32 Bd Léon Jean Grégory, Thuir", 15, 45);
-    doc.setFillColor(245, 245, 245); doc.roundedRect(110, 10, 85, 25, 2, 2, 'F');
+    doc.text("PF SOLIDAIRE", 15, 40);
+    doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.setTextColor(80);
+    doc.text("32 boulevard Léon Jean Grégory Thuir - TEL : 07.55.18.27.77", 15, 45);
+    doc.text("HABILITATION N° : 23-66-0205 | SIRET : 53927029800042", 15, 49);
+    doc.setFillColor(245, 245, 245); doc.roundedRect(110, 10, 85, 32, 3, 3, 'F');
     doc.setFontSize(10); doc.setTextColor(0); doc.setFont("helvetica","bold");
     doc.text(`${data.client.civility || ''} ${data.client.nom}`, 115, 18);
     doc.setFont("helvetica","normal"); doc.setFontSize(9); 
-    doc.text(doc.splitTextToSize(data.client.adresse || '', 80), 115, 24);
-    let y = 60; doc.setFontSize(14); doc.setFont("helvetica","bold"); doc.setTextColor(...greenColor);
+    const addrLines = doc.splitTextToSize(data.client.adresse || '', 80);
+    doc.text(addrLines, 115, 24);
+    const infoText = String(data.client.info || "").trim();
+    if (infoText) {
+        const infoY = 24 + (addrLines.length * 4) + 2;
+        doc.setFontSize(9);
+        doc.setTextColor(60);
+        doc.text(doc.splitTextToSize(infoText, 80), 115, infoY);
+        doc.setTextColor(0);
+    }
+    let y = 58; doc.setFontSize(13); doc.setFont("helvetica","bold"); doc.setTextColor(...greenColor);
     doc.text(`${data.info.type} N° ${data.info.numero}`, 15, y);
     doc.setFontSize(10); doc.setTextColor(0); doc.setFont("helvetica","normal");
     doc.text(`Date : ${new Date(data.info.date).toLocaleDateString()}`, 15, y+6);
     doc.text(`Défunt : ${data.defunt.nom}`, 15, y+12);
     let datesDefunt = ""; if(data.defunt.naiss) datesDefunt += `Né(e) le : ${new Date(data.defunt.naiss).toLocaleDateString()} `; if(data.defunt.deces) datesDefunt += `- Décédé(e) le : ${new Date(data.defunt.deces).toLocaleDateString()}`; doc.setFontSize(8); doc.setTextColor(100); doc.text(datesDefunt, 15, y+16);
-    y += 25;
+    y += 22;
     const body = [];
     data.lignes.forEach(l => {
         if(l.type === 'section') { 
@@ -560,10 +686,19 @@ window.generatePDFFromData = function(data, saveMode = false) {
             body.push([l.desc, pCourant, pOptionnel]);
         }
     });
-    doc.autoTable({ startY: y, head: [['Description', 'Prestations\nCourantes', 'Prestations\nOptionnelles']], body: body, theme: 'grid', styles: { fontSize: 9, cellPadding: 3 }, headStyles: { fillColor: [16, 185, 129], textColor: 255, halign: 'center', valign: 'middle' }, columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 35 }, 2: { halign: 'right', cellWidth: 35 } } });
+    doc.autoTable({
+        startY: y,
+        margin: { left: 12, right: 12 },
+        head: [['Description', 'Prestations\nCourantes (TTC)', 'Prestations\nOptionnelles (TTC)']],
+        body: body,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+        headStyles: { fillColor: [16, 185, 129], textColor: 255, halign: 'center', valign: 'middle', fontSize: 8, cellPadding: 2 },
+        columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 33 }, 2: { halign: 'right', cellWidth: 33 } }
+    });
     
     // --- TOTAUX & PIED DE PAGE OPTIMISÉ ---
-    let footerY = doc.lastAutoTable.finalY + 10;
+    let footerY = doc.lastAutoTable.finalY + 8;
     if (footerY > 250) { doc.addPage(); footerY = 20; }
 
     const rightLabelX = 165; const rightValueX = 195;
@@ -608,6 +743,15 @@ window.generatePDFFromData = function(data, saveMode = false) {
         doc.setFont("helvetica", "normal"); doc.text(`Banque : ${INFO_SOCIETE.banque}`, leftX + 2, leftY + 9);
         doc.text(`IBAN : ${INFO_SOCIETE.iban}`, leftX + 2, leftY + 14);
     }
+
+    // Mention légale TVA (franchise en base)
+    try {
+        const pageHeight = doc.internal.pageSize.getHeight();
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(120);
+        doc.text("TVA non applicable, art. 293 B du CGI", 15, pageHeight - 10);
+    } catch (e) {}
 
     if(saveMode) doc.save(`${data.info.type}_${data.info.numero}.pdf`); else window.open(doc.output('bloburl'), '_blank');
 };
