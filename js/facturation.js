@@ -161,8 +161,19 @@ window.refreshPilotageFinancier = function() {
 
     // 4) Dépenses réglées sur période
     const depensesReglees = cacheDepenses
-        .filter(x => x?.statut === "Réglé" && dateInPeriod(x?.date || "", year, month))
-        .reduce((s, x) => s + (parseFloat(x?.montant) || 0), 0);
+        .filter(x => {
+            // Pilotage trésorerie: on se base d'abord sur la date de règlement (si présente),
+            // sinon on retombe sur la date facture pour compatibilité anciens enregistrements.
+            const cashDate = x?.date_reglement || x?.date || "";
+            return dateInPeriod(cashDate, year, month);
+        })
+        .reduce((s, x) => {
+            const montant = parseFloat(x?.montant) || 0;
+            const avance = parseFloat(x?.avance_versee) || 0;
+            if (x?.statut === "Réglé") return s + montant;
+            if (avance > 0) return s + Math.min(avance, montant);
+            return s;
+        }, 0);
 
     // 5) Résultat trésorerie
     const resultatTreso = caEncaisse - depensesReglees;
@@ -668,6 +679,9 @@ window.filtrerDepenses = function() {
             dateRegleHtml = `<br><span style="font-size:0.7rem; color:#059669;"><i class="fas fa-check"></i> Réglé le ${new Date(d.date_reglement).toLocaleDateString()}</span>`;
         }
         const detailsHtml = d.details ? `<br><span style="font-size:0.8rem; color:#6b7280; font-style:italic;">${escapeHtml(d.details)}</span>` : "";
+        const avance = Math.max(0, parseFloat(d.avance_versee) || 0);
+        const montant = Math.max(0, parseFloat(d.montant) || 0);
+        const reste = Math.max(0, (parseFloat(d.reste_a_payer) || (montant - avance)));
 
         const tr = document.createElement('tr'); 
         tr.innerHTML = `
@@ -675,7 +689,9 @@ window.filtrerDepenses = function() {
             <td><strong>${escapeHtml(d.fournisseur)}</strong>${detailsHtml}<br><small style="color:#d97706; font-size:0.75rem;">${escapeHtml(d.categorie)}</small></td>
             <td>${escapeHtml(d.reference||'-')}</td>
             <td>${badge}</td>
-            <td style="text-align:right;">-${parseFloat(d.montant).toFixed(2)} €</td>
+            <td style="text-align:right;">-${montant.toFixed(2)} €</td>
+            <td style="text-align:right; color:#0f766e; font-weight:700;">${avance > 0 ? `-${avance.toFixed(2)} €` : '-'}</td>
+            <td style="text-align:right; color:${reste > 0 ? '#b45309' : '#16a34a'}; font-weight:700;">${reste.toFixed(2)} €</td>
             <td style="text-align:center;">
                 <button class="btn-icon" onclick="window.preparerModification('${d.id}')"><i class="fas fa-edit"></i></button>
                 <button class="btn-icon" onclick="window.supprimerDepense('${d.id}')"><i class="fas fa-trash"></i></button>
@@ -684,12 +700,29 @@ window.filtrerDepenses = function() {
     }); 
 };
 
+window.calculerResteDepense = function() {
+    const montant = parseFloat(document.getElementById('dep_montant')?.value) || 0;
+    let avance = parseFloat(document.getElementById('dep_avance')?.value) || 0;
+    if (avance < 0) avance = 0;
+    if (avance > montant) avance = montant;
+    const reste = Math.max(0, montant - avance);
+    const resteEl = document.getElementById('dep_reste');
+    if (resteEl) resteEl.value = reste.toFixed(2);
+};
+
 window.gererDepense = async function() { 
     const id = document.getElementById('dep_edit_id').value; 
+    const montant = parseFloat(document.getElementById('dep_montant').value) || 0;
+    let avance = parseFloat(document.getElementById('dep_avance')?.value) || 0;
+    if (avance < 0) avance = 0;
+    if (avance > montant) avance = montant;
+    const reste = Math.max(0, montant - avance);
+    const statutFinal = (reste <= 0.001) ? 'Réglé' : document.getElementById('dep_statut').value;
     const data = { 
         date: document.getElementById('dep_date_fac').value, reference: document.getElementById('dep_ref').value, fournisseur: document.getElementById('dep_fourn').value, 
         details: document.getElementById('dep_details').value, categorie: document.getElementById('dep_cat').value, mode: document.getElementById('dep_mode').value, 
-        statut: document.getElementById('dep_statut').value, montant: parseFloat(document.getElementById('dep_montant').value) || 0, date_reglement: document.getElementById('dep_date_reg').value 
+        statut: statutFinal, montant: montant, date_reglement: document.getElementById('dep_date_reg').value,
+        avance_versee: avance, reste_a_payer: reste
     }; 
     if(!data.date) return alert("Date requise"); 
     try { 
@@ -699,18 +732,37 @@ window.gererDepense = async function() {
     } catch(e){alert(e.message);} 
 };
 
-window.resetFormDepense = function() { document.getElementById('dep_edit_id').value = ""; document.getElementById('form-depense').reset(); document.getElementById('btn-action-depense').innerHTML="ENREGISTRER"; };
+window.resetFormDepense = function() {
+    document.getElementById('dep_edit_id').value = "";
+    document.getElementById('form-depense').reset();
+    document.getElementById('btn-action-depense').innerHTML="ENREGISTRER";
+    if (document.getElementById('dep_reste')) document.getElementById('dep_reste').value = "0.00";
+};
 window.preparerModification = function(id) { 
     const d = cacheDepenses.find(x=>x.id===id); 
     if(d) { 
         document.getElementById('dep_edit_id').value=id; document.getElementById('dep_date_fac').value=d.date; document.getElementById('dep_ref').value=d.reference; 
         document.getElementById('dep_fourn').value=d.fournisseur; document.getElementById('dep_montant').value=d.montant; document.getElementById('dep_cat').value=d.categorie; 
+        if (document.getElementById('dep_avance')) document.getElementById('dep_avance').value = (parseFloat(d.avance_versee) || 0).toFixed(2);
         document.getElementById('dep_details').value = d.details || ""; 
         document.getElementById('dep_mode').value=d.mode; document.getElementById('dep_statut').value=d.statut; 
+        if (document.getElementById('dep_reste')) document.getElementById('dep_reste').value = (Math.max(0, parseFloat(d.reste_a_payer) || ((parseFloat(d.montant) || 0) - (parseFloat(d.avance_versee) || 0)))).toFixed(2);
         document.getElementById('btn-action-depense').innerHTML="MODIFIER"; document.getElementById('container-form-depense').classList.add('open'); 
     } 
 };
-window.marquerCommeRegle = async function(id) { if(confirm("Valider paiement ?")) { await updateDoc(doc(db, "depenses", id), { statut: "Réglé", date_reglement: new Date().toISOString().split('T')[0] }); window.chargerDepenses(); } };
+window.marquerCommeRegle = async function(id) {
+    if(confirm("Valider paiement ?")) {
+        const d = cacheDepenses.find(x => x.id === id) || {};
+        const montant = parseFloat(d.montant) || 0;
+        await updateDoc(doc(db, "depenses", id), {
+            statut: "Réglé",
+            date_reglement: new Date().toISOString().split('T')[0],
+            avance_versee: montant,
+            reste_a_payer: 0
+        });
+        window.chargerDepenses();
+    }
+};
 window.supprimerDepense = async (id) => { if(confirm("Supprimer ?")) { await deleteDoc(doc(db,"depenses",id)); window.chargerDepenses(); } };
 
 // --- 3. UI GENERALE ---
@@ -1034,9 +1086,9 @@ window.exportExcelSmart = function() {
         document.body.appendChild(link); link.click(); 
     } 
     else { 
-        csvContent += "Date;Fournisseur;Reference;Categorie;Montant;Statut\n"; 
+        csvContent += "Date;Fournisseur;Reference;Categorie;Montant;Avance Versee;Reste a Payer;Statut\n"; 
         cacheDepenses.forEach(d => { 
-            csvContent += `${d.date};${d.fournisseur};${d.reference};${d.categorie};${d.montant};${d.statut}\n`; 
+            csvContent += `${d.date};${d.fournisseur};${d.reference};${d.categorie};${d.montant};${(parseFloat(d.avance_versee)||0).toFixed(2)};${(Math.max(0, parseFloat(d.reste_a_payer)||((parseFloat(d.montant)||0)-(parseFloat(d.avance_versee)||0)))).toFixed(2)};${d.statut}\n`; 
         }); 
         const encodedUri = encodeURI(csvContent); 
         const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "export_achats.csv"); 
