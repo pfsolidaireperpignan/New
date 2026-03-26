@@ -90,6 +90,14 @@
                             <i class="fas fa-search"></i>
                             <input type="text" id="search-facture" onkeyup="window.filtrerFactures()" placeholder="Rechercher...">
                         </div>
+                        <div class="quick-filters">
+                            <button class="quick-filter active" onclick="window.setQuickFilter('ALL')">Tout</button>
+                            <button class="quick-filter" onclick="window.setQuickFilter('EN_RETARD')">En retard</button>
+                            <button class="quick-filter" onclick="window.setQuickFilter('PAYE')">Payé</button>
+                            <button class="quick-filter" onclick="window.setQuickFilter('PARTIEL')">Partiel</button>
+                            <button class="quick-filter" onclick="window.setQuickFilter('EMIS')">Émis</button>
+                            <button class="quick-filter" onclick="window.setQuickFilter('BROUILLON')">Brouillon</button>
+                        </div>
                         <button class="btn btn-grey" onclick="document.getElementById('fac-advanced-filters').classList.toggle('hidden')"><i class="fas fa-filter"></i> FILTRES</button>
                         <button class="btn btn-green" onclick="window.exportExcelSmart()"><i class="fas fa-file-excel"></i> EXPORT</button>
                     </div>
@@ -119,6 +127,7 @@
                                 <option value="">Type (Tous)</option>
                                 <option value="DEVIS">Devis</option>
                                 <option value="FACTURE">Facture</option>
+                                <option value="AVOIR">Avoir</option>
                             </select>
                         </div>
                         <div>
@@ -140,7 +149,21 @@
                 
                 <div class="card">
                     <table class="compta-table">
-                        <thead><tr><th>NUMÉRO</th><th>DATE</th><th>TYPE</th><th>CLIENT</th><th>DÉFUNT</th><th style="text-align:right;">TOTAL TTC</th><th style="text-align:right;">RESTE DÛ</th><th style="text-align:center;">ACTIONS</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>NUMÉRO</th>
+                                <th>DATE</th>
+                                <th>TYPE</th>
+                                <th>STATUT</th>
+                                <th>ÉCHÉANCE</th>
+                                <th>DOSSIER</th>
+                                <th>CLIENT</th>
+                                <th>DÉFUNT</th>
+                                <th style="text-align:right;">TOTAL TTC</th>
+                                <th style="text-align:right;">RESTE DÛ</th>
+                                <th style="text-align:center;">ACTIONS</th>
+                            </tr>
+                        </thead>
                         <tbody id="list-body"></tbody>
                     </table>
                 </div>
@@ -267,6 +290,8 @@
                     <button class="btn btn-green" onclick="window.sauvegarderDocument()"><i class="fas fa-save"></i> SAUVEGARDER</button>
                     <button class="btn btn-grey" onclick="window.genererPDFFacture()"><i class="fas fa-print"></i> IMPRIMER</button>
                     <button class="btn btn-blue" id="btn-transform" onclick="window.transformerEnFacture()" style="display:none;"><i class="fas fa-magic"></i> FACTURER</button>
+                    <button class="btn btn-red" id="btn-annuler-doc" onclick="window.annulerDocument()" style="display:none;"><i class="fas fa-ban"></i> ANNULER</button>
+                    <button class="btn btn-purple" id="btn-avoir-doc" onclick="window.creerAvoir()" style="display:none;"><i class="fas fa-receipt"></i> AVOIR</button>
                 </div>
             </div>
             
@@ -290,6 +315,10 @@
                     <div style="display:flex; gap:10px; margin-bottom:15px;">
                         <input id="doc_statut" placeholder="Statut" readonly style="background:#f8fafc; font-weight:700; width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                         <input type="date" id="doc_echeance" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input id="dossier_numero" placeholder="Numéro dossier (ex: DA-2026-001)" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb; width:100%;">
+                        <input id="dossier_id" placeholder="ID dossier (optionnel)" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb; width:100%;">
                     </div>
                     <input id="defunt_nom" list="defunts_suggestions" placeholder="Concerne le défunt (Nom Prénom)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     
@@ -333,6 +362,10 @@
                     <div style="font-size:1.5rem; font-weight:800; margin-bottom:10px; color:#111827;">TOTAL : <span id="total_general">0.00 €</span></div>
                     <div style="color:#059669; font-weight:600;">REGLÉ : <span id="total_paye">0.00 €</span></div>
                     <div style="color:#dc2626; font-weight:800; font-size:1.2rem; border-top:1px solid #eee; margin-top:10px; padding-top:10px;">RESTE : <span id="reste_a_payer">0.00 €</span></div>
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #d1d5db; text-align:left; font-size:0.86rem; color:#475569;">
+                        <div><strong>Date dernier paiement :</strong> <span id="pay_last_date">-</span></div>
+                        <div><strong>Mode principal :</strong> <span id="pay_main_mode">-</span></div>
+                    </div>
                     <span id="total_display" class="hidden">0</span>
                 </div>
             </div>

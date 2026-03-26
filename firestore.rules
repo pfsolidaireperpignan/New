@@ -70,6 +70,8 @@ service cloud.firestore {
         'date_creation',
         'date_emission',
         'date_echeance',
+        'date_annulation',
+        'date_dernier_paiement',
         'created_at',
         'client',
         'client_id',
@@ -77,6 +79,8 @@ service cloud.firestore {
         'client_adresse',
         'client_civility',
         'client_info',
+        'dossier_numero',
+        'dossier_id',
         'defunt',
         'defunt_nom',
         'defunt_date_naiss',
@@ -87,10 +91,12 @@ service cloud.firestore {
         'total_ttc',
         'total_paye',
         'reste_a_payer',
+        'mode_paiement_principal',
         'acompte',
         'paiements',
         'statut',
         'statut_doc',
+        'avoir_de',
         'reference_devis',
         'info'
       ])
@@ -99,6 +105,12 @@ service cloud.firestore {
       && (!('statut' in request.resource.data) || isString(request.resource.data.statut))
       && (!('date_emission' in request.resource.data) || isString(request.resource.data.date_emission))
       && (!('date_echeance' in request.resource.data) || isString(request.resource.data.date_echeance))
+      && (!('date_annulation' in request.resource.data) || isString(request.resource.data.date_annulation))
+      && (!('date_dernier_paiement' in request.resource.data) || isString(request.resource.data.date_dernier_paiement))
+      && (!('avoir_de' in request.resource.data) || isString(request.resource.data.avoir_de))
+      && (!('dossier_numero' in request.resource.data) || isString(request.resource.data.dossier_numero))
+      && (!('dossier_id' in request.resource.data) || isString(request.resource.data.dossier_id))
+      && (!('mode_paiement_principal' in request.resource.data) || isString(request.resource.data.mode_paiement_principal))
       && (!('client' in request.resource.data) || isMap(request.resource.data.client))
       && (!('client_info' in request.resource.data) || isString(request.resource.data.client_info))
       && (!('defunt' in request.resource.data) || isMap(request.resource.data.defunt))
