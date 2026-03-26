@@ -308,7 +308,9 @@
                             <div><label>Date Facture</label><input type="date" id="dep_date_fac" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
                             <div><label>Fournisseur</label><input id="dep_fourn" list="fournisseurs_list" placeholder="Nom..." style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
                             <div><label>Réf. Pièce</label><input id="dep_ref" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
-                            <div><label>Montant TTC</label><input type="number" id="dep_montant" placeholder="0.00" step="0.01" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px; font-weight:bold;"></div>
+                            <div><label>Montant TTC</label><input type="number" id="dep_montant" placeholder="0.00" step="0.01" oninput="window.calculerResteDepense()" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px; font-weight:bold;"></div>
+                            <div><label>Avance versée</label><input type="number" id="dep_avance" placeholder="0.00" step="0.01" oninput="window.calculerResteDepense()" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
+                            <div><label>Reste à payer</label><input type="number" id="dep_reste" readonly style="width:100%; padding:10px; border:1px dashed #fca5a5; border-radius:8px; background:#fff7ed; font-weight:700;"></div>
                             
                             <div style="grid-column: span 2;"><label>Catégorie</label>
                                 <select id="dep_cat" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;">
@@ -343,7 +345,7 @@
 
                 <div class="card">
                     <table class="compta-table">
-                        <thead><tr><th>DATE</th><th>FOURNISSEUR & DÉTAIL</th><th>RÉF</th><th>STATUT</th><th style="text-align:right;">MONTANT</th><th style="text-align:center;">ACTION</th></tr></thead>
+                        <thead><tr><th>DATE</th><th>FOURNISSEUR & DÉTAIL</th><th>RÉF</th><th>STATUT</th><th style="text-align:right;">MONTANT</th><th style="text-align:right;">AVANCE</th><th style="text-align:right;">RESTE</th><th style="text-align:center;">ACTION</th></tr></thead>
                         <tbody id="depenses-body"></tbody>
                     </table>
                 </div>
