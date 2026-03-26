@@ -165,6 +165,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 window.chargerBaseClients = DB.chargerBaseClients;
 window.filtrerBaseClients = DB.filtrerBaseClients;
+window.chargerDossiersAdminList = DB.chargerDossiersAdminList;
+window.filtrerDossiersAdmin = DB.filtrerDossiersAdmin;
 window.supprimerDossier = DB.supprimerDossier;
 window.nouveauDossier = function() {
     window.currentDossierId = null;
@@ -240,7 +242,7 @@ window.toggleSections = function() {
 window.toggleVol2 = function() { const chk = document.getElementById('check_vol2'); const bloc = document.getElementById('bloc_vol2'); if(chk && bloc) { chk.checked ? bloc.classList.remove('hidden') : bloc.classList.add('hidden'); } };
 window.togglePolice = function() { const select = document.getElementById('type_presence_select'); const bP = document.getElementById('police_fields'); const bF = document.getElementById('famille_fields'); if(!select) return; if(select.value === 'police') { bP.classList.remove('hidden'); bF.classList.add('hidden'); } else { bP.classList.add('hidden'); bF.classList.remove('hidden'); } };
 window.copierMandant = function() { const chk = document.getElementById('copy_mandant'); if(chk && chk.checked) { document.getElementById('f_nom_prenom').value = document.getElementById('soussigne').value; document.getElementById('f_lien').value = document.getElementById('lien').value; } };
-window.showSection = function(id) { document.querySelectorAll('.main-content > div').forEach(div => { if(div.id.startsWith('view-')) div.classList.add('hidden'); }); const target = document.getElementById('view-' + id); if(target) target.classList.remove('hidden'); if(id === 'base') DB.chargerBaseClients(); if(id === 'stock') DB.chargerStock(); if(id === 'admin') DB.chargerSelectImport(); };
+window.showSection = function(id) { document.querySelectorAll('.main-content > div').forEach(div => { if(div.id.startsWith('view-')) div.classList.add('hidden'); }); const target = document.getElementById('view-' + id); if(target) target.classList.remove('hidden'); if(id === 'base') DB.chargerBaseClients(); if(id === 'stock') DB.chargerStock(); if(id === 'admin') { DB.chargerSelectImport(); DB.chargerDossiersAdminList(); } };
 window.switchAdminTab = function(tabName) {
     ['identite', 'technique', 'protocole'].forEach((name) => {
         document.getElementById('tab-content-' + name)?.classList.add('hidden');

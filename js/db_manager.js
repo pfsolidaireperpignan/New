@@ -4,7 +4,8 @@ import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy,
 import { getVal, setVal } from './utils.js';
 
 let importCache = [];
-let clientsCache = []; // Mémoire pour la recherche
+let dossiersCache = []; // dossiers_admin
+let clientsRefCache = []; // collection clients
 const escapeHtml = (value) => String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -22,6 +23,7 @@ function renderClientsRefRows(refBody, rows) {
     rows.forEach(c => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
+            <td><code>${escapeHtml(c.id || '-')}</code></td>
             <td><strong>${escapeHtml(c.nom || '-')}</strong></td>
             <td>${escapeHtml(c.telephone || '-')}</td>
             <td>${escapeHtml(c.email || '-')}</td>
@@ -33,98 +35,28 @@ function renderClientsRefRows(refBody, rows) {
     });
 }
 
-// --- 1. CLIENTS (CHARGEMENT + FILTRE) ---
-export async function chargerBaseClients() {
-    const tbody = document.getElementById('clients-table-body');
-    const refBody = document.getElementById('clients-ref-table-body');
-    if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Chargement des dossiers...</td></tr>';
-    if(refBody) refBody.innerHTML = '<tr><td colspan="6" style="text-align:center">Chargement des fiches clients...</td></tr>';
-    
-    try {
-        // On charge les 100 derniers dossiers pour avoir de la matière à chercher
-        const q = query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc"), limit(100));
-        const snapshot = await getDocs(q);
-        
-        clientsCache = []; // On vide le cache avant de remplir
-        
-        if(snapshot.empty) { 
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Aucun dossier trouvé.</td></tr>'; 
-            return; 
-        }
-
-        snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            data.id = docSnap.id; // Important pour les boutons actions
-            clientsCache.push(data);
-        });
-
-        // On affiche tout par défaut
-        filtrerBaseClients();
-
-        // Chargement collection clients (référentiel facturation)
-        if (refBody) {
-            try {
-                // 1) Tentative standard: tri par nom
-                const cQ = query(collection(db, "clients"), orderBy("nom"), limit(300));
-                const cSnap = await getDocs(cQ);
-                const rows = [];
-                cSnap.forEach(docSnap => rows.push(docSnap.data() || {}));
-                renderClientsRefRows(refBody, rows);
-            } catch (e) {
-                // 2) Fallback robuste: sans orderBy (évite certains blocages d'index/règles)
-                try {
-                    const fallbackSnap = await getDocs(query(collection(db, "clients"), limit(300)));
-                    const rows = [];
-                    fallbackSnap.forEach(docSnap => rows.push(docSnap.data() || {}));
-                    rows.sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), 'fr'));
-                    renderClientsRefRows(refBody, rows);
-                } catch (e2) {
-                    console.error("Erreur chargement collection clients:", e2);
-                    const msg = (e2?.code || e?.code || "inconnue").toString();
-                    refBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#ef4444;">Erreur chargement fiches clients (${escapeHtml(msg)}).</td></tr>`;
-                }
-            }
-        }
-
-    } catch (e) { 
-        console.error(e); 
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Erreur de chargement.</td></tr>';
-        if(refBody) refBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#ef4444;">Erreur chargement fiches clients.</td></tr>';
-    }
+function guessDossierCode(data, id) {
+    return data?.technique?.numero_dossier || data?.details_op?.numero_dossier || data?.numero_dossier || id || "-";
 }
 
-export function filtrerBaseClients() {
-    const term = (document.getElementById('search-client')?.value || "").toLowerCase();
-    const tbody = document.getElementById('clients-table-body');
-    if(!tbody) return;
-    
-    tbody.innerHTML = "";
-
-    // On cherche dans le NOM DU DÉFUNT ou le NOM DU MANDANT
-    const resultats = clientsCache.filter(d => {
-        const defunt = `${d.defunt?.nom || ""} ${d.defunt?.prenom || ""}`.trim().toLowerCase();
-        const mandant = (d.mandant?.nom || "").toLowerCase();
-        return defunt.includes(term) || mandant.includes(term);
-    });
-
-    if(resultats.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Aucun résultat pour cette recherche.</td></tr>';
+function renderDossiersAdminRows(tbody, rows) {
+    if (!tbody) return;
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Aucun dossier trouvé.</td></tr>';
         return;
     }
-
-    resultats.forEach(data => {
+    tbody.innerHTML = "";
+    rows.forEach(data => {
         const tr = document.createElement('tr');
-        
         let dateCreation = '-';
-        if(data.date_creation) {
-            try { dateCreation = new Date(data.date_creation).toLocaleDateString(); } catch(e){}
+        if (data.date_creation) {
+            try { dateCreation = new Date(data.date_creation).toLocaleDateString(); } catch (_) {}
         }
-
         const defuntNomComplet = `${data.defunt?.nom || ''} ${data.defunt?.prenom || ''}`.trim();
-
+        const codeDossier = guessDossierCode(data, data.id);
         tr.innerHTML = `
             <td>${dateCreation}</td>
+            <td><strong>${escapeHtml(codeDossier)}</strong></td>
             <td><strong>${escapeHtml(defuntNomComplet || 'Inconnu')}</strong></td>
             <td>${escapeHtml(data.mandant?.nom || '-')}</td>
             <td><span class="badge badge-blue">${escapeHtml(data.technique?.type_operation || 'Dossier')}</span></td>
@@ -140,7 +72,85 @@ export function filtrerBaseClients() {
     });
 }
 
-// --- 2. IMPORT (FACTURATION -> DOSSIER) ---
+// --- 1. BASE CLIENTS (fiches clients uniquement) ---
+export async function chargerBaseClients() {
+    const refBody = document.getElementById('clients-ref-table-body');
+    if (!refBody) return;
+    refBody.innerHTML = '<tr><td colspan="7" style="text-align:center">Chargement des fiches clients...</td></tr>';
+    
+    try {
+        try {
+            const cQ = query(collection(db, "clients"), orderBy("nom"), limit(300));
+            const cSnap = await getDocs(cQ);
+            clientsRefCache = [];
+            cSnap.forEach(docSnap => clientsRefCache.push({ id: docSnap.id, ...(docSnap.data() || {}) }));
+            renderClientsRefRows(refBody, clientsRefCache);
+        } catch (e) {
+            try {
+                const fallbackSnap = await getDocs(query(collection(db, "clients"), limit(300)));
+                clientsRefCache = [];
+                fallbackSnap.forEach(docSnap => clientsRefCache.push({ id: docSnap.id, ...(docSnap.data() || {}) }));
+                clientsRefCache.sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), 'fr'));
+                renderClientsRefRows(refBody, clientsRefCache);
+            } catch (e2) {
+                console.error("Erreur chargement collection clients:", e2);
+                const msg = (e2?.code || e?.code || "inconnue").toString();
+                refBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#ef4444;">Erreur chargement fiches clients (${escapeHtml(msg)}).</td></tr>`;
+            }
+        }
+    } catch (e) { 
+        console.error(e); 
+        refBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#ef4444;">Erreur chargement fiches clients.</td></tr>';
+    }
+}
+
+export function filtrerBaseClients() {
+    const term = (document.getElementById('search-client')?.value || "").toLowerCase();
+    const refBody = document.getElementById('clients-ref-table-body');
+    if (!refBody) return;
+    const resultats = clientsRefCache.filter(c => {
+        const txt = `${c.id || ""} ${c.nom || ""} ${c.telephone || ""} ${c.email || ""} ${c.type || ""} ${c.adresse || ""} ${c.notes || ""}`.toLowerCase();
+        return txt.includes(term);
+    });
+    renderClientsRefRows(refBody, resultats);
+}
+
+// --- 2. DOSSIERS ADMIN (liste déplacée depuis Base Clients) ---
+export async function chargerDossiersAdminList() {
+    const tbody = document.getElementById('dossiers-admin-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">Chargement des dossiers...</td></tr>';
+    try {
+        const q = query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc"), limit(200));
+        const snapshot = await getDocs(q);
+        dossiersCache = [];
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data() || {};
+            data.id = docSnap.id;
+            dossiersCache.push(data);
+        });
+        filtrerDossiersAdmin();
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#ef4444;">Erreur chargement dossiers.</td></tr>';
+    }
+}
+
+export function filtrerDossiersAdmin() {
+    const tbody = document.getElementById('dossiers-admin-table-body');
+    if (!tbody) return;
+    const term = (document.getElementById('search-dossier-admin')?.value || "").toLowerCase();
+    const rows = dossiersCache.filter(d => {
+        const defunt = `${d.defunt?.nom || ""} ${d.defunt?.prenom || ""}`.trim();
+        const mandant = d.mandant?.nom || "";
+        const code = guessDossierCode(d, d.id);
+        const txt = `${defunt} ${mandant} ${code} ${d.technique?.type_operation || ""}`.toLowerCase();
+        return txt.includes(term);
+    });
+    renderDossiersAdminRows(tbody, rows);
+}
+
+// --- 3. IMPORT (FACTURATION -> DOSSIER) ---
 export async function chargerSelectImport() {
     const select = document.getElementById('select-import-client');
     if(!select) return;
