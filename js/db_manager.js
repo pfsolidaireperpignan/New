@@ -15,8 +15,10 @@ const escapeHtml = (value) => String(value ?? "")
 // --- 1. CLIENTS (CHARGEMENT + FILTRE) ---
 export async function chargerBaseClients() {
     const tbody = document.getElementById('clients-table-body');
+    const refBody = document.getElementById('clients-ref-table-body');
     if(!tbody) return;
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Chargement des dossiers...</td></tr>';
+    if(refBody) refBody.innerHTML = '<tr><td colspan="6" style="text-align:center">Chargement des fiches clients...</td></tr>';
     
     try {
         // On charge les 100 derniers dossiers pour avoir de la matière à chercher
@@ -39,9 +41,38 @@ export async function chargerBaseClients() {
         // On affiche tout par défaut
         filtrerBaseClients();
 
+        // Chargement collection clients (référentiel facturation)
+        if (refBody) {
+            try {
+                const cQ = query(collection(db, "clients"), orderBy("nom"), limit(300));
+                const cSnap = await getDocs(cQ);
+                if (cSnap.empty) {
+                    refBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Aucune fiche client.</td></tr>';
+                } else {
+                    refBody.innerHTML = "";
+                    cSnap.forEach(docSnap => {
+                        const c = docSnap.data() || {};
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong>${escapeHtml(c.nom || '-')}</strong></td>
+                            <td>${escapeHtml(c.telephone || '-')}</td>
+                            <td>${escapeHtml(c.email || '-')}</td>
+                            <td><span class="badge badge-blue">${escapeHtml(c.type || 'particulier')}</span></td>
+                            <td>${escapeHtml(c.adresse || '-')}</td>
+                            <td>${escapeHtml(c.notes || '-')}</td>
+                        `;
+                        refBody.appendChild(tr);
+                    });
+                }
+            } catch (e) {
+                refBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#ef4444;">Erreur chargement fiches clients.</td></tr>';
+            }
+        }
+
     } catch (e) { 
         console.error(e); 
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Erreur de chargement.</td></tr>';
+        if(refBody) refBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#ef4444;">Erreur chargement fiches clients.</td></tr>';
     }
 }
 

@@ -1,6 +1,7 @@
 /* js/facturation.js - VERSION FINALE (COMPATIBLE ANCIENS & NOUVEAUX DOSSIERS) */
-import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, limit, startAfter, getDoc, auth } from "./config.js";
+import { app, db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, limit, startAfter, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 // --- INFOS BANCAIRES ---
 const INFO_SOCIETE = {
@@ -12,6 +13,8 @@ const INFO_SOCIETE = {
 let paiements = []; 
 let cacheDepenses = []; 
 let cacheFactures = []; 
+let cacheClients = [];
+let cacheDossiersAdmin = [];
 let lastFactureCursor = null;
 let hasMoreFactures = true;
 const FACTURES_PAGE_SIZE = 60;
@@ -20,6 +23,7 @@ let quickFilter = "ALL"; // ALL | EN_RETARD | PAYE | PARTIEL | EMIS | BROUILLON
 let global_CA = 0; 
 let global_Depenses = 0; 
 let logoBase64 = null; 
+const storage = app ? getStorage(app) : getStorage();
 const currentYear = new Date().getFullYear();
 const escapeHtml = (value) => String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -27,6 +31,7 @@ const escapeHtml = (value) => String(value ?? "")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+const normalizeText = (v) => String(v || "").trim().toLowerCase();
 
 // --- INIT ---
 onAuthStateChanged(auth, (user) => {
@@ -98,14 +103,83 @@ function setEditorActionButtonsVisibility() {
     const hasId = Boolean(document.getElementById('current_doc_id')?.value);
 
     const btnAnnuler = document.getElementById('btn-annuler-doc');
-    const btnAvoir = document.getElementById('btn-avoir-doc');
-    if (!btnAnnuler || !btnAvoir) return;
+    if (!btnAnnuler) return;
 
-    const canAnnuler = hasId && (type === "FACTURE" || type === "AVOIR") && statut !== "ANNULE";
-    const canAvoir = hasId && type === "FACTURE" && statut !== "ANNULE" && statut !== "AVOIR";
+    const canAnnuler = hasId && (type === "FACTURE") && statut !== "ANNULE";
 
     btnAnnuler.style.display = canAnnuler ? 'inline-flex' : 'none';
-    btnAvoir.style.display = canAvoir ? 'inline-flex' : 'none';
+}
+
+function formatDateFR(value) {
+    if (!value) return "-";
+    try { return new Date(value).toLocaleDateString('fr-FR'); } catch(_) { return String(value); }
+}
+
+function getAEncaisserRows() {
+    return cacheFactures
+        .filter(d => String(d.finalType || "").toUpperCase() === "FACTURE")
+        .map(d => {
+            const paye = (d.finalPaiements || []).reduce((s, p) => s + (parseFloat(p?.montant) || 0), 0);
+            const reste = (parseFloat(d.finalTotal) || 0) - paye;
+            return { ...d, reste };
+        })
+        .filter(d => d.reste > 0.01 && !["PAYE", "ANNULE", "AVOIR"].includes(String(d.finalStatut || "").toUpperCase()))
+        .sort((a, b) => {
+            const da = a.finalEcheance ? new Date(a.finalEcheance).getTime() : Number.MAX_SAFE_INTEGER;
+            const db = b.finalEcheance ? new Date(b.finalEcheance).getTime() : Number.MAX_SAFE_INTEGER;
+            return da - db;
+        });
+}
+
+function renderAEncaisserTable() {
+    const tbody = document.getElementById('encaisser-body');
+    if (!tbody) return;
+    const rows = getAEncaisserRows();
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Aucun impayé.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = "";
+    rows.forEach(r => {
+        const tr = document.createElement('tr');
+        const overdue = r.finalEcheance && new Date(r.finalEcheance) < new Date(new Date().toDateString());
+        tr.innerHTML = `
+            <td><strong>${escapeHtml(r.finalNumero || "-")}</strong></td>
+            <td>${escapeHtml(r.finalClient || "-")}</td>
+            <td><span class="${overdue ? 'echeance echeance-retard' : 'echeance'}">${escapeHtml(formatDateFR(r.finalEcheance))}</span></td>
+            <td style="text-align:right; font-weight:700; color:#b91c1c;">${r.reste.toFixed(2)} €</td>
+            <td>${escapeHtml(String(r.finalStatut || "EMIS").toUpperCase())}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.exportAEncaisserCSV = function() {
+    const rows = getAEncaisserRows();
+    let csv = "Numero;Client;Echeance;Reste Du;Statut\n";
+    rows.forEach(r => {
+        csv += `${r.finalNumero || ""};${r.finalClient || ""};${r.finalEcheance || ""};${r.reste.toFixed(2)};${String(r.finalStatut || "EMIS").toUpperCase()}\n`;
+    });
+    const encoded = encodeURI("data:text/csv;charset=utf-8," + csv);
+    const link = document.createElement("a");
+    link.setAttribute("href", encoded);
+    link.setAttribute("download", "a_encaisser.csv");
+    document.body.appendChild(link);
+    link.click();
+};
+
+async function uploadPaymentReceipt(file, numeroDoc = "DOC") {
+    if (!file) return { url: "", path: "" };
+    const ct = String(file.type || "").toLowerCase();
+    const isAllowed = ct.startsWith("image/") || ct === "application/pdf";
+    if (!isAllowed) throw new Error("Format justificatif non supporté (image/PDF).");
+    if (file.size > 10 * 1024 * 1024) throw new Error("Fichier trop volumineux (max 10 Mo).");
+    const safeName = String(file.name || "justificatif").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `ged_files/receipt_${String(numeroDoc || "DOC").replace(/[^a-zA-Z0-9_-]/g, "_")}_${Date.now()}_${safeName}`;
+    const fileRef = ref(storage, filePath);
+    await uploadBytes(fileRef, file, { contentType: ct || "application/octet-stream" });
+    const url = await getDownloadURL(fileRef);
+    return { url, path: filePath };
 }
 
 function summarizePaiements(list, total) {
@@ -184,6 +258,7 @@ window.chargerListeFactures = async function(reset = true) {
         updateLoadMoreButton();
         window.filtrerFactures();
         window.chargerDepenses();
+        renderAEncaisserTable();
     } catch(e) { console.error(e); }
 };
 
@@ -349,7 +424,6 @@ window.filtrerFactures = function() {
                 <button class="btn-icon" onclick="window.apercuDocument('${d.id}')" title="Aperçu PDF"><i class="fas fa-eye"></i></button>
                 ${classerBtn}
                 ${d.finalType === 'FACTURE' ? `<button class="btn-icon" style="color:#dc2626;" onclick="window.annulerDocumentById('${d.id}')" title="Annuler"><i class="fas fa-ban"></i></button>` : ``}
-                ${d.finalType === 'FACTURE' ? `<button class="btn-icon" style="color:#7c3aed;" onclick="window.creerAvoirById('${d.id}')" title="Créer un avoir"><i class="fas fa-receipt"></i></button>` : ``}
                 <button class="btn-icon" style="color:red;" onclick="window.supprimerDocument('${d.id}')" title="Supprimer (admin)"><i class="fas fa-trash"></i></button>
             </td>`;
         tbody.appendChild(tr);
@@ -531,6 +605,7 @@ window.nouveauDocument = function() {
     document.getElementById('current_doc_id').value = "";
     document.getElementById('doc_numero').value = "Auto";
     document.getElementById('client_nom').value = "";
+    if(document.getElementById('client_id')) document.getElementById('client_id').value = "";
     document.getElementById('client_adresse').value = "";
     if(document.getElementById('client_info')) document.getElementById('client_info').value = "";
     document.getElementById('defunt_nom').value = "";
@@ -563,6 +638,7 @@ window.chargerDocument = async (id) => {
         
         // COMPATIBILITÉ CHARGEMENT
         document.getElementById('doc_numero').value = data.numero || data.info?.numero; 
+        if(document.getElementById('client_id')) document.getElementById('client_id').value = data.client_id || "";
         document.getElementById('client_nom').value = data.client_nom || data.client?.nom; 
         document.getElementById('client_adresse').value = data.client_adresse || data.client?.adresse; 
         const clientInfoEl = document.getElementById('client_info');
@@ -634,6 +710,58 @@ window.calculTotal = function() {
     if (mainModeEl) mainModeEl.innerText = lettrage.mainMode;
 };
 
+async function ensureClientLinkOnSave() {
+    const idEl = document.getElementById('client_id');
+    const nom = document.getElementById('client_nom')?.value || "";
+    const adresse = document.getElementById('client_adresse')?.value || "";
+    const info = document.getElementById('client_info')?.value || "";
+    let clientId = idEl?.value || "";
+    if (!nom) return clientId;
+    if (clientId) return clientId;
+
+    // 1) cache local
+    const fromCache = findClientByName(nom);
+    if (fromCache?.id) {
+        clientId = fromCache.id;
+        if (idEl) idEl.value = clientId;
+        return clientId;
+    }
+
+    // 2) Firestore
+    try {
+        const snap = await getDocs(query(collection(db, "clients"), where("nom", "==", nom), limit(5)));
+        if (!snap.empty) {
+            const first = snap.docs[0];
+            clientId = first.id;
+            if (idEl) idEl.value = clientId;
+            cacheClients.push({ id: first.id, ...(first.data() || {}) });
+            return clientId;
+        }
+    } catch (_) {}
+
+    // 3) création automatique NON BLOQUANTE
+    try {
+        const now = new Date().toISOString();
+        const created = await addDoc(collection(db, "clients"), {
+            nom,
+            adresse,
+            telephone: "",
+            email: "",
+            type: "particulier",
+            notes: info,
+            created_at: now,
+            updated_at: now
+        });
+        clientId = created.id;
+        if (idEl) idEl.value = clientId;
+        cacheClients.push({ id: created.id, nom, adresse, telephone: "", email: "", type: "particulier", notes: info });
+    } catch (e) {
+        // demandé par l'utilisateur: ne pas bloquer la sauvegarde si non lié
+        console.warn("Liaison client non créée:", e);
+    }
+    return clientId;
+}
+
 // SAUVEGARDE
 window.sauvegarderDocument = async function() { 
     const lignes = []; 
@@ -672,6 +800,7 @@ window.sauvegarderDocument = async function() {
 
     const docData = { 
         type: docType, numero: document.getElementById('doc_numero').value, date: docDate, 
+        client_id: document.getElementById('client_id') ? document.getElementById('client_id').value : "",
         client_nom: document.getElementById('client_nom').value, client_adresse: document.getElementById('client_adresse').value, client_civility: document.getElementById('client_civility').value,
         client_info: document.getElementById('client_info') ? document.getElementById('client_info').value : "",
         dossier_numero: document.getElementById('dossier_numero') ? document.getElementById('dossier_numero').value : "",
@@ -688,6 +817,8 @@ window.sauvegarderDocument = async function() {
     }; 
     const id = document.getElementById('current_doc_id').value; 
     try { 
+        docData.client_id = await ensureClientLinkOnSave();
+
         if (!docData.numero || docData.numero === "Auto") {
             const q = query(collection(db, "factures_v2")); 
             const snap = await getDocs(q); 
@@ -696,7 +827,7 @@ window.sauvegarderDocument = async function() {
                 const dType = d.data().type || d.data().info?.type;
                 if(dType === docData.type) compteurType++; 
             });
-            const prefix = docData.type === 'DEVIS' ? 'D' : (docData.type === 'AVOIR' ? 'A' : 'F');
+            const prefix = docData.type === 'DEVIS' ? 'D' : 'F';
             docData.numero = `${prefix}-${currentYear}-${String(compteurType + 1).padStart(3, '0')}`;
         }
 
@@ -720,9 +851,34 @@ window.sauvegarderDocument = async function() {
     } catch(e) { alert("Erreur : " + e.message); } 
 };
 
-window.ajouterPaiement = () => { const p = { date: document.getElementById('pay_date').value, mode: document.getElementById('pay_mode').value, montant: parseFloat(document.getElementById('pay_amount').value) }; if(p.montant > 0) { paiements.push(p); window.renderPaiements(); window.calculTotal(); } };
+window.ajouterPaiement = async () => {
+    const date = document.getElementById('pay_date').value;
+    const mode = document.getElementById('pay_mode').value;
+    const montant = parseFloat(document.getElementById('pay_amount').value);
+    const fileInput = document.getElementById('pay_receipt');
+    const file = fileInput?.files?.[0];
+    if (!(montant > 0)) return;
+    try {
+        const numeroDoc = document.getElementById('doc_numero')?.value || "DOC";
+        const receipt = await uploadPaymentReceipt(file, numeroDoc);
+        const p = {
+            date,
+            mode,
+            montant,
+            justificatif_url: receipt.url || "",
+            justificatif_path: receipt.path || "",
+            justificatif_nom: file?.name || ""
+        };
+        paiements.push(p);
+        if (fileInput) fileInput.value = "";
+        window.renderPaiements();
+        window.calculTotal();
+    } catch (e) {
+        alert("Erreur justificatif : " + (e?.message || e));
+    }
+};
 window.supprimerPaiement = (i) => { paiements.splice(i, 1); window.renderPaiements(); window.calculTotal(); };
-window.renderPaiements = () => { const div = document.getElementById('liste_paiements'); div.innerHTML = ""; paiements.forEach((p, i) => { div.innerHTML += `<div>${p.date} - ${p.mode}: <strong>${p.montant}€</strong> <i class="fas fa-trash" style="color:red;cursor:pointer;margin-left:10px;" onclick="window.supprimerPaiement(${i})"></i></div>`; }); };
+window.renderPaiements = () => { const div = document.getElementById('liste_paiements'); div.innerHTML = ""; paiements.forEach((p, i) => { const receipt = p.justificatif_url ? ` <a href="${p.justificatif_url}" target="_blank" rel="noopener" style="margin-left:8px; color:#065f46; font-weight:700;">Justificatif</a>` : ""; div.innerHTML += `<div>${p.date} - ${p.mode}: <strong>${p.montant}€</strong>${receipt} <i class="fas fa-trash" style="color:red;cursor:pointer;margin-left:10px;" onclick="window.supprimerPaiement(${i})"></i></div>`; }); };
 window.supprimerDocument = async (id) => { if(confirm("Supprimer ?")) { await deleteDoc(doc(db,"factures_v2",id)); window.chargerListeFactures(); } };
 window.transformerEnFacture = async function() { if(confirm("Créer une FACTURE à partir de ce devis ?")) { 
     const idDevis = document.getElementById('current_doc_id').value;
@@ -746,65 +902,6 @@ window.annulerDocument = async function() {
     if(!id) return alert("Aucun document ouvert.");
     await window.annulerDocumentById(id);
     try { window.showDashboard(); } catch(_) {}
-};
-
-window.creerAvoirById = async function(id) {
-    if(!confirm("Créer un avoir à partir de cette facture ?")) return;
-    try {
-        const srcSnap = await getDoc(doc(db, "factures_v2", id));
-        if(!srcSnap.exists()) return alert("Facture introuvable.");
-        const src = srcSnap.data();
-        const today = new Date().toISOString().split('T')[0];
-
-        // Duplique les lignes en négatif (avoir)
-        const lignesSrc = Array.isArray(src.lignes) ? src.lignes : [];
-        const lignesAvoir = lignesSrc.map(l => {
-            if (l && l.type === 'section') return { ...l };
-            const prix = parseFloat(l?.prix) || 0;
-            return { ...l, prix: -Math.abs(prix) };
-        });
-
-        const totalSrc = parseFloat((src.total !== undefined) ? src.total : (src.info?.total || 0)) || 0;
-        const avoirData = {
-            type: "AVOIR",
-            numero: "Auto",
-            date: today,
-            client_nom: src.client_nom || src.client?.nom || "",
-            client_adresse: src.client_adresse || src.client?.adresse || "",
-            client_civility: src.client_civility || src.client?.civility || "M.",
-            client_info: src.client_info || src.client?.info || "",
-            dossier_numero: src.dossier_numero || "",
-            dossier_id: src.dossier_id || "",
-            defunt_nom: src.defunt_nom || src.defunt?.nom || "",
-            defunt_date_naiss: src.defunt_date_naiss || src.defunt?.naiss || "",
-            defunt_date_deces: src.defunt_date_deces || src.defunt?.deces || "",
-            statut: "AVOIR",
-            date_emission: today,
-            date_echeance: "",
-            date_dernier_paiement: "",
-            mode_paiement_principal: "",
-            total: -Math.abs(totalSrc),
-            total_paye: 0,
-            reste_a_payer: -Math.abs(totalSrc),
-            lignes: lignesAvoir,
-            paiements: [],
-            date_creation: new Date().toISOString(),
-            avoir_de: id,
-            statut_doc: "Validé"
-        };
-
-        const created = await addDoc(collection(db, "factures_v2"), avoirData);
-        alert("✅ Avoir créé.");
-        await window.chargerListeFactures(true);
-        await window.chargerDocument(created.id);
-        setEditorActionButtonsVisibility();
-    } catch(e) { alert("Erreur : " + e.message); }
-};
-
-window.creerAvoir = async function() {
-    const id = document.getElementById('current_doc_id')?.value;
-    if(!id) return alert("Aucun document ouvert.");
-    await window.creerAvoirById(id);
 };
 
 // EXPORT EXCEL
@@ -831,8 +928,431 @@ window.exportExcelSmart = function() {
     } 
 };
 
-async function chargerSuggestionsClients() { try { const q = query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc")); const snap = await getDocs(q); const dl = document.getElementById('clients_suggestions'); dl.innerHTML = ""; snap.forEach(doc => { if(doc.data().mandant?.nom) dl.innerHTML += `<option value="${doc.data().mandant.nom}">`; }); } catch(e){} }
-window.checkClientAuto = function() { const val = document.getElementById('client_nom').value; const client = cacheFactures.find(f => f.finalClient === val); if(client) document.getElementById('client_adresse').value = client.client_adresse || client.client?.adresse || ''; };
+function guessDossierNumero(data, id) {
+    return data?.numero_dossier
+        || data?.technique?.numero_dossier
+        || data?.details_op?.numero_dossier
+        || data?.details_op?.numero
+        || data?.reference
+        || id
+        || "";
+}
+
+function applyDossierToForm(dossier) {
+    if (!dossier) return;
+    const dossierIdEl = document.getElementById('dossier_id');
+    const dossierNumeroEl = document.getElementById('dossier_numero');
+    if (dossierIdEl) dossierIdEl.value = dossier.id || "";
+    if (dossierNumeroEl) dossierNumeroEl.value = dossier.numero || "";
+    const addr = dossier?.data?.mandant?.adresse || "";
+    if (addr && document.getElementById('client_adresse')) document.getElementById('client_adresse').value = addr;
+}
+
+function applyClientToForm(clientDoc) {
+    if (!clientDoc) return;
+    const idEl = document.getElementById('client_id');
+    const nomEl = document.getElementById('client_nom');
+    const adrEl = document.getElementById('client_adresse');
+    const infoEl = document.getElementById('client_info');
+    if (idEl) idEl.value = clientDoc.id || "";
+    if (nomEl && !nomEl.value) nomEl.value = clientDoc.nom || "";
+    if (adrEl && !adrEl.value) adrEl.value = clientDoc.adresse || "";
+    if (infoEl && !infoEl.value) infoEl.value = clientDoc.telephone || clientDoc.notes || "";
+}
+
+function findClientByName(name) {
+    const n = normalizeText(name);
+    if (!n) return null;
+    return cacheClients.find(c => normalizeText(c.nom) === n) || null;
+}
+
+function findDossierByNamesForMigration(clientName, defuntName) {
+    const c = normalizeText(clientName);
+    const d = normalizeText(defuntName);
+    if (c) {
+        const byClient = cacheDossiersAdmin.find(x => normalizeText(x?.data?.mandant?.nom) === c);
+        if (byClient) return byClient;
+    }
+    if (d) {
+        const byDefunt = cacheDossiersAdmin.find(x => normalizeText(x?.data?.defunt?.nom) === d);
+        if (byDefunt) return byDefunt;
+    }
+    return null;
+}
+
+async function renderClientHistoryInSheet(clientId, fallbackName = "") {
+    const tbody = document.getElementById('sheet_client_history');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
+    let rows = [];
+    try {
+        if (clientId) {
+            const snap = await getDocs(query(collection(db, "factures_v2"), where("client_id", "==", clientId), limit(80)));
+            snap.forEach(d => {
+                const x = d.data();
+                rows.push({
+                    numero: x.numero || x.info?.numero || "-",
+                    date: x.date || x.info?.date || x.date_creation || "",
+                    type: x.type || x.info?.type || "DOC",
+                    statut: x.statut || computeFactureStatut(x),
+                    total: parseFloat((x.total !== undefined) ? x.total : (x.info?.total || 0))
+                });
+            });
+        } else if (fallbackName) {
+            rows = cacheFactures
+                .filter(f => normalizeText(f.finalClient) === normalizeText(fallbackName))
+                .map(f => ({
+                    numero: f.finalNumero || "-",
+                    date: f.finalDate || "",
+                    type: f.finalType || "DOC",
+                    statut: f.finalStatut || "-",
+                    total: parseFloat(f.finalTotal || 0)
+                }));
+        }
+    } catch (_) {}
+
+    rows.sort((a, b) => (String(b.date || "")).localeCompare(String(a.date || "")));
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Aucune facture liée.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = "";
+    rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${escapeHtml(r.numero)}</td>
+            <td>${escapeHtml(formatDateFR(r.date))}</td>
+            <td>${escapeHtml(r.type)}</td>
+            <td>${escapeHtml(String(r.statut || "").toUpperCase())}</td>
+            <td style="text-align:right;">${(parseFloat(r.total) || 0).toFixed(2)} €</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.closeClientSheet = function() {
+    document.getElementById('modal-client-sheet')?.classList.add('hidden');
+};
+
+window.openClientSheet = async function() {
+    const nom = document.getElementById('client_nom')?.value || "";
+    if (!nom) return alert("Renseigne d'abord le nom du client.");
+
+    // On essaie de lier automatiquement avant ouverture (non bloquant)
+    const linkedId = await ensureClientLinkOnSave();
+    const clientId = linkedId || document.getElementById('client_id')?.value || "";
+    let client = clientId ? cacheClients.find(c => c.id === clientId) : findClientByName(nom);
+
+    if (!client && clientId) {
+        try {
+            const snap = await getDoc(doc(db, "clients", clientId));
+            if (snap.exists()) client = { id: snap.id, ...(snap.data() || {}) };
+        } catch (_) {}
+    }
+
+    const id = client?.id || clientId || "";
+    document.getElementById('sheet_client_id').value = id;
+    document.getElementById('sheet_client_nom').value = client?.nom || nom || "";
+    document.getElementById('sheet_client_type').value = client?.type || "particulier";
+    document.getElementById('sheet_client_tel').value = client?.telephone || "";
+    document.getElementById('sheet_client_email').value = client?.email || "";
+    document.getElementById('sheet_client_adresse').value = client?.adresse || document.getElementById('client_adresse')?.value || "";
+    document.getElementById('sheet_client_notes').value = client?.notes || document.getElementById('client_info')?.value || "";
+
+    document.getElementById('modal-client-sheet')?.classList.remove('hidden');
+    await renderClientHistoryInSheet(id, nom);
+};
+
+window.saveClientSheet = async function() {
+    const idEl = document.getElementById('sheet_client_id');
+    const data = {
+        nom: document.getElementById('sheet_client_nom')?.value || "",
+        type: document.getElementById('sheet_client_type')?.value || "particulier",
+        telephone: document.getElementById('sheet_client_tel')?.value || "",
+        email: document.getElementById('sheet_client_email')?.value || "",
+        adresse: document.getElementById('sheet_client_adresse')?.value || "",
+        notes: document.getElementById('sheet_client_notes')?.value || "",
+        updated_at: new Date().toISOString()
+    };
+    if (!data.nom) return alert("Nom client obligatoire.");
+    try {
+        let clientId = idEl?.value || "";
+        if (clientId) {
+            await updateDoc(doc(db, "clients", clientId), data);
+        } else {
+            const created = await addDoc(collection(db, "clients"), {
+                ...data,
+                created_at: new Date().toISOString()
+            });
+            clientId = created.id;
+            if (idEl) idEl.value = clientId;
+            if (document.getElementById('client_id')) document.getElementById('client_id').value = clientId;
+        }
+
+        // Répercute dans le formulaire facture
+        if (document.getElementById('client_nom')) document.getElementById('client_nom').value = data.nom;
+        if (document.getElementById('client_adresse')) document.getElementById('client_adresse').value = data.adresse;
+        if (document.getElementById('client_info')) document.getElementById('client_info').value = data.telephone || data.notes || "";
+        if (document.getElementById('client_id')) document.getElementById('client_id').value = clientId;
+
+        // rafraîchit cache clients local
+        const idx = cacheClients.findIndex(c => c.id === clientId);
+        const fresh = { id: clientId, ...data };
+        if (idx >= 0) cacheClients[idx] = fresh;
+        else cacheClients.push(fresh);
+
+        await renderClientHistoryInSheet(clientId, data.nom);
+        alert("✅ Fiche client enregistrée.");
+    } catch (e) {
+        alert("Erreur fiche client : " + (e?.message || e));
+    }
+};
+
+window.runMigrationDouce = async function() {
+    const ok = confirm("Lancer la migration douce des anciennes factures ?\n\nCette action enrichit les champs manquants (client_id, dossier, lettrage, échéance/statut) sans casser l'historique.");
+    if (!ok) return;
+
+    let scanned = 0;
+    let updated = 0;
+    let skipped = 0;
+    let errors = 0;
+    const startTs = Date.now();
+
+    try {
+        // Précharge caches utiles
+        await chargerSuggestionsClients();
+
+        // Recharge référentiel clients (au cas où)
+        try {
+            cacheClients = [];
+            const cSnap = await getDocs(query(collection(db, "clients"), orderBy("nom")));
+            cSnap.forEach(x => cacheClients.push({ id: x.id, ...(x.data() || {}) }));
+        } catch (_) {}
+
+        let lastDoc = null;
+        while (true) {
+            let q = query(collection(db, "factures_v2"), orderBy("date_creation", "desc"), limit(100));
+            if (lastDoc) q = query(collection(db, "factures_v2"), orderBy("date_creation", "desc"), startAfter(lastDoc), limit(100));
+            const snap = await getDocs(q);
+            if (snap.empty) break;
+
+            for (const docSnap of snap.docs) {
+                scanned += 1;
+                const data = docSnap.data() || {};
+                const patch = {};
+
+                const type = data.type || data.info?.type || "DOC";
+                const clientNom = data.client_nom || data.client?.nom || "";
+                const defuntNom = data.defunt_nom || data.defunt?.nom || "";
+                const total = parseFloat((data.total !== undefined) ? data.total : (data.info?.total || 0)) || 0;
+                const paiements = Array.isArray(data.paiements) ? data.paiements : [];
+                const lettrage = summarizePaiements(paiements, total);
+
+                // client_id manquant -> liaison/creation douce
+                if (!data.client_id && clientNom) {
+                    let found = findClientByName(clientNom);
+                    if (!found) {
+                        try {
+                            const created = await addDoc(collection(db, "clients"), {
+                                nom: clientNom,
+                                adresse: data.client_adresse || data.client?.adresse || "",
+                                telephone: "",
+                                email: "",
+                                type: "particulier",
+                                notes: data.client_info || "",
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            });
+                            found = { id: created.id, nom: clientNom };
+                            cacheClients.push(found);
+                        } catch (_) {}
+                    }
+                    if (found?.id) patch.client_id = found.id;
+                }
+
+                // dossier_id / dossier_numero manquants
+                if (!data.dossier_id || !data.dossier_numero) {
+                    const dossier = findDossierByNamesForMigration(clientNom, defuntNom);
+                    if (dossier) {
+                        if (!data.dossier_id) patch.dossier_id = dossier.id;
+                        if (!data.dossier_numero) patch.dossier_numero = dossier.numero || dossier.id;
+                    }
+                }
+
+                // Lettrage manquant
+                if (data.total_paye === undefined) patch.total_paye = lettrage.totalPaye;
+                if (data.reste_a_payer === undefined) patch.reste_a_payer = lettrage.reste;
+                if (!data.date_dernier_paiement && lettrage.lastDate !== "-") patch.date_dernier_paiement = lettrage.lastDate;
+                if (!data.mode_paiement_principal && lettrage.mainMode !== "-") patch.mode_paiement_principal = lettrage.mainMode;
+
+                // Statut / dates facture manquants
+                if (!data.statut) {
+                    patch.statut = computeFactureStatut({
+                        ...data,
+                        finalType: type,
+                        finalTotal: total,
+                        finalPaiements: paiements
+                    });
+                }
+                if (type === "FACTURE") {
+                    if (!data.date_emission) {
+                        const d = (data.date || data.info?.date || data.date_creation || "").toString();
+                        patch.date_emission = d.includes("T") ? d.split("T")[0] : d;
+                    }
+                    if (!data.date_echeance) {
+                        const baseStr = patch.date_emission || data.date_emission || data.date || data.info?.date || "";
+                        if (baseStr) {
+                            try {
+                                const dt = new Date(baseStr);
+                                dt.setDate(dt.getDate() + 30);
+                                patch.date_echeance = dt.toISOString().split("T")[0];
+                            } catch (_) {}
+                        }
+                    }
+                }
+
+                if (Object.keys(patch).length) {
+                    try {
+                        await updateDoc(doc(db, "factures_v2", docSnap.id), patch);
+                        updated += 1;
+                    } catch (_) {
+                        errors += 1;
+                    }
+                } else {
+                    skipped += 1;
+                }
+            }
+
+            lastDoc = snap.docs[snap.docs.length - 1];
+            if (!lastDoc) break;
+        }
+
+        await window.chargerListeFactures(true);
+        const elapsed = Math.round((Date.now() - startTs) / 1000);
+        alert(`Migration terminée.\n\nScannés: ${scanned}\nMis à jour: ${updated}\nSans changement: ${skipped}\nErreurs: ${errors}\nDurée: ${elapsed}s`);
+    } catch (e) {
+        alert("Erreur migration: " + (e?.message || e));
+    }
+};
+
+function findDossierByClientName(name) {
+    const n = String(name || "").trim().toLowerCase();
+    if (!n) return null;
+    const matches = cacheDossiersAdmin.filter(d => String(d?.data?.mandant?.nom || "").trim().toLowerCase() === n);
+    if (matches.length === 0) return null;
+    if (matches.length === 1) return matches[0];
+    return chooseDossierFromMatches(matches, "client");
+}
+
+function findDossierByDefuntName(name) {
+    const n = String(name || "").trim().toLowerCase();
+    if (!n) return null;
+    const matches = cacheDossiersAdmin.filter(d => String(d?.data?.defunt?.nom || "").trim().toLowerCase() === n);
+    if (matches.length === 0) return null;
+    if (matches.length === 1) return matches[0];
+    return chooseDossierFromMatches(matches, "defunt");
+}
+
+function chooseDossierFromMatches(matches, contextLabel) {
+    const title = contextLabel === "defunt"
+        ? "Plusieurs dossiers trouvés pour ce défunt."
+        : "Plusieurs dossiers trouvés pour ce client.";
+    const lines = matches.slice(0, 8).map((d, i) => {
+        const date = d?.data?.date_creation ? new Date(d.data.date_creation).toLocaleDateString('fr-FR') : "-";
+        const dossierNum = d?.numero || d?.id || "-";
+        const mandant = d?.data?.mandant?.nom || "-";
+        const defunt = d?.data?.defunt?.nom || "-";
+        return `${i + 1}) ${dossierNum} | ${date} | Mandant: ${mandant} | Défunt: ${defunt}`;
+    });
+    const answer = window.prompt(`${title}\nChoisis un numéro:\n\n${lines.join("\n")}\n\n(Annuler = aucun choix)`, "1");
+    if (!answer) return null;
+    const idx = parseInt(answer, 10) - 1;
+    if (Number.isNaN(idx) || idx < 0 || idx >= Math.min(matches.length, 8)) return null;
+    return matches[idx];
+}
+
+async function chargerSuggestionsClients() {
+    try {
+        cacheClients = [];
+        const names = new Set();
+        const dlClients = document.getElementById('clients_suggestions');
+        const dlDefunts = document.getElementById('defunts_suggestions');
+        if (dlClients) dlClients.innerHTML = "";
+        if (dlDefunts) dlDefunts.innerHTML = "";
+
+        // 1) Référentiel clients (si présent)
+        try {
+            const cSnap = await getDocs(query(collection(db, "clients"), orderBy("nom")));
+            cSnap.forEach(docSnap => {
+                const data = docSnap.data();
+                const item = {
+                    id: docSnap.id,
+                    nom: data?.nom || "",
+                    adresse: data?.adresse || "",
+                    telephone: data?.telephone || "",
+                    email: data?.email || "",
+                    type: data?.type || "particulier",
+                    notes: data?.notes || ""
+                };
+                cacheClients.push(item);
+                if (item.nom) names.add(item.nom);
+            });
+        } catch (_) {
+            // collection clients pas encore déployée ou non accessible: on continue en fallback dossiers_admin
+        }
+
+        // 2) Fallback dossiers_admin
+        const q = query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc"));
+        const snap = await getDocs(q);
+        cacheDossiersAdmin = [];
+
+        snap.forEach(docSnap => {
+            const data = docSnap.data();
+            const item = {
+                id: docSnap.id,
+                numero: guessDossierNumero(data, docSnap.id),
+                data
+            };
+            cacheDossiersAdmin.push(item);
+
+            const mandantNom = data?.mandant?.nom;
+            const defuntNom = data?.defunt?.nom;
+            if (mandantNom) names.add(mandantNom);
+            if (defuntNom && dlDefunts) dlDefunts.innerHTML += `<option value="${defuntNom}">`;
+        });
+
+        if (dlClients) {
+            dlClients.innerHTML = Array.from(names).map(n => `<option value="${n}">`).join("");
+        }
+    } catch(e) {}
+}
+
+window.checkClientAuto = function() {
+    const val = document.getElementById('client_nom')?.value || "";
+    const foundClient = findClientByName(val);
+    if (foundClient) applyClientToForm(foundClient);
+    const dossier = findDossierByClientName(val);
+    if (dossier) applyDossierToForm(dossier);
+    else {
+        const client = cacheFactures.find(f => f.finalClient === val);
+        if(client) document.getElementById('client_adresse').value = client.client_adresse || client.client?.adresse || '';
+    }
+};
+
+window.checkDefuntAuto = function() {
+    const val = document.getElementById('defunt_nom')?.value || "";
+    const dossier = findDossierByDefuntName(val);
+    if (dossier) {
+        applyDossierToForm(dossier);
+        // si client vide, on propose le mandant du dossier
+        const clientNomEl = document.getElementById('client_nom');
+        if (clientNomEl && !clientNomEl.value) {
+            clientNomEl.value = dossier?.data?.mandant?.nom || "";
+            const foundClient = findClientByName(clientNomEl.value);
+            if (foundClient) applyClientToForm(foundClient);
+        }
+    }
+};
 
 // GESTION MODÈLES
 window.loadTemplate = function(type) { 
