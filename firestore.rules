@@ -130,6 +130,36 @@ service cloud.firestore {
     }
 
     // -------------------------------
+    // clients (référentiel)
+    // -------------------------------
+    function validClient() {
+      return onlyKeys([
+        'nom',
+        'adresse',
+        'telephone',
+        'email',
+        'type',
+        'notes',
+        'created_at',
+        'updated_at'
+      ])
+      && (!('nom' in request.resource.data) || isString(request.resource.data.nom))
+      && (!('adresse' in request.resource.data) || isString(request.resource.data.adresse))
+      && (!('telephone' in request.resource.data) || isString(request.resource.data.telephone))
+      && (!('email' in request.resource.data) || isString(request.resource.data.email))
+      && (!('type' in request.resource.data) || isString(request.resource.data.type))
+      && (!('notes' in request.resource.data) || isString(request.resource.data.notes))
+      && (!('created_at' in request.resource.data) || isString(request.resource.data.created_at))
+      && (!('updated_at' in request.resource.data) || isString(request.resource.data.updated_at));
+    }
+
+    match /clients/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && validClient();
+      allow delete: if isSignedIn();
+    }
+
+    // -------------------------------
     // depenses
     // -------------------------------
     function validDepense() {

@@ -38,6 +38,33 @@
             <button style="margin-top:24px; background:none; border:none; color:#9ca3af; cursor:pointer;" onclick="document.getElementById('modal-choix').classList.add('hidden')">Annuler</button>
         </div>
     </div>
+    <div id="modal-client-sheet" class="modal hidden">
+        <div style="background:white; padding:22px; border-radius:16px; width:min(900px, 96vw); max-height:90vh; overflow:auto; box-shadow:0 10px 30px rgba(0,0,0,0.18);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h3 style="margin:0; color:#111827;">Fiche Client</h3>
+                <button class="btn btn-grey" onclick="window.closeClientSheet()"><i class="fas fa-times"></i> Fermer</button>
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:12px;">
+                <input id="sheet_client_id" placeholder="ID client" readonly style="background:#f8fafc; border:1px dashed #cbd5e1;">
+                <input id="sheet_client_nom" placeholder="Nom client">
+                <select id="sheet_client_type"><option value="particulier">Particulier</option><option value="pro">Professionnel</option></select>
+                <input id="sheet_client_tel" placeholder="Téléphone">
+                <input id="sheet_client_email" placeholder="Email">
+                <input id="sheet_client_adresse" placeholder="Adresse">
+            </div>
+            <textarea id="sheet_client_notes" placeholder="Notes client" style="min-height:70px; margin-bottom:10px;"></textarea>
+            <div style="display:flex; gap:10px; margin-bottom:14px;">
+                <button class="btn btn-green" onclick="window.saveClientSheet()"><i class="fas fa-save"></i> Enregistrer fiche client</button>
+            </div>
+            <div class="card" style="padding:12px; margin:0;">
+                <h4 style="margin:0 0 8px 0;">Historique factures liées</h4>
+                <table class="compta-table">
+                    <thead><tr><th>Numéro</th><th>Date</th><th>Type</th><th>Statut</th><th style="text-align:right;">Total</th></tr></thead>
+                    <tbody id="sheet_client_history"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <nav class="sidebar">
         <div class="brand">
@@ -100,6 +127,7 @@
                         </div>
                         <button class="btn btn-grey" onclick="document.getElementById('fac-advanced-filters').classList.toggle('hidden')"><i class="fas fa-filter"></i> FILTRES</button>
                         <button class="btn btn-green" onclick="window.exportExcelSmart()"><i class="fas fa-file-excel"></i> EXPORT</button>
+                        <button class="btn btn-purple" onclick="window.runMigrationDouce()"><i class="fas fa-wrench"></i> MIGRATION DOUCE</button>
                     </div>
                     <button class="btn btn-blue" onclick="document.getElementById('modal-choix').classList.remove('hidden')">
                         <i class="fas fa-plus"></i> CRÉER
@@ -318,6 +346,10 @@
                         <select id="client_civility" style="width:80px; padding:10px; border-radius:8px; border:1px solid #e5e7eb;"><option>M.</option><option>Mme</option></select>
                         <input id="client_nom" list="clients_suggestions" onchange="window.checkClientAuto()" placeholder="Nom Prénom" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
+                    <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+                        <button class="btn btn-grey" type="button" onclick="window.openClientSheet()"><i class="fas fa-address-card"></i> FICHE CLIENT</button>
+                    </div>
+                    <input id="client_id" placeholder="ID client (auto)" readonly style="width:100%; padding:10px; border-radius:8px; border:1px dashed #cbd5e1; background:#f8fafc; margin-bottom:10px;">
                     <input id="client_adresse" placeholder="Adresse complète" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     <input id="client_info" placeholder="Téléphone ou lien de parenté (optionnel)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb; margin-top:10px;">
                 </div>
