@@ -216,7 +216,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--secondary); back
 .badge-statut-emis { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
 .badge-statut-brouillon { background: #f1f5f9; color: #334155; border-color: #e2e8f0; }
 .badge-statut-annule { background: #f3f4f6; color: #6b7280; border-color: #e5e7eb; }
-.badge-statut-avoir { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
 .echeance { font-weight: 700; color: #334155; }
 .echeance-retard { color: #b91c1c; background: #fee2e2; border: 1px solid #fecaca; padding: 3px 8px; border-radius: 999px; }
 .stock-alert { color: #dc2626; background-color: #fee2e2; padding: 2px 8px; border-radius: 4px; font-weight: bold; }

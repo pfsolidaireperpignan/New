@@ -349,7 +349,7 @@
                     <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
                         <button class="btn btn-grey" type="button" onclick="window.openClientSheet()"><i class="fas fa-address-card"></i> FICHE CLIENT</button>
                     </div>
-                    <input id="client_id" placeholder="ID client (auto)" readonly style="width:100%; padding:10px; border-radius:8px; border:1px dashed #cbd5e1; background:#f8fafc; margin-bottom:10px;">
+                    <input id="client_id" type="hidden" readonly>
                     <input id="client_adresse" placeholder="Adresse complète" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     <input id="client_info" placeholder="Téléphone ou lien de parenté (optionnel)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb; margin-top:10px;">
                 </div>
@@ -364,10 +364,8 @@
                         <input id="doc_statut" placeholder="Statut" readonly style="background:#f8fafc; font-weight:700; width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                         <input type="date" id="doc_echeance" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
-                    <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <input id="dossier_numero" placeholder="Numéro dossier (ex: DA-2026-001)" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb; width:100%;">
-                        <input id="dossier_id" placeholder="ID dossier (optionnel)" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb; width:100%;">
-                    </div>
+                    <input id="dossier_numero" type="hidden">
+                    <input id="dossier_id" type="hidden">
                     <input id="defunt_nom" list="defunts_suggestions" onchange="window.checkDefuntAuto()" placeholder="Concerne le défunt (Nom Prénom)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     
                     <div style="display:flex; gap:10px; margin-top:10px;">
