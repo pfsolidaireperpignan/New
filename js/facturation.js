@@ -1,5 +1,5 @@
 /* js/facturation.js - VERSION FINALE (COMPATIBLE ANCIENS & NOUVEAUX DOSSIERS) */
-import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit, startAfter, getDoc, auth } from "./config.js";
+import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, limit, startAfter, getDoc, auth } from "./config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // --- INFOS BANCAIRES ---
@@ -16,6 +16,7 @@ let lastFactureCursor = null;
 let hasMoreFactures = true;
 const FACTURES_PAGE_SIZE = 60;
 let currentDocSnapshot = null;
+let quickFilter = "ALL"; // ALL | EN_RETARD | PAYE | PARTIEL | EMIS | BROUILLON
 let global_CA = 0; 
 let global_Depenses = 0; 
 let logoBase64 = null; 
@@ -91,10 +92,51 @@ function updateLoadMoreButton() {
     else btn.classList.add('hidden');
 }
 
+function setEditorActionButtonsVisibility() {
+    const type = document.getElementById('doc_type')?.value;
+    const statut = String(document.getElementById('doc_statut')?.value || "").toUpperCase();
+    const hasId = Boolean(document.getElementById('current_doc_id')?.value);
+
+    const btnAnnuler = document.getElementById('btn-annuler-doc');
+    const btnAvoir = document.getElementById('btn-avoir-doc');
+    if (!btnAnnuler || !btnAvoir) return;
+
+    const canAnnuler = hasId && (type === "FACTURE" || type === "AVOIR") && statut !== "ANNULE";
+    const canAvoir = hasId && type === "FACTURE" && statut !== "ANNULE" && statut !== "AVOIR";
+
+    btnAnnuler.style.display = canAnnuler ? 'inline-flex' : 'none';
+    btnAvoir.style.display = canAvoir ? 'inline-flex' : 'none';
+}
+
+function summarizePaiements(list, total) {
+    const items = Array.isArray(list) ? list : [];
+    const totalPaye = items.reduce((s, p) => s + (parseFloat(p?.montant) || 0), 0);
+    const reste = (parseFloat(total) || 0) - totalPaye;
+
+    let lastDate = "";
+    items.forEach(p => {
+        const d = String(p?.date || "").trim();
+        if (d && (!lastDate || d > lastDate)) lastDate = d;
+    });
+
+    const modeCount = {};
+    items.forEach(p => {
+        const m = String(p?.mode || "").trim() || "Autre";
+        modeCount[m] = (modeCount[m] || 0) + 1;
+    });
+    let mainMode = "-";
+    let best = 0;
+    Object.keys(modeCount).forEach(k => {
+        if (modeCount[k] > best) { best = modeCount[k]; mainMode = k; }
+    });
+
+    return { totalPaye, reste, lastDate: lastDate || "-", mainMode };
+}
+
 window.chargerListeFactures = async function(reset = true) {
     const tbody = document.getElementById('list-body');
     if(!tbody) return;
-    if (reset) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center">Chargement...</td></tr>';
+    if (reset) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center">Chargement...</td></tr>';
     
     try {
         if (reset) {
@@ -110,7 +152,7 @@ window.chargerListeFactures = async function(reset = true) {
 
         if (snap.empty) {
             hasMoreFactures = false;
-            if (reset) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8;">Aucun document.</td></tr>';
+            if (reset) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#94a3b8;">Aucun document.</td></tr>';
             updateLoadMoreButton();
             return;
         }
@@ -128,8 +170,10 @@ window.chargerListeFactures = async function(reset = true) {
             d.finalTotal = parseFloat((d.total !== undefined) ? d.total : (d.info?.total || 0));
             d.finalClient = d.client_nom || d.client?.nom || "Inconnu";
             d.finalDefunt = d.defunt_nom || d.defunt?.nom || "";
+            d.finalDossierNumero = d.dossier_numero || "-";
             d.finalPaiements = d.paiements || [];
             d.finalStatut = computeFactureStatut(d);
+            d.finalEcheance = d.date_echeance || "";
             
             if(d.finalType === 'DEVIS' && !d.statut_doc) d.statut_doc = 'En cours';
             
@@ -147,6 +191,23 @@ window.chargerPlusFactures = async function() {
     await window.chargerListeFactures(false);
 };
 
+window.setQuickFilter = function(value) {
+    quickFilter = String(value || "ALL").toUpperCase();
+    document.querySelectorAll('.quick-filter').forEach(btn => btn.classList.remove('active'));
+    const map = {
+        ALL: 0,
+        EN_RETARD: 1,
+        PAYE: 2,
+        PARTIEL: 3,
+        EMIS: 4,
+        BROUILLON: 5
+    };
+    const idx = map[quickFilter];
+    const list = document.querySelectorAll('.quick-filter');
+    if (Number.isInteger(idx) && list[idx]) list[idx].classList.add('active');
+    window.filtrerFactures();
+};
+
 window.filtrerFactures = function() {
     const term = (document.getElementById('search-facture')?.value || "").toLowerCase();
     
@@ -157,11 +218,26 @@ window.filtrerFactures = function() {
 
     const tbody = document.getElementById('list-body'); tbody.innerHTML = "";
     
+    function isOverdue(d) {
+        const statut = String(d.finalStatut || "").toUpperCase();
+        if (statut === "PAYE" || statut === "ANNULE" || statut === "AVOIR") return false;
+        const e = d.finalEcheance || d.date_echeance || "";
+        if (!e) return false;
+        try {
+            const due = new Date(e);
+            const now = new Date();
+            now.setHours(0,0,0,0);
+            due.setHours(0,0,0,0);
+            return due < now;
+        } catch(_) { return false; }
+    }
+
     const results = cacheFactures.filter(d => {
         const numero = (d.finalNumero || "").toLowerCase();
         const client = (d.finalClient || "").toLowerCase();
         const defunt = (d.finalDefunt || "").toLowerCase();
-        const textMatch = numero.includes(term) || client.includes(term) || defunt.includes(term);
+        const dossierNumero = (d.finalDossierNumero || "").toLowerCase();
+        const textMatch = numero.includes(term) || client.includes(term) || defunt.includes(term) || dossierNumero.includes(term);
         const typeMatch = !fType || fType === "" || d.finalType === fType;
 
         let dateMatch = true;
@@ -189,12 +265,33 @@ window.filtrerFactures = function() {
             if (d.finalType === 'DEVIS' && d.statut_doc === "Sans suite") statutMatch = false;
         }
 
-        return textMatch && typeMatch && dateMatch && statutMatch;
+        let quickMatch = true;
+        if (quickFilter && quickFilter !== "ALL") {
+            if (quickFilter === "EN_RETARD") quickMatch = isOverdue(d);
+            else quickMatch = String(d.finalStatut || "").toUpperCase() === quickFilter;
+        }
+
+        return textMatch && typeMatch && dateMatch && statutMatch && quickMatch;
     });
     
     if(results.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8;">Aucun document trouvé.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#94a3b8;">Aucun document trouvé.</td></tr>';
         return;
+    }
+
+    function statutBadge(statut) {
+        const s = String(statut || "").toUpperCase();
+        if (s === "PAYE") return { cls: "badge-statut badge-statut-paye", label: "PAYÉ" };
+        if (s === "PARTIEL") return { cls: "badge-statut badge-statut-partiel", label: "PARTIEL" };
+        if (s === "EMIS") return { cls: "badge-statut badge-statut-emis", label: "ÉMIS" };
+        if (s === "ANNULE") return { cls: "badge-statut badge-statut-annule", label: "ANNULÉ" };
+        if (s === "AVOIR") return { cls: "badge-statut badge-statut-avoir", label: "AVOIR" };
+        return { cls: "badge-statut badge-statut-brouillon", label: "BROUILLON" };
+    }
+
+    function formatDateISOToFR(iso) {
+        if (!iso) return "-";
+        try { return new Date(iso).toLocaleDateString('fr-FR'); } catch(e) { return String(iso); }
     }
 
     results.forEach(d => {
@@ -229,12 +326,21 @@ window.filtrerFactures = function() {
             }
         }
 
+        const st = statutBadge(d.finalStatut);
+        const overdue = isOverdue(d);
+        const echeanceFR = formatDateISOToFR(d.finalEcheance);
+        const dossierLabel = d.finalDossierNumero || "-";
+
         const tr = document.createElement('tr');
         tr.style = rowStyle;
+        if (overdue) tr.style = (tr.style ? (tr.style + ";") : "") + "box-shadow: inset 4px 0 0 #ef4444;";
         tr.innerHTML = `
             <td class="link-doc" onclick="window.chargerDocument('${d.id}')" style="cursor:pointer; color:#3b82f6;"><strong>${escapeHtml(d.finalNumero)}</strong></td>
             <td>${dateAffiche}</td>
             <td><span class="badge ${badgeClass}">${escapeHtml(statutText)}</span></td>
+            <td><span class="${st.cls}">${escapeHtml(st.label)}</span></td>
+            <td><span class="${overdue ? 'echeance echeance-retard' : 'echeance'}">${escapeHtml(echeanceFR)}</span></td>
+            <td>${escapeHtml(dossierLabel)}</td>
             <td><strong>${escapeHtml(d.finalClient)}</strong></td>
             <td>${escapeHtml(d.finalDefunt)}</td>
             <td style="text-align:right;">${d.finalTotal.toFixed(2)} €</td>
@@ -242,7 +348,9 @@ window.filtrerFactures = function() {
             <td style="text-align:center; display:flex; justify-content:center; gap:5px;">
                 <button class="btn-icon" onclick="window.apercuDocument('${d.id}')" title="Aperçu PDF"><i class="fas fa-eye"></i></button>
                 ${classerBtn}
-                <button class="btn-icon" style="color:red;" onclick="window.supprimerDocument('${d.id}')" title="Supprimer"><i class="fas fa-trash"></i></button>
+                ${d.finalType === 'FACTURE' ? `<button class="btn-icon" style="color:#dc2626;" onclick="window.annulerDocumentById('${d.id}')" title="Annuler"><i class="fas fa-ban"></i></button>` : ``}
+                ${d.finalType === 'FACTURE' ? `<button class="btn-icon" style="color:#7c3aed;" onclick="window.creerAvoirById('${d.id}')" title="Créer un avoir"><i class="fas fa-receipt"></i></button>` : ``}
+                <button class="btn-icon" style="color:red;" onclick="window.supprimerDocument('${d.id}')" title="Supprimer (admin)"><i class="fas fa-trash"></i></button>
             </td>`;
         tbody.appendChild(tr);
     });
@@ -429,6 +537,8 @@ window.nouveauDocument = function() {
     document.getElementById('doc_type').value = "DEVIS";
     if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = "BROUILLON";
     if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = "";
+    if(document.getElementById('dossier_numero')) document.getElementById('dossier_numero').value = "";
+    if(document.getElementById('dossier_id')) document.getElementById('dossier_id').value = "";
     document.getElementById('tbody_lignes').innerHTML = "";
     paiements = [];
     window.renderPaiements();
@@ -436,6 +546,11 @@ window.nouveauDocument = function() {
     document.getElementById('btn-transform').style.display = 'none';
     document.getElementById('view-dashboard').classList.add('hidden');
     document.getElementById('view-editor').classList.remove('hidden');
+    const lastDateEl = document.getElementById('pay_last_date');
+    const mainModeEl = document.getElementById('pay_main_mode');
+    if (lastDateEl) lastDateEl.innerText = "-";
+    if (mainModeEl) mainModeEl.innerText = "-";
+    setEditorActionButtonsVisibility();
 };
 
 // CHARGEMENT DOCUMENT
@@ -460,6 +575,8 @@ window.chargerDocument = async (id) => {
         document.getElementById('defunt_date_deces').value = data.defunt_date_deces || data.defunt?.date_deces || "";
         if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = (data.statut || computeFactureStatut({ ...data, finalType: (data.type || data.info?.type), finalTotal: parseFloat(data.total || data.info?.total || 0), finalPaiements: (data.paiements || []) }) || "BROUILLON");
         if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = data.date_echeance || "";
+        if(document.getElementById('dossier_numero')) document.getElementById('dossier_numero').value = data.dossier_numero || "";
+        if(document.getElementById('dossier_id')) document.getElementById('dossier_id').value = data.dossier_id || "";
         
         document.getElementById('doc_type').value = data.type || data.info?.type; 
         document.getElementById('doc_date').value = data.date || data.info?.date; 
@@ -469,8 +586,14 @@ window.chargerDocument = async (id) => {
         
         paiements = data.paiements || []; 
         window.renderPaiements(); window.calculTotal(); 
+        const lettrage = summarizePaiements(paiements, parseFloat(data.total || data.info?.total || 0));
+        const lastDateEl = document.getElementById('pay_last_date');
+        const mainModeEl = document.getElementById('pay_main_mode');
+        if (lastDateEl) lastDateEl.innerText = lettrage.lastDate;
+        if (mainModeEl) mainModeEl.innerText = lettrage.mainMode;
         document.getElementById('btn-transform').style.display = (document.getElementById('doc_type').value === 'DEVIS') ? 'block' : 'none'; 
         document.getElementById('view-dashboard').classList.add('hidden'); document.getElementById('view-editor').classList.remove('hidden'); 
+        setEditorActionButtonsVisibility();
     } 
 };
 
@@ -497,7 +620,19 @@ window.ajouterSection = function(titre="SECTION") {
     document.getElementById('tbody_lignes').appendChild(tr); 
 };
 
-window.calculTotal = function() { let total = 0; document.querySelectorAll('.val-prix').forEach(i => total += parseFloat(i.value) || 0); document.getElementById('total_general').innerText = total.toFixed(2) + " €"; let paye = paiements.reduce((s, p) => s + parseFloat(p.montant), 0); document.getElementById('total_paye').innerText = paye.toFixed(2) + " €"; document.getElementById('reste_a_payer').innerText = (total - paye).toFixed(2) + " €"; document.getElementById('total_display').innerText = total.toFixed(2); };
+window.calculTotal = function() {
+    let total = 0;
+    document.querySelectorAll('.val-prix').forEach(i => total += parseFloat(i.value) || 0);
+    const lettrage = summarizePaiements(paiements, total);
+    document.getElementById('total_general').innerText = total.toFixed(2) + " €";
+    document.getElementById('total_paye').innerText = lettrage.totalPaye.toFixed(2) + " €";
+    document.getElementById('reste_a_payer').innerText = lettrage.reste.toFixed(2) + " €";
+    document.getElementById('total_display').innerText = total.toFixed(2);
+    const lastDateEl = document.getElementById('pay_last_date');
+    const mainModeEl = document.getElementById('pay_main_mode');
+    if (lastDateEl) lastDateEl.innerText = lettrage.lastDate;
+    if (mainModeEl) mainModeEl.innerText = lettrage.mainMode;
+};
 
 // SAUVEGARDE
 window.sauvegarderDocument = async function() { 
@@ -510,8 +645,9 @@ window.sauvegarderDocument = async function() {
     const docType = document.getElementById('doc_type').value;
     const docDate = document.getElementById('doc_date').value;
     const totalValue = parseFloat(document.getElementById('total_display').innerText);
-    const totalPayeCalc = paiements.reduce((sum, p) => sum + parseFloat(p.montant), 0);
-    const resteCalc = totalValue - totalPayeCalc;
+    const lettrage = summarizePaiements(paiements, totalValue);
+    const totalPayeCalc = lettrage.totalPaye;
+    const resteCalc = lettrage.reste;
     const existingStatut = String(currentDocSnapshot?.statut || "").trim().toUpperCase();
     let statut = existingStatut || (docType === 'FACTURE' ? 'EMIS' : 'BROUILLON');
     if (statut !== 'ANNULE' && statut !== 'AVOIR') {
@@ -538,32 +674,46 @@ window.sauvegarderDocument = async function() {
         type: docType, numero: document.getElementById('doc_numero').value, date: docDate, 
         client_nom: document.getElementById('client_nom').value, client_adresse: document.getElementById('client_adresse').value, client_civility: document.getElementById('client_civility').value,
         client_info: document.getElementById('client_info') ? document.getElementById('client_info').value : "",
+        dossier_numero: document.getElementById('dossier_numero') ? document.getElementById('dossier_numero').value : "",
+        dossier_id: document.getElementById('dossier_id') ? document.getElementById('dossier_id').value : "",
         defunt_nom: document.getElementById('defunt_nom').value, defunt_date_naiss: document.getElementById('defunt_date_naiss').value, defunt_date_deces: document.getElementById('defunt_date_deces').value,
         statut,
         date_emission: dateEmission,
         date_echeance: dateEcheance,
+        date_dernier_paiement: lettrage.lastDate === "-" ? "" : lettrage.lastDate,
+        mode_paiement_principal: lettrage.mainMode === "-" ? "" : lettrage.mainMode,
         total: totalValue, total_paye: totalPayeCalc, reste_a_payer: resteCalc,
         lignes: lignes, paiements: paiements, date_creation: new Date().toISOString(),
         statut_doc: document.getElementById('doc_type').value === 'DEVIS' ? 'En cours' : 'Validé'
     }; 
     const id = document.getElementById('current_doc_id').value; 
     try { 
+        if (!docData.numero || docData.numero === "Auto") {
+            const q = query(collection(db, "factures_v2")); 
+            const snap = await getDocs(q); 
+            let compteurType = 0;
+            snap.forEach(d => { 
+                const dType = d.data().type || d.data().info?.type;
+                if(dType === docData.type) compteurType++; 
+            });
+            const prefix = docData.type === 'DEVIS' ? 'D' : (docData.type === 'AVOIR' ? 'A' : 'F');
+            docData.numero = `${prefix}-${currentYear}-${String(compteurType + 1).padStart(3, '0')}`;
+        }
+
+        // Anti-doublon métier sur le numéro
+        const dupSnap = await getDocs(query(collection(db, "factures_v2"), where("numero", "==", docData.numero)));
+        if (!dupSnap.empty) {
+            const hasOther = dupSnap.docs.some(x => !id || x.id !== id);
+            if (hasOther) {
+                alert(`Numéro déjà utilisé : ${docData.numero}. Choisissez un autre numéro.`);
+                return;
+            }
+        }
+
         if(id) {
             await updateDoc(doc(db, "factures_v2", id), docData); 
         } 
         else { 
-            if(docData.numero === "" || docData.numero === "Auto") {
-                const q = query(collection(db, "factures_v2")); 
-                const snap = await getDocs(q); 
-                let compteurType = 0;
-                snap.forEach(d => { 
-                    // Compatibilité type
-                    const dType = d.data().type || d.data().info?.type;
-                    if(dType === docData.type) compteurType++; 
-                });
-                const prefix = docData.type === 'DEVIS' ? 'D' : 'F';
-                docData.numero = `${prefix}-${currentYear}-${String(compteurType + 1).padStart(3, '0')}`;
-            }
             await addDoc(collection(db, "factures_v2"), docData); 
         } 
         alert("✅ Enregistré !"); window.showDashboard(); 
@@ -580,15 +730,91 @@ window.transformerEnFacture = async function() { if(confirm("Créer une FACTURE 
     document.getElementById('doc_type').value = "FACTURE"; document.getElementById('doc_date').valueAsDate = new Date(); document.getElementById('current_doc_id').value = ""; document.getElementById('doc_numero').value = "Auto"; window.sauvegarderDocument(); 
 } };
 
+window.annulerDocumentById = async function(id) {
+    if(!confirm("Annuler ce document ? (Il ne sera pas supprimé)")) return;
+    try {
+        await updateDoc(doc(db, "factures_v2", id), {
+            statut: "ANNULE",
+            date_annulation: new Date().toISOString().split('T')[0]
+        });
+        window.chargerListeFactures(true);
+    } catch(e) { alert("Erreur : " + e.message); }
+};
+
+window.annulerDocument = async function() {
+    const id = document.getElementById('current_doc_id')?.value;
+    if(!id) return alert("Aucun document ouvert.");
+    await window.annulerDocumentById(id);
+    try { window.showDashboard(); } catch(_) {}
+};
+
+window.creerAvoirById = async function(id) {
+    if(!confirm("Créer un avoir à partir de cette facture ?")) return;
+    try {
+        const srcSnap = await getDoc(doc(db, "factures_v2", id));
+        if(!srcSnap.exists()) return alert("Facture introuvable.");
+        const src = srcSnap.data();
+        const today = new Date().toISOString().split('T')[0];
+
+        // Duplique les lignes en négatif (avoir)
+        const lignesSrc = Array.isArray(src.lignes) ? src.lignes : [];
+        const lignesAvoir = lignesSrc.map(l => {
+            if (l && l.type === 'section') return { ...l };
+            const prix = parseFloat(l?.prix) || 0;
+            return { ...l, prix: -Math.abs(prix) };
+        });
+
+        const totalSrc = parseFloat((src.total !== undefined) ? src.total : (src.info?.total || 0)) || 0;
+        const avoirData = {
+            type: "AVOIR",
+            numero: "Auto",
+            date: today,
+            client_nom: src.client_nom || src.client?.nom || "",
+            client_adresse: src.client_adresse || src.client?.adresse || "",
+            client_civility: src.client_civility || src.client?.civility || "M.",
+            client_info: src.client_info || src.client?.info || "",
+            dossier_numero: src.dossier_numero || "",
+            dossier_id: src.dossier_id || "",
+            defunt_nom: src.defunt_nom || src.defunt?.nom || "",
+            defunt_date_naiss: src.defunt_date_naiss || src.defunt?.naiss || "",
+            defunt_date_deces: src.defunt_date_deces || src.defunt?.deces || "",
+            statut: "AVOIR",
+            date_emission: today,
+            date_echeance: "",
+            date_dernier_paiement: "",
+            mode_paiement_principal: "",
+            total: -Math.abs(totalSrc),
+            total_paye: 0,
+            reste_a_payer: -Math.abs(totalSrc),
+            lignes: lignesAvoir,
+            paiements: [],
+            date_creation: new Date().toISOString(),
+            avoir_de: id,
+            statut_doc: "Validé"
+        };
+
+        const created = await addDoc(collection(db, "factures_v2"), avoirData);
+        alert("✅ Avoir créé.");
+        await window.chargerListeFactures(true);
+        await window.chargerDocument(created.id);
+        setEditorActionButtonsVisibility();
+    } catch(e) { alert("Erreur : " + e.message); }
+};
+
+window.creerAvoir = async function() {
+    const id = document.getElementById('current_doc_id')?.value;
+    if(!id) return alert("Aucun document ouvert.");
+    await window.creerAvoirById(id);
+};
+
 // EXPORT EXCEL
 window.exportExcelSmart = function() { 
     let csvContent = "data:text/csv;charset=utf-8,"; 
     if(!document.getElementById('tab-factures').classList.contains('hidden')) { 
-        csvContent += "Numero;Date;Type;Client;Defunt;Total TTC;Reste a Payer\n"; 
+        csvContent += "Numero;Date;Type;Statut;Dossier;Client;Defunt;Total TTC;Total Paye;Reste a Payer;Dernier Paiement;Mode Principal\n"; 
         cacheFactures.forEach(d => { 
-            const paye = d.finalPaiements.reduce((s, p) => s + parseFloat(p.montant), 0); 
-            const reste = (d.finalTotal - paye).toFixed(2); 
-            csvContent += `${d.finalNumero};${d.finalDate};${d.finalType};${d.finalClient};${d.finalDefunt};${d.finalTotal};${reste}\n`; 
+            const lt = summarizePaiements(d.finalPaiements || [], d.finalTotal || 0);
+            csvContent += `${d.finalNumero};${d.finalDate};${d.finalType};${d.finalStatut || ''};${d.finalDossierNumero || ''};${d.finalClient};${d.finalDefunt};${(d.finalTotal || 0).toFixed(2)};${lt.totalPaye.toFixed(2)};${lt.reste.toFixed(2)};${lt.lastDate};${lt.mainMode}\n`; 
         }); 
         const encodedUri = encodeURI(csvContent); 
         const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "export_ventes.csv"); 

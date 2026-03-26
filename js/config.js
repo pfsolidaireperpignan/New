@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 // AJOUT DE 'getDoc' DANS LA LIGNE CI-DESSOUS :
-import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, limit, startAfter, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, query, where, orderBy, limit, startAfter, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDmsIkTjW2IFkIks5BUAnxLLnc7pnj2e0w",
@@ -29,6 +29,6 @@ export {
     app,
     auth, db, collection, addDoc, getDocs, 
     getDoc,
-    query, orderBy, limit, startAfter, doc, updateDoc, deleteDoc, 
+    query, where, orderBy, limit, startAfter, doc, updateDoc, deleteDoc, 
     onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail 
 };
