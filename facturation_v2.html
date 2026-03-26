@@ -65,10 +65,37 @@
             </div>
         </div>
     </div>
+    <div id="modal-edit-depense" class="modal hidden">
+        <div style="background:white; padding:22px; border-radius:16px; width:min(900px, 96vw); max-height:90vh; overflow:auto; box-shadow:0 10px 30px rgba(0,0,0,0.18);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h3 style="margin:0; color:#111827;">Modifier la dépense</h3>
+                <button class="btn btn-grey" onclick="window.closeDepenseEditModal()"><i class="fas fa-times"></i> Fermer</button>
+            </div>
+            <input type="hidden" id="dep_modal_id">
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px;">
+                <div><label>Date Facture</label><input type="date" id="dep_modal_date"></div>
+                <div><label>Fournisseur</label><input id="dep_modal_fournisseur"></div>
+                <div><label>Réf. Pièce</label><input id="dep_modal_ref"></div>
+                <div><label>Montant TTC</label><input type="number" id="dep_modal_montant" step="0.01" oninput="window.calculerResteDepenseModal()"></div>
+                <div style="grid-column: span 2;"><label>Catégorie</label><select id="dep_modal_cat"></select></div>
+                <div style="grid-column: span 2;"><label>Détails / Note</label><input id="dep_modal_details"></div>
+                <div><label>Statut</label><select id="dep_modal_statut"></select></div>
+                <div><label>Moyen Paiement</label><select id="dep_modal_mode"></select></div>
+                <div><label>Date Règlement</label><input type="date" id="dep_modal_date_reglement"></div>
+                <div><label>Avance versée</label><input type="number" id="dep_modal_avance" step="0.01" oninput="window.calculerResteDepenseModal()"></div>
+                <div><label>Date avance payée</label><input type="date" id="dep_modal_date_avance"></div>
+                <div><label>Reste à payer</label><input type="number" id="dep_modal_reste" readonly style="background:#fff7ed; border:1px dashed #fca5a5; font-weight:700;"></div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+                <button class="btn btn-grey" onclick="window.closeDepenseEditModal()">Annuler</button>
+                <button class="btn btn-green" onclick="window.saveDepenseFromModal()"><i class="fas fa-save"></i> Enregistrer</button>
+            </div>
+        </div>
+    </div>
 
     <nav class="sidebar">
         <div class="brand">
-            <i class="fas fa-dove"></i> <span class="brand-text">PF ERP</span>
+            <img src="logo.png" alt="Logo" style="width:28px; height:28px; object-fit:contain;"> <span class="brand-text">PF ERP</span>
             <button id="btn-toggle-menu" onclick="window.toggleSidebar()"><i class="fas fa-bars"></i></button>
         </div>
         <ul class="nav-menu">
@@ -310,6 +337,7 @@
                             <div><label>Réf. Pièce</label><input id="dep_ref" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
                             <div><label>Montant TTC</label><input type="number" id="dep_montant" placeholder="0.00" step="0.01" oninput="window.calculerResteDepense()" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px; font-weight:bold;"></div>
                             <div><label>Avance versée</label><input type="number" id="dep_avance" placeholder="0.00" step="0.01" oninput="window.calculerResteDepense()" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
+                            <div><label>Date avance payée</label><input type="date" id="dep_date_avance" style="width:100%; padding:10px; border:1px solid #fecaca; border-radius:8px;"></div>
                             <div><label>Reste à payer</label><input type="number" id="dep_reste" readonly style="width:100%; padding:10px; border:1px dashed #fca5a5; border-radius:8px; background:#fff7ed; font-weight:700;"></div>
                             
                             <div style="grid-column: span 2;"><label>Catégorie</label>
@@ -449,15 +477,27 @@
 
     <script type="module" src="js/facturation.js"></script>
     <script>
+    const SIDEBAR_STORAGE_KEY = "pf_sidebar_collapsed";
+
+    function applySidebarState(collapsed) {
+        const sidebar = document.querySelector('.sidebar');
+        if (!sidebar) return;
+        sidebar.classList.toggle('collapsed', !!collapsed);
+    }
+
     window.toggleSidebar = function() {
         const sidebar = document.querySelector('.sidebar');
-        if (sidebar) {
-            sidebar.classList.toggle('collapsed');
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            const spans = sidebar.querySelectorAll('.brand-text, .nav-text');
-            spans.forEach(span => { span.style.display = isCollapsed ? 'none' : 'inline'; });
-        }
+        if (!sidebar) return;
+        const nextCollapsed = !sidebar.classList.contains('collapsed');
+        applySidebarState(nextCollapsed);
+        try { localStorage.setItem(SIDEBAR_STORAGE_KEY, nextCollapsed ? "1" : "0"); } catch (_) {}
     };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        let collapsed = false;
+        try { collapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1"; } catch (_) {}
+        applySidebarState(collapsed);
+    });
     </script> 
 </body>
 </html>

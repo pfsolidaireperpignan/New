@@ -163,20 +163,10 @@ service cloud.firestore {
     // depenses
     // -------------------------------
     function validDepense() {
-      return onlyKeys([
-        'date',
-        'reference',
-        'fournisseur',
-        'details',
-        'categorie',
-        'mode',
-        'statut',
-        'montant',
-            'date_reglement',
-            'avance_versee',
-            'reste_a_payer'
-      ])
-      && (!('date' in request.resource.data) || isString(request.resource.data.date))
+      // Rétro-compatible: on valide les types des champs connus
+      // sans bloquer un update si un ancien document contient
+      // des clés historiques non prévues.
+      return (!('date' in request.resource.data) || isString(request.resource.data.date))
       && (!('reference' in request.resource.data) || isString(request.resource.data.reference))
       && (!('fournisseur' in request.resource.data) || isString(request.resource.data.fournisseur))
       && (!('details' in request.resource.data) || isString(request.resource.data.details))
@@ -186,6 +176,7 @@ service cloud.firestore {
       && (!('montant' in request.resource.data) || isNumber(request.resource.data.montant))
           && (!('date_reglement' in request.resource.data) || isString(request.resource.data.date_reglement))
           && (!('avance_versee' in request.resource.data) || isNumber(request.resource.data.avance_versee))
+          && (!('date_avance' in request.resource.data) || isString(request.resource.data.date_avance))
           && (!('reste_a_payer' in request.resource.data) || isNumber(request.resource.data.reste_a_payer));
     }
 
