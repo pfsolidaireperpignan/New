@@ -366,6 +366,13 @@
                     <thead><tr><th>Date</th><th>Défunt</th><th>Mandant</th><th>Opération</th><th style="text-align:center;">Actions</th></tr></thead>
                     <tbody id="dossiers-admin-table-body"></tbody>
                 </table>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-top:1px solid #e2e8f0; background:#f8fafc;">
+                    <div id="admin-dossiers-range" style="color:#334155; font-weight:700; font-size:13px;">Affichage : 0-0 sur 0</div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-grey" id="btn-admin-prev" onclick="window.adminDossiersPrevPage()"><i class="fas fa-chevron-left"></i> Précédent</button>
+                        <button class="btn btn-grey" id="btn-admin-next" onclick="window.adminDossiersNextPage()">Suivant <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
             </div>
             </div>
 
