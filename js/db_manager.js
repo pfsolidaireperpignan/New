@@ -7,6 +7,8 @@ let importCache = [];
 let dossiersCache = []; // dossiers_admin
 let clientsRefCache = []; // collection clients
 let selectedClientRef = null;
+let clientsPage = 1;
+const CLIENTS_PAGE_SIZE = 20;
 const escapeHtml = (value) => String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -20,16 +22,40 @@ const truncateText = (value, max = 48) => {
     return s.slice(0, max - 1) + "…";
 };
 
+function updateClientsPager(totalFiltered) {
+    const total = Math.max(0, parseInt(totalFiltered || 0, 10) || 0);
+    const maxPage = Math.max(1, Math.ceil(total / CLIENTS_PAGE_SIZE));
+    if (clientsPage > maxPage) clientsPage = maxPage;
+    if (clientsPage < 1) clientsPage = 1;
+
+    const start = total === 0 ? 0 : ((clientsPage - 1) * CLIENTS_PAGE_SIZE + 1);
+    const end = total === 0 ? 0 : Math.min(total, clientsPage * CLIENTS_PAGE_SIZE);
+
+    const rangeEl = document.getElementById('base-clients-range');
+    if (rangeEl) rangeEl.textContent = `Affichage : ${start}-${end} sur ${total}`;
+
+    const prevBtn = document.getElementById('btn-clients-prev');
+    const nextBtn = document.getElementById('btn-clients-next');
+    if (prevBtn) prevBtn.disabled = clientsPage <= 1;
+    if (nextBtn) nextBtn.disabled = clientsPage >= maxPage;
+}
+
 function renderClientsRefRows(refBody, rows) {
     if (!refBody) return;
     if (!rows || !rows.length) {
         refBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#94a3b8;">Aucune fiche client.</td></tr>';
+        updateClientsPager(0);
         return;
     }
+    updateClientsPager(rows.length);
+    const startIdx = (clientsPage - 1) * CLIENTS_PAGE_SIZE;
+    const pageRows = rows.slice(startIdx, startIdx + CLIENTS_PAGE_SIZE);
     refBody.innerHTML = "";
-    rows.forEach(c => {
+    pageRows.forEach((c, i) => {
+        const position = startIdx + i + 1;
         const tr = document.createElement('tr');
         tr.innerHTML = `
+            <td style="color:#64748b; font-weight:700;">${position}</td>
             <td><strong>${escapeHtml(c.nom || '-')}</strong></td>
             <td>${escapeHtml(c.telephone || '-')}</td>
             <td>${escapeHtml(c.email || '-')}</td>
@@ -551,6 +577,7 @@ export async function chargerBaseClients() {
             const cSnap = await getDocs(cQ);
             clientsRefCache = [];
             cSnap.forEach(docSnap => clientsRefCache.push({ id: docSnap.id, ...(docSnap.data() || {}) }));
+            clientsPage = 1;
             renderClientsRefRows(refBody, clientsRefCache);
         } catch (e) {
             try {
@@ -558,6 +585,7 @@ export async function chargerBaseClients() {
                 clientsRefCache = [];
                 fallbackSnap.forEach(docSnap => clientsRefCache.push({ id: docSnap.id, ...(docSnap.data() || {}) }));
                 clientsRefCache.sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), 'fr'));
+                clientsPage = 1;
                 renderClientsRefRows(refBody, clientsRefCache);
             } catch (e2) {
                 console.error("Erreur chargement collection clients:", e2);
@@ -579,7 +607,26 @@ export function filtrerBaseClients() {
         const txt = `${c.id || ""} ${c.nom || ""} ${c.telephone || ""} ${c.email || ""} ${c.type || ""} ${c.adresse || ""} ${c.notes || ""}`.toLowerCase();
         return txt.includes(term);
     });
+    clientsPage = 1;
     renderClientsRefRows(refBody, resultats);
+}
+
+export function baseClientsNextPage() {
+    clientsPage += 1;
+    renderClientsRefRows(document.getElementById('clients-ref-table-body'), clientsRefCache.filter(c => {
+        const term = (document.getElementById('search-client')?.value || "").toLowerCase();
+        const txt = `${c.id || ""} ${c.nom || ""} ${c.telephone || ""} ${c.email || ""} ${c.type || ""} ${c.adresse || ""} ${c.notes || ""}`.toLowerCase();
+        return txt.includes(term);
+    }));
+}
+
+export function baseClientsPrevPage() {
+    clientsPage -= 1;
+    renderClientsRefRows(document.getElementById('clients-ref-table-body'), clientsRefCache.filter(c => {
+        const term = (document.getElementById('search-client')?.value || "").toLowerCase();
+        const txt = `${c.id || ""} ${c.nom || ""} ${c.telephone || ""} ${c.email || ""} ${c.type || ""} ${c.adresse || ""} ${c.notes || ""}`.toLowerCase();
+        return txt.includes(term);
+    }));
 }
 
 // --- 2. DOSSIERS ADMIN (liste déplacée depuis Base Clients) ---
