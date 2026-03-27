@@ -285,8 +285,12 @@ window.startNewPrestationFromClient = async function(clientId, clientObj) {
     window.nouveauDossier();
     const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
     setVal('soussigne', window.prefillClientContext.nom);
+    setVal('mandant_prenom', "");
     setVal('tel_mandant', window.prefillClientContext.tel);
     setVal('demeurant', window.prefillClientContext.adresse);
+    const chkPayeur = document.getElementById('payeur_different');
+    if (chkPayeur) chkPayeur.checked = false;
+    if (window.togglePayeurSection) window.togglePayeurSection();
 };
 window.viderFormulaire = function() {
     window.currentDossierId = null;
@@ -357,6 +361,13 @@ window.toggleSections = function() {
 window.toggleVol2 = function() { const chk = document.getElementById('check_vol2'); const bloc = document.getElementById('bloc_vol2'); if(chk && bloc) { chk.checked ? bloc.classList.remove('hidden') : bloc.classList.add('hidden'); } };
 window.togglePolice = function() { const select = document.getElementById('type_presence_select'); const bP = document.getElementById('police_fields'); const bF = document.getElementById('famille_fields'); if(!select) return; if(select.value === 'police') { bP.classList.remove('hidden'); bF.classList.add('hidden'); } else { bP.classList.add('hidden'); bF.classList.remove('hidden'); } };
 window.copierMandant = function() { const chk = document.getElementById('copy_mandant'); if(chk && chk.checked) { document.getElementById('f_nom_prenom').value = document.getElementById('soussigne').value; document.getElementById('f_lien').value = document.getElementById('lien').value; } };
+window.togglePayeurSection = function() {
+    const chk = document.getElementById('payeur_different');
+    const bloc = document.getElementById('bloc_payeur_different');
+    if (!chk || !bloc) return;
+    if (chk.checked) bloc.classList.remove('hidden');
+    else bloc.classList.add('hidden');
+};
 window.showSection = function(id) { document.querySelectorAll('.main-content > div').forEach(div => { if(div.id.startsWith('view-')) div.classList.add('hidden'); }); const target = document.getElementById('view-' + id); if(target) target.classList.remove('hidden'); if(id === 'base') { DB.showBaseClientListView(); DB.chargerBaseClients(); } if(id === 'stock') DB.chargerStock(); if(id === 'admin') { window.showAdminListView(); DB.chargerDossiersAdminList(); DB.chargerSelectImport(); } };
 window.switchAdminTab = function(tabName) {
     ['identite', 'technique', 'protocole'].forEach((name) => {
@@ -447,8 +458,7 @@ window.sauvegarderDossier = async function() {
                 lieu_naiss: getVal('lieu_naiss'), nationalite: getVal('nationalite'),
                 adresse: getVal('adresse_fr'), pere: getVal('pere'), mere: getVal('mere'), situation: getVal('matrimoniale'), conjoint: getVal('conjoint'), profession: getVal('profession_libelle') 
             },
-            mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), lien: getVal('lien'), telephone: getVal('tel_mandant'), adresse: getVal('demeurant') },
-            signataire: { nom: getVal('signataire_nom'), telephone: getVal('signataire_tel'), lien: getVal('signataire_lien'), adresse: getVal('signataire_adresse') },
+            mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), prenom: getVal('mandant_prenom'), lien: getVal('lien'), telephone: getVal('tel_mandant'), adresse: getVal('demeurant') },
             technique: { type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'), cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'), heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'), date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat') },
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), av_date_dep: getVal('av_date_dep'), av_heure_dep: getVal('av_heure_dep'), av_date_arr: getVal('av_date_arr'), av_heure_arr: getVal('av_heure_arr'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), ap_date_dep: getVal('ap_date_dep'), ap_heure_dep: getVal('ap_heure_dep'), ap_date_arr: getVal('ap_date_arr'), ap_heure_arr: getVal('ap_heure_arr'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta'), vol1_num: getVal('vol1_num'), vol1_dep_aero: getVal('vol1_dep_aero'), vol1_arr_aero: getVal('vol1_arr_aero'), vol1_dep_time: getVal('vol1_dep_time'), vol1_arr_time: getVal('vol1_arr_time'), vol2_num: getVal('vol2_num'), vol2_dep_aero: getVal('vol2_dep_aero'), vol2_arr_aero: getVal('vol2_arr_aero'), vol2_dep_time: getVal('vol2_dep_time'), vol2_arr_time: getVal('vol2_arr_time'), rap_immat: getVal('rap_immat'), rap_date_dep_route: getVal('rap_date_dep_route'), rap_ville_dep: getVal('rap_ville_dep'), rap_ville_arr: getVal('rap_ville_arr'), attest_trajet_depart: getVal('attest_trajet_depart'), attest_trajet_arrivee: getVal('attest_trajet_arrivee'), attest_cercueil_option: document.querySelector('input[name="attest_cercueil_option"]:checked')?.value || 'funisorb' },
             protocole: {
@@ -458,25 +468,48 @@ window.sauvegarderDossier = async function() {
                 columbarium: getVal('proto_columbarium'), instructions: getVal('proto_instructions'), planning_dyn: planningData 
             }
         };
-        // Liaisons automatiques client/signataire (IDs invisibles, back-end only)
+        const payeurDifferent = getChk('payeur_different');
+        const payeurData = payeurDifferent
+            ? {
+                nom: getVal('payeur_nom'),
+                telephone: getVal('payeur_tel'),
+                adresse: getVal('payeur_adresse'),
+                email: getVal('payeur_email')
+            }
+            : {
+                nom: data.mandant?.nom,
+                telephone: data.mandant?.telephone,
+                adresse: data.mandant?.adresse,
+                email: ""
+            };
+        data.payeur = { different: payeurDifferent, ...payeurData };
+
+        // Liaisons automatiques invisibles: signataire = mandant (toujours)
         const linkedMandant = await ensureClientRecordFromPerson({
             nom: data.mandant?.nom,
             telephone: data.mandant?.telephone,
             adresse: data.mandant?.adresse,
             type: "particulier"
-        }, "payeur");
-        const linkedSignataire = await ensureClientRecordFromPerson({
-            nom: data.signataire?.nom,
-            telephone: data.signataire?.telephone,
-            adresse: data.signataire?.adresse,
-            type: "particulier"
         }, "signataire");
+        const linkedPayeur = payeurDifferent
+            ? await ensureClientRecordFromPerson({
+                nom: payeurData.nom,
+                telephone: payeurData.telephone,
+                adresse: payeurData.adresse,
+                type: "particulier"
+            }, "payeur")
+            : linkedMandant;
+
         data.details_op = {
             ...(data.details_op || {}),
-            client_id: linkedMandant?.id || window.prefillClientContext?.id || "",
-            client_nom: linkedMandant?.nom || data.mandant?.nom || window.prefillClientContext?.nom || "",
-            signataire_client_id: linkedSignataire?.id || "",
-            signataire_client_nom: linkedSignataire?.nom || data.signataire?.nom || ""
+            // Client facturation = payeur
+            client_id: linkedPayeur?.id || window.prefillClientContext?.id || "",
+            client_nom: linkedPayeur?.nom || payeurData.nom || window.prefillClientContext?.nom || "",
+            // Signataire pouvoir = mandant
+            signataire_client_id: linkedMandant?.id || "",
+            signataire_client_nom: linkedMandant?.nom || data.mandant?.nom || "",
+            payeur_client_id: linkedPayeur?.id || "",
+            payeur_client_nom: linkedPayeur?.nom || payeurData.nom || ""
         };
         let finalId = idDossier;
         if(idDossier) { await updateDoc(doc(db, "dossiers_admin", idDossier), data); } 
@@ -564,8 +597,13 @@ window.chargerDossier = async function(id) {
             set('lieu_naiss', data.defunt.lieu_naiss); set('nationalite', data.defunt.nationalite);
             set('adresse_fr', data.defunt.adresse); set('pere', data.defunt.pere); set('mere', data.defunt.mere); set('matrimoniale', data.defunt.situation); set('conjoint', data.defunt.conjoint); set('profession_libelle', data.defunt.profession); 
         }
-        if (data.mandant) { set('civilite_mandant', data.mandant.civility); set('soussigne', data.mandant.nom); set('lien', data.mandant.lien); set('tel_mandant', data.mandant.telephone); set('demeurant', data.mandant.adresse); }
-        if (data.signataire) { set('signataire_nom', data.signataire.nom); set('signataire_tel', data.signataire.telephone); set('signataire_lien', data.signataire.lien); set('signataire_adresse', data.signataire.adresse); }
+        if (data.mandant) { set('civilite_mandant', data.mandant.civility); set('soussigne', data.mandant.nom); set('mandant_prenom', data.mandant.prenom); set('lien', data.mandant.lien); set('tel_mandant', data.mandant.telephone); set('demeurant', data.mandant.adresse); }
+        setChk('payeur_different', !!data?.payeur?.different);
+        set('payeur_nom', data?.payeur?.nom || "");
+        set('payeur_tel', data?.payeur?.telephone || "");
+        set('payeur_email', data?.payeur?.email || "");
+        set('payeur_adresse', data?.payeur?.adresse || "");
+        if(window.togglePayeurSection) window.togglePayeurSection();
         if (data.technique) { const op = data.technique.type_operation || 'Inhumation'; set('prestation', op); set('lieu_mise_biere', data.technique.lieu_mise_biere); set('date_fermeture', data.technique.date_fermeture); set('cimetiere_nom', data.technique.cimetiere); set('crematorium_nom', data.technique.crematorium); set('num_concession', data.technique.num_concession); set('faita', data.technique.faita); set('dateSignature', data.technique.date_signature); set('p_nom_grade', data.technique.police_nom); set('p_commissariat', data.technique.police_commissariat); if (op === 'Inhumation') { set('date_inhumation', data.technique.date_ceremonie); set('heure_inhumation', data.technique.heure_ceremonie); } else if (op === 'Crémation') { set('date_cremation', data.technique.date_ceremonie); set('heure_cremation', data.technique.heure_ceremonie); } }
         if (data.transport) { set('av_lieu_depart', data.transport.av_dep); set('av_lieu_arrivee', data.transport.av_arr); set('av_date_dep', data.transport.av_date_dep); set('av_heure_dep', data.transport.av_heure_dep); set('av_date_arr', data.transport.av_date_arr); set('av_heure_arr', data.transport.av_heure_arr); set('ap_lieu_depart', data.transport.ap_dep); set('ap_lieu_arrivee', data.transport.ap_arr); set('ap_date_dep', data.transport.ap_date_dep); set('ap_heure_dep', data.transport.ap_heure_dep); set('ap_date_arr', data.transport.ap_date_arr); set('ap_heure_arr', data.transport.ap_heure_arr); set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta); set('vol1_num', data.transport.vol1_num); set('vol1_dep_aero', data.transport.vol1_dep_aero); set('vol1_arr_aero', data.transport.vol1_arr_aero); set('vol1_dep_time', data.transport.vol1_dep_time); set('vol1_arr_time', data.transport.vol1_arr_time); set('vol2_num', data.transport.vol2_num); set('vol2_dep_aero', data.transport.vol2_dep_aero); set('vol2_arr_aero', data.transport.vol2_arr_aero); set('vol2_dep_time', data.transport.vol2_dep_time); set('vol2_arr_time', data.transport.vol2_arr_time); set('rap_immat', data.transport.rap_immat); set('rap_date_dep_route', data.transport.rap_date_dep_route); set('rap_ville_dep', data.transport.rap_ville_dep); set('rap_ville_arr', data.transport.rap_ville_arr); set('attest_trajet_depart', data.transport.attest_trajet_depart); set('attest_trajet_arrivee', data.transport.attest_trajet_arrivee); const aco = data.transport.attest_cercueil_option || 'funisorb'; document.querySelectorAll('input[name="attest_cercueil_option"]').forEach((r) => { r.checked = r.value === aco; }); }
         

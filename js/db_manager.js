@@ -171,6 +171,8 @@ async function renderClientPrestations(clientObj) {
         if (clientId) {
             const s1 = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.client_id", "==", clientId), limit(300)));
             s1.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
+            const s1p = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.payeur_client_id", "==", clientId), limit(300)));
+            s1p.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
             const s1b = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.signataire_client_id", "==", clientId), limit(300)));
             s1b.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
         }
@@ -187,6 +189,8 @@ async function renderClientPrestations(clientObj) {
         try {
             const s3 = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.client_nom", "==", clientNom), limit(300)));
             s3.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
+            const s3p = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.payeur_client_nom", "==", clientNom), limit(300)));
+            s3p.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
         } catch (_) {}
     }
 
@@ -250,7 +254,7 @@ async function renderClientPrestations(clientObj) {
         const prestation = d?.technique?.type_operation || "Dossier";
         const defunt = `${d?.defunt?.nom || ""} ${d?.defunt?.prenom || ""}`.trim() || "-";
         const dte = formatIsoDate(d?.date_creation || d?.date_modification || "");
-        const isPayeur = String(d?.details_op?.client_id || "") === String(clientObj?.id || "") || normalizeText(d?.mandant?.nom || "") === normalizeText(clientObj?.nom || "");
+        const isPayeur = String(d?.details_op?.payeur_client_id || d?.details_op?.client_id || "") === String(clientObj?.id || "") || normalizeText(d?.payeur?.nom || d?.mandant?.nom || "") === normalizeText(clientObj?.nom || "");
         const isSignataire = String(d?.details_op?.signataire_client_id || "") === String(clientObj?.id || "") || normalizeText(d?.signataire?.nom || "") === normalizeText(clientObj?.nom || "");
         const role = isPayeur && isSignataire ? "Payeur + Signataire" : (isPayeur ? "Payeur/Demandeur" : (isSignataire ? "Signataire pouvoir" : "Lié"));
         const tr = document.createElement('tr');
@@ -661,9 +665,11 @@ export async function sauvegarderDossier() {
 export function viderFormulaire() {
     document.getElementById('dossier_id').value = "";
     document.querySelectorAll('#view-admin input').forEach(i => i.value = "");
+    document.querySelectorAll('#view-admin input[type="checkbox"]').forEach(i => i.checked = false);
     setVal('faita', 'PERPIGNAN'); setVal('immatriculation', 'DA-081-ZQ');
     document.getElementById('liste_pieces_jointes').innerHTML = '<div style="color:#94a3b8; font-style:italic;">Aucun document joint.</div>';
     if(window.toggleSections) window.toggleSections();
+    if(window.togglePayeurSection) window.togglePayeurSection();
 }
 
 export async function chargerDossier(id) {
