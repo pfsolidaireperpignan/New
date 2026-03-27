@@ -176,8 +176,8 @@ window.refreshPilotageFinancier = function() {
         const docDate = d.finalDate || d.date_creation || "";
         const inDocPeriod = dateInPeriod(docDate, year, month);
         const total = parseFloat(d.finalTotal || 0) || 0;
-        const totalPaye = (d.finalPaiements || []).reduce((s, p) => s + (parseFloat(p?.montant) || 0), 0);
-        const reste = Math.max(0, total - totalPaye);
+        const totalVerse = (d.finalPaiements || []).reduce((s, p) => s + (parseFloat(p?.montant) || 0), 0);
+        const reste = Math.max(0, total - totalVerse);
 
         if (inDocPeriod) {
             caFacture += total;
@@ -185,6 +185,7 @@ window.refreshPilotageFinancier = function() {
         }
 
         (d.finalPaiements || []).forEach(p => {
+            if (p?.liberation) return;
             if (dateInPeriod(p?.date || "", year, month)) {
                 caEncaisse += (parseFloat(p?.montant) || 0);
             }
@@ -386,10 +387,27 @@ async function uploadPaymentReceipt(file, numeroDoc = "DOC") {
     return { url, path: filePath };
 }
 
+async function uploadDepenseJustificatif(file, depenseId = "dep") {
+    if (!file) return { url: "", path: "" };
+    const ct = String(file.type || "").toLowerCase();
+    const isAllowed = ct.startsWith("image/") || ct === "application/pdf";
+    if (!isAllowed) throw new Error("Format justificatif non supporté (image/PDF).");
+    if (file.size > 10 * 1024 * 1024) throw new Error("Fichier trop volumineux (max 10 Mo).");
+    const safeName = String(file.name || "justificatif").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const idSafe = String(depenseId || "dep").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filePath = `ged_files/depense_${idSafe}_${Date.now()}_${safeName}`;
+    const fileRef = ref(storage, filePath);
+    await uploadBytes(fileRef, file, { contentType: ct || "application/octet-stream" });
+    const url = await getDownloadURL(fileRef);
+    return { url, path: filePath };
+}
+
 function summarizePaiements(list, total) {
     const items = Array.isArray(list) ? list : [];
-    const totalPaye = items.reduce((s, p) => s + (parseFloat(p?.montant) || 0), 0);
-    const reste = (parseFloat(total) || 0) - totalPaye;
+    const totalPourSolde = items.reduce((s, p) => s + (parseFloat(p?.montant) || 0), 0);
+    const encaisseReel = items.reduce((s, p) => s + (p?.liberation ? 0 : (parseFloat(p?.montant) || 0)), 0);
+    const liberationsMontant = items.reduce((s, p) => s + (p?.liberation ? (parseFloat(p?.montant) || 0) : 0), 0);
+    const reste = (parseFloat(total) || 0) - totalPourSolde;
 
     let lastDate = "";
     items.forEach(p => {
@@ -399,6 +417,7 @@ function summarizePaiements(list, total) {
 
     const modeCount = {};
     items.forEach(p => {
+        if (p?.liberation) return;
         const m = String(p?.mode || "").trim() || "Autre";
         modeCount[m] = (modeCount[m] || 0) + 1;
     });
@@ -408,7 +427,14 @@ function summarizePaiements(list, total) {
         if (modeCount[k] > best) { best = modeCount[k]; mainMode = k; }
     });
 
-    return { totalPaye, reste, lastDate: lastDate || "-", mainMode };
+    return {
+        totalPaye: totalPourSolde,
+        encaisseReel,
+        liberationsMontant,
+        reste,
+        lastDate: lastDate || "-",
+        mainMode
+    };
 }
 
 window.chargerListeFactures = async function(reset = true) {
@@ -507,6 +533,7 @@ window.filtrerFactures = function() {
     const tbody = document.getElementById('list-body'); tbody.innerHTML = "";
     
     function isOverdue(d) {
+        if (String(d.finalType || "").toUpperCase() === "DEVIS") return false;
         const statut = String(d.finalStatut || "").toUpperCase();
         if (statut === "PAYE" || statut === "ANNULE") return false;
         const e = d.finalEcheance || d.date_echeance || "";
@@ -620,11 +647,12 @@ window.filtrerFactures = function() {
     pageRows.forEach(d => {
         const paye = d.finalPaiements.reduce((s, p) => s + parseFloat(p.montant), 0);
         const reste = d.finalTotal - paye;
+        const isDevis = d.finalType === 'DEVIS';
         let dateAffiche = "-";
         try { dateAffiche = new Date(d.finalDate).toLocaleDateString(); } catch(e){}
         
         let badgeClass = d.finalType === 'FACTURE' ? 'badge-facture' : 'badge-devis';
-        let statusColor = reste > 0.1 ? '#ef4444' : '#10b981'; 
+        let statusColor = isDevis ? '#94a3b8' : (reste > 0.1 ? '#ef4444' : '#10b981'); 
         
         let rowStyle = "";
         let classerBtn = "";
@@ -666,7 +694,7 @@ window.filtrerFactures = function() {
             <td><strong>${escapeHtml(d.finalClient)}</strong></td>
             <td>${escapeHtml(d.finalDefunt)}</td>
             <td style="text-align:right;">${d.finalTotal.toFixed(2)} €</td>
-            <td style="text-align:right; font-weight:bold; color:${statusColor};">${reste.toFixed(2)} €</td>
+            <td style="text-align:right; font-weight:600; color:${statusColor};" title="${isDevis ? 'Devis : pas de créance comptable tant que la facture n\'est pas émise.' : ''}">${isDevis ? "—" : `${reste.toFixed(2)} €`}</td>
             <td style="text-align:center; display:flex; justify-content:center; gap:5px;">
                 <button class="btn-icon" onclick="window.apercuDocument('${d.id}')" title="Aperçu PDF"><i class="fas fa-eye"></i></button>
                 ${classerBtn}
@@ -841,7 +869,7 @@ window.filtrerDepenses = function() {
         tr.innerHTML = `
             <td><span style="font-weight:600;">${new Date(d.date).toLocaleDateString()}</span>${dateRegleHtml}</td>
             <td><strong>${escapeHtml(d.fournisseur)}</strong>${detailsHtml}<br><small style="color:#d97706; font-size:0.75rem;">${escapeHtml(d.categorie)}</small></td>
-            <td>${escapeHtml(d.reference||'-')}</td>
+            <td>${escapeHtml(d.reference||'-')}${d.justificatif_url ? ` <a href="${escapeHtml(d.justificatif_url)}" target="_blank" rel="noopener" title="Voir le justificatif" onclick="event.stopPropagation();" style="color:#0f766e;"><i class="fas fa-paperclip"></i></a>` : ""}</td>
             <td>${badge}</td>
             <td style="text-align:right;">-${montant.toFixed(2)} €</td>
             <td style="text-align:right; color:#0f766e; font-weight:700;">${avance > 0 ? `-${avance.toFixed(2)} €${avanceDateTxt}` : '-'}</td>
@@ -907,7 +935,31 @@ window.preparerModification = function(id) {
 };
 window.closeDepenseEditModal = function() {
     document.getElementById('modal-edit-depense')?.classList.add('hidden');
+    const jf = document.getElementById('dep_modal_justif');
+    if (jf) jf.value = "";
 };
+
+function renderDepModalJustifZone(d) {
+    const fileIn = document.getElementById('dep_modal_justif');
+    const st = document.getElementById('dep_modal_justif_status');
+    if (fileIn) fileIn.value = "";
+    const uEl = document.getElementById('dep_modal_justif_url');
+    const pEl = document.getElementById('dep_modal_justif_path');
+    const nEl = document.getElementById('dep_modal_justif_nom');
+    const url = d.justificatif_url || "";
+    const path = d.justificatif_path || "";
+    const nom = d.justificatif_nom || "";
+    if (uEl) uEl.value = url;
+    if (pEl) pEl.value = path;
+    if (nEl) nEl.value = nom;
+    if (!st) return;
+    if (url) {
+        st.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="color:#0f766e;font-weight:700;"><i class="fas fa-paperclip"></i> ${escapeHtml(nom || "Justificatif")}</a>
+            <label style="margin-left:12px;cursor:pointer;font-size:0.85rem;color:#64748b;"><input type="checkbox" id="dep_modal_remove_justif"> Retirer le justificatif</label>`;
+    } else {
+        st.innerHTML = `<span style="color:#94a3b8;">Aucun fichier joint.</span>`;
+    }
+}
 
 window.calculerResteDepenseModal = function() {
     const montant = parseFloat(document.getElementById('dep_modal_montant')?.value) || 0;
@@ -947,6 +999,7 @@ window.openDepenseEditModal = function(id) {
     document.getElementById('dep_modal_avance').value = parseFloat(d.avance_versee || 0).toFixed(2);
     document.getElementById('dep_modal_date_avance').value = d.date_avance || "";
     window.calculerResteDepenseModal();
+    renderDepModalJustifZone(d);
     document.getElementById('modal-edit-depense')?.classList.remove('hidden');
 };
 
@@ -961,6 +1014,31 @@ window.saveDepenseFromModal = async function() {
     const statutChoisi = document.getElementById('dep_modal_statut')?.value || "En attente";
     const statutFinal = (reste <= 0.001) ? "Réglé" : statutChoisi;
 
+    const fileInput = document.getElementById('dep_modal_justif');
+    const file = fileInput?.files?.[0];
+    const removeEl = document.getElementById('dep_modal_remove_justif');
+    const remove = removeEl && removeEl.checked;
+
+    let ju = document.getElementById('dep_modal_justif_url')?.value || "";
+    let jp = document.getElementById('dep_modal_justif_path')?.value || "";
+    let jn = document.getElementById('dep_modal_justif_nom')?.value || "";
+
+    try {
+        if (file) {
+            const up = await uploadDepenseJustificatif(file, id);
+            ju = up.url;
+            jp = up.path;
+            jn = file.name || "fichier";
+        } else if (remove) {
+            ju = "";
+            jp = "";
+            jn = "";
+        }
+    } catch (e) {
+        alert("Justificatif : " + (e?.message || e));
+        return;
+    }
+
     const data = {
         date: document.getElementById('dep_modal_date')?.value || "",
         reference: document.getElementById('dep_modal_ref')?.value || "",
@@ -973,7 +1051,10 @@ window.saveDepenseFromModal = async function() {
         date_reglement: document.getElementById('dep_modal_date_reglement')?.value || "",
         avance_versee: avance,
         date_avance: document.getElementById('dep_modal_date_avance')?.value || "",
-        reste_a_payer: reste
+        reste_a_payer: reste,
+        justificatif_url: ju,
+        justificatif_path: jp,
+        justificatif_nom: jn
     };
 
     if (!data.date) return alert("Date requise");
@@ -1120,7 +1201,17 @@ window.calculTotal = function() {
     document.querySelectorAll('.val-prix').forEach(i => total += parseFloat(i.value) || 0);
     const lettrage = summarizePaiements(paiements, total);
     document.getElementById('total_general').innerText = total.toFixed(2) + " €";
-    document.getElementById('total_paye').innerText = lettrage.totalPaye.toFixed(2) + " €";
+    document.getElementById('total_paye').innerText = lettrage.encaisseReel.toFixed(2) + " €";
+    const libRow = document.getElementById('liberation_row');
+    const libSpan = document.getElementById('pay_liberation');
+    if (libRow && libSpan) {
+        if (lettrage.liberationsMontant > 0.001) {
+            libRow.classList.remove('hidden');
+            libSpan.innerText = lettrage.liberationsMontant.toFixed(2) + " €";
+        } else {
+            libRow.classList.add('hidden');
+        }
+    }
     document.getElementById('reste_a_payer').innerText = lettrage.reste.toFixed(2) + " €";
     document.getElementById('total_display').innerText = total.toFixed(2);
     const lastDateEl = document.getElementById('pay_last_date');
@@ -1232,7 +1323,7 @@ window.sauvegarderDocument = async function() {
         date_echeance: dateEcheance,
         date_dernier_paiement: lettrage.lastDate === "-" ? "" : lettrage.lastDate,
         mode_paiement_principal: lettrage.mainMode === "-" ? "" : lettrage.mainMode,
-        total: totalValue, total_paye: totalPayeCalc, reste_a_payer: resteCalc,
+        total: totalValue, total_paye: lettrage.encaisseReel, reste_a_payer: resteCalc,
         lignes: lignes, paiements: paiements,
         statut_doc: document.getElementById('doc_type').value === 'DEVIS'
             ? (document.getElementById('doc_statut')?.value || 'En cours')
@@ -1300,6 +1391,15 @@ window.ajouterPaiement = async () => {
     const fileInput = document.getElementById('pay_receipt');
     const file = fileInput?.files?.[0];
     if (!(montant > 0)) return;
+    const isLiberation = String(mode).includes("Libération") || String(mode).includes("libération");
+    if (document.getElementById('doc_type')?.value === "FACTURE" && isLiberation) {
+        const total = parseFloat(document.getElementById('total_display').innerText) || 0;
+        const lt = summarizePaiements(paiements, total);
+        if (montant > lt.reste + 0.01) {
+            alert(`Le montant ne peut pas dépasser le reliquat (${lt.reste.toFixed(2)} €).`);
+            return;
+        }
+    }
     try {
         const numeroDoc = document.getElementById('doc_numero')?.value || "DOC";
         const receipt = await uploadPaymentReceipt(file, numeroDoc);
@@ -1307,6 +1407,7 @@ window.ajouterPaiement = async () => {
             date,
             mode,
             montant,
+            liberation: isLiberation,
             justificatif_url: receipt.url || "",
             justificatif_path: receipt.path || "",
             justificatif_nom: file?.name || ""
@@ -1319,8 +1420,47 @@ window.ajouterPaiement = async () => {
         alert("Erreur justificatif : " + (e?.message || e));
     }
 };
+
+window.libererReliquat = function() {
+    const docType = document.getElementById('doc_type')?.value;
+    if (docType !== "FACTURE") {
+        alert("La libération du reliquat ne s'applique qu'aux factures.");
+        return;
+    }
+    const total = parseFloat(document.getElementById('total_display').innerText) || 0;
+    const lettrage = summarizePaiements(paiements, total);
+    const reste = lettrage.reste;
+    if (reste <= 0.01) {
+        alert("Aucun reliquat à libérer.");
+        return;
+    }
+    const motif = prompt("Motif (optionnel) : geste commercial, abandon de créance, difficulté du client…", "Geste commercial");
+    if (motif === null) return;
+    if (!confirm(`Libérer le reliquat de ${reste.toFixed(2)} € ?\n\nCe montant ne sera pas compté comme encaissement en trésorerie, mais la facture sera soldée (reste à 0 €).`)) return;
+    const today = new Date().toISOString().split("T")[0];
+    paiements.push({
+        date: today,
+        mode: "Libération / Geste",
+        montant: reste,
+        liberation: true,
+        motif: String(motif || "").trim()
+    });
+    window.renderPaiements();
+    window.calculTotal();
+};
+
 window.supprimerPaiement = (i) => { paiements.splice(i, 1); window.renderPaiements(); window.calculTotal(); };
-window.renderPaiements = () => { const div = document.getElementById('liste_paiements'); div.innerHTML = ""; paiements.forEach((p, i) => { const receipt = p.justificatif_url ? ` <a href="${p.justificatif_url}" target="_blank" rel="noopener" style="margin-left:8px; color:#065f46; font-weight:700;">Justificatif</a>` : ""; div.innerHTML += `<div>${p.date} - ${p.mode}: <strong>${p.montant}€</strong>${receipt} <i class="fas fa-trash" style="color:red;cursor:pointer;margin-left:10px;" onclick="window.supprimerPaiement(${i})"></i></div>`; }); };
+window.renderPaiements = () => {
+    const div = document.getElementById('liste_paiements');
+    if (!div) return;
+    div.innerHTML = "";
+    paiements.forEach((p, i) => {
+        const receipt = p.justificatif_url ? ` <a href="${p.justificatif_url}" target="_blank" rel="noopener" style="margin-left:8px; color:#065f46; font-weight:700;">Justificatif</a>` : "";
+        const libTag = p.liberation ? ` <span style="background:#ede9fe;color:#5b21b6;padding:2px 6px;border-radius:4px;font-size:0.75rem;">hors trésorerie</span>` : "";
+        const motif = p.motif ? ` <span style="color:#64748b;font-size:0.85rem;">(${escapeHtml(p.motif)})</span>` : "";
+        div.innerHTML += `<div>${p.date} - ${p.mode}: <strong>${p.montant}€</strong>${libTag}${motif}${receipt} <i class="fas fa-trash" style="color:red;cursor:pointer;margin-left:10px;" onclick="window.supprimerPaiement(${i})"></i></div>`;
+    });
+};
 window.supprimerDocument = async (id) => { if(confirm("Supprimer ?")) { await deleteDoc(doc(db,"factures_v2",id)); window.chargerListeFactures(); } };
 window.transformerEnFacture = async function() { if(confirm("Créer une FACTURE à partir de ce devis ?")) { 
     const idDevis = document.getElementById('current_doc_id').value;
@@ -1353,10 +1493,11 @@ window.annulerDocument = async function() {
 window.exportExcelSmart = function() { 
     let csvContent = "data:text/csv;charset=utf-8,"; 
     if(!document.getElementById('tab-factures').classList.contains('hidden')) { 
-        csvContent += "Numero;Date;Type;Statut;Dossier;Client;Defunt;Total TTC;Total Paye;Reste a Payer;Dernier Paiement;Mode Principal\n"; 
+        csvContent += "Numero;Date;Type;Statut;Dossier;Client;Defunt;Total TTC;Encaisse tresorerie;Reste a Payer;Dernier Paiement;Mode Principal\n"; 
         cacheFactures.forEach(d => { 
             const lt = summarizePaiements(d.finalPaiements || [], d.finalTotal || 0);
-            csvContent += `${d.finalNumero};${d.finalDate};${d.finalType};${d.finalStatut || ''};${d.finalDossierNumero || ''};${d.finalClient};${d.finalDefunt};${(d.finalTotal || 0).toFixed(2)};${lt.totalPaye.toFixed(2)};${lt.reste.toFixed(2)};${lt.lastDate};${lt.mainMode}\n`; 
+            const resteExport = String(d.finalType || "").toUpperCase() === "DEVIS" ? "" : lt.reste.toFixed(2);
+            csvContent += `${d.finalNumero};${d.finalDate};${d.finalType};${d.finalStatut || ''};${d.finalDossierNumero || ''};${d.finalClient};${d.finalDefunt};${(d.finalTotal || 0).toFixed(2)};${lt.encaisseReel.toFixed(2)};${resteExport};${lt.lastDate};${lt.mainMode}\n`; 
         }); 
         const encodedUri = encodeURI(csvContent); 
         const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "export_ventes.csv"); 
@@ -1806,8 +1947,11 @@ window.generatePDFFromData = function(data, saveMode = false) {
 
     const rightLabelX = 165; const rightValueX = 195;
     const totalTTC = data.info.total;
-    const totalPaye = data.paiements.reduce((sum, p) => sum + parseFloat(p.montant), 0);
-    const resteAPayer = totalTTC - totalPaye;
+    const list = data.paiements || [];
+    const totalVerse = list.reduce((sum, p) => sum + parseFloat(p.montant), 0);
+    const encaissePdf = list.reduce((sum, p) => sum + (p.liberation ? 0 : parseFloat(p.montant)), 0);
+    const libPdf = list.reduce((sum, p) => sum + (p.liberation ? parseFloat(p.montant) : 0), 0);
+    const resteAPayer = totalTTC - totalVerse;
 
     doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(0);
     doc.text(`Total TTC :`, rightLabelX, footerY, { align: 'right' }); 
@@ -1815,10 +1959,18 @@ window.generatePDFFromData = function(data, saveMode = false) {
     doc.text(`${totalTTC.toFixed(2)} €`, rightValueX, footerY, { align: 'right' });
     footerY += 6;
 
-    if (totalPaye > 0) { 
+    if (encaissePdf > 0) {
         doc.setFont("helvetica", "normal"); 
-        doc.text(`Déjà réglé :`, rightLabelX, footerY, { align: 'right' }); 
-        doc.text(`- ${totalPaye.toFixed(2)} €`, rightValueX, footerY, { align: 'right' }); 
+        doc.text(`Encaissé (trésorerie) :`, rightLabelX, footerY, { align: 'right' }); 
+        doc.text(`- ${encaissePdf.toFixed(2)} €`, rightValueX, footerY, { align: 'right' }); 
+        footerY += 6; 
+    }
+    if (libPdf > 0) {
+        doc.setFont("helvetica", "normal"); 
+        doc.setTextColor(91, 33, 182);
+        doc.text(`Libération / geste :`, rightLabelX, footerY, { align: 'right' }); 
+        doc.text(`- ${libPdf.toFixed(2)} €`, rightValueX, footerY, { align: 'right' }); 
+        doc.setTextColor(0);
         footerY += 6; 
     }
     
