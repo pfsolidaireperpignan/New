@@ -202,19 +202,108 @@
         </div>
 
         <div id="view-base" class="hidden">
-            <div class="page-header">
-                <h1>Base Clients</h1>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="search-client" placeholder="Rechercher une fiche client..." style="width:250px;">
-                    <button class="btn btn-blue" onclick="window.chargerBaseClients()"><i class="fas fa-sync"></i> Actualiser</button>
+            <div id="base-clients-list-view">
+                <div class="page-header">
+                    <h1>Base Clients</h1>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="search-client" placeholder="Rechercher une fiche client..." style="width:250px;">
+                        <button class="btn btn-blue" onclick="window.chargerBaseClients()"><i class="fas fa-sync"></i> Actualiser</button>
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0; overflow:hidden;">
+                    <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; font-weight:700; color:#0f172a;">Fiches Clients (Facturation)</div>
+                    <table class="history-table">
+                        <thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Type</th><th>Adresse</th><th>Notes</th><th style="text-align:center;">Actions</th></tr></thead>
+                        <tbody id="clients-ref-table-body"></tbody>
+                    </table>
                 </div>
             </div>
-            <div class="card" style="padding:0; overflow:hidden;">
-                <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; font-weight:700; color:#0f172a;">Fiches Clients (Facturation)</div>
-                <table class="history-table">
-                    <thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Type</th><th>Adresse</th><th>Notes</th></tr></thead>
-                    <tbody id="clients-ref-table-body"></tbody>
-                </table>
+
+            <div id="base-client-detail-view" class="hidden">
+                <div class="page-header" style="align-items:flex-start;">
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <button class="btn btn-grey" onclick="window.showBaseClientListView()" style="width:fit-content;"><i class="fas fa-arrow-left"></i> Retour à la liste</button>
+                        <h1 id="client-detail-title" style="margin:0;">Détails Client : -</h1>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+                        <button class="btn btn-green" onclick="window.saveBaseClientDetails()"><i class="fas fa-save"></i> Enregistrer les modifications</button>
+                    </div>
+                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:12px;">
+                        <div>
+                            <label>ID</label>
+                            <input id="detail_client_id" readonly style="background:#f8fafc; border:1px dashed #cbd5e1;">
+                        </div>
+                        <div>
+                            <label>NOM</label>
+                            <input id="detail_client_nom" placeholder="Nom client">
+                        </div>
+                        <div>
+                            <label>TYPE</label>
+                            <select id="detail_client_type"><option value="pro">Pro</option><option value="particulier">Particulier</option></select>
+                        </div>
+                        <div>
+                            <label>Téléphone</label>
+                            <input id="detail_client_tel" placeholder="Téléphone">
+                        </div>
+                        <div>
+                            <label>Email</label>
+                            <input id="detail_client_email" placeholder="Email">
+                        </div>
+                        <div>
+                            <label>Adresse</label>
+                            <input id="detail_client_adresse" placeholder="Adresse">
+                        </div>
+                        <div style="grid-column:1 / -1;">
+                            <label>Notes client</label>
+                            <textarea id="detail_client_notes" rows="3" placeholder="Notes..."></textarea>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button class="btn btn-green" onclick="window.saveBaseClientDetails()"><i class="fas fa-save"></i> Enregistrer les modifications</button>
+                    </div>
+                </div>
+
+                <div class="card" style="padding:16px;">
+                    <div class="tabs-container" style="margin-bottom:14px;">
+                        <button id="client-tab-prestations" class="tab-btn active" onclick="window.switchBaseClientDetailTab('prestations')">Prestations</button>
+                        <button id="client-tab-factures" class="tab-btn" onclick="window.switchBaseClientDetailTab('factures')">Factures & Devis</button>
+                        <button id="client-tab-journal" class="tab-btn" onclick="window.switchBaseClientDetailTab('journal')">Journal d'Actions</button>
+                        <button id="client-tab-technique" class="tab-btn" onclick="window.switchBaseClientDetailTab('technique')">Détails Techniques</button>
+                        <button id="client-tab-pieces" class="tab-btn" onclick="window.switchBaseClientDetailTab('pieces')">Pièces Jointes</button>
+                    </div>
+
+                    <div id="client-tab-content-prestations">
+                        <div style="color:#64748b;">Prestations liées au client (bientôt disponible).</div>
+                    </div>
+                    <div id="client-tab-content-factures" class="hidden">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>TYPE</th>
+                                    <th>NUMÉRO</th>
+                                    <th>DATE</th>
+                                    <th>STATUT</th>
+                                    <th style="text-align:right;">TOTAL</th>
+                                    <th style="text-align:center;">ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="client-factures-table-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="client-tab-content-journal" class="hidden">
+                        <div style="color:#64748b;">Journal d'actions (bientôt disponible).</div>
+                    </div>
+                    <div id="client-tab-content-technique" class="hidden">
+                        <div style="color:#64748b;">Détails techniques liés (bientôt disponible).</div>
+                    </div>
+                    <div id="client-tab-content-pieces" class="hidden">
+                        <div style="color:#64748b;">Pièces jointes liées (bientôt disponible).</div>
+                    </div>
+                </div>
             </div>
         </div>
 
