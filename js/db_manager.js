@@ -13,6 +13,7 @@ const escapeHtml = (value) => String(value ?? "")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+const normalizeText = (v) => String(v || "").trim().toLowerCase();
 const truncateText = (value, max = 48) => {
     const s = String(value ?? "");
     if (s.length <= max) return s;
@@ -156,16 +157,77 @@ async function renderClientPrestations(clientObj) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
 
     let rows = [];
+    const seen = new Set();
+    const pushUnique = (item) => {
+        const key = String(item?.id || "");
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        rows.push(item);
+    };
+    const clientId = String(clientObj?.id || "");
+    const clientNom = String(clientObj?.nom || "");
+    const clientNomNorm = normalizeText(clientNom);
     try {
-        if (clientObj?.id) {
-            const s1 = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.client_id", "==", clientObj.id), limit(200)));
-            s1.forEach(d => rows.push({ id: d.id, ...(d.data() || {}) }));
+        if (clientId) {
+            const s1 = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.client_id", "==", clientId), limit(300)));
+            s1.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
         }
     } catch (_) {}
-    if (!rows.length && clientObj?.nom) {
+    if (!rows.length && clientNom) {
         try {
-            const s2 = await getDocs(query(collection(db, "dossiers_admin"), where("mandant.nom", "==", clientObj.nom), limit(200)));
-            s2.forEach(d => rows.push({ id: d.id, ...(d.data() || {}) }));
+            const s2 = await getDocs(query(collection(db, "dossiers_admin"), where("mandant.nom", "==", clientNom), limit(300)));
+            s2.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
+        } catch (_) {}
+    }
+    if (!rows.length && clientNom) {
+        try {
+            const s3 = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.client_nom", "==", clientNom), limit(300)));
+            s3.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
+        } catch (_) {}
+    }
+
+    // Fallback robuste: relier via factures (dossier_id) puis matcher par nom en local
+    if (!rows.length) {
+        try {
+            const linkedDossierIds = new Set();
+            if (clientId) {
+                const f1 = await getDocs(query(collection(db, "factures_v2"), where("client_id", "==", clientId), limit(300)));
+                f1.forEach(x => {
+                    const fd = x.data() || {};
+                    const did = String(fd.dossier_id || "");
+                    if (did) linkedDossierIds.add(did);
+                });
+            }
+            if (!linkedDossierIds.size && clientNom) {
+                const f2 = await getDocs(query(collection(db, "factures_v2"), where("client_nom", "==", clientNom), limit(300)));
+                f2.forEach(x => {
+                    const fd = x.data() || {};
+                    const did = String(fd.dossier_id || "");
+                    if (did) linkedDossierIds.add(did);
+                });
+            }
+
+            if (linkedDossierIds.size) {
+                const allDossiers = await getDocs(query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc"), limit(600)));
+                allDossiers.forEach(d => {
+                    const item = { id: d.id, ...(d.data() || {}) };
+                    if (linkedDossierIds.has(String(item.id || ""))) pushUnique(item);
+                });
+            }
+
+            // Dernier filet: filtrage local tolérant sur les noms
+            if (!rows.length && clientNomNorm) {
+                const allDossiers2 = await getDocs(query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc"), limit(600)));
+                allDossiers2.forEach(d => {
+                    const item = { id: d.id, ...(d.data() || {}) };
+                    const mandantNom = normalizeText(item?.mandant?.nom || "");
+                    const linkedNom = normalizeText(item?.details_op?.client_nom || "");
+                    const isMatch =
+                        (mandantNom && (mandantNom.includes(clientNomNorm) || clientNomNorm.includes(mandantNom))) ||
+                        (linkedNom && (linkedNom.includes(clientNomNorm) || clientNomNorm.includes(linkedNom)));
+                    if (isMatch) pushUnique(item);
+                });
+            }
         } catch (_) {}
     }
 
