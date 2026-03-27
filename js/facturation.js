@@ -22,6 +22,7 @@ let currentDocSnapshot = null;
 let quickFilter = "ALL"; // ALL | EN_RETARD | PAYE | PARTIEL | EMIS
 let tableSortKey = "date"; // date | numero
 let tableSortDir = "desc"; // asc | desc
+let deepLinkHandled = false;
 let global_CA = 0; 
 let global_Depenses = 0; 
 let logoBase64 = null; 
@@ -49,8 +50,25 @@ onAuthStateChanged(auth, (user) => {
         if(el && window.Sortable) {
             new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: window.calculTotal });
         }
+        handleDeepLinkAction();
     }
 });
+
+async function handleDeepLinkAction() {
+    if (deepLinkHandled) return;
+    deepLinkHandled = true;
+    try {
+        const params = new URLSearchParams(window.location.search || "");
+        const docId = params.get("doc") || params.get("preview");
+        if (!docId) return;
+        if (typeof window.chargerDocument === "function") {
+            await window.chargerDocument(docId);
+        }
+        if (params.get("preview") && typeof window.apercuDocument === "function") {
+            await window.apercuDocument(docId);
+        }
+    } catch (_) {}
+}
 
 function initYearFilter() {
     const opts = `<option value="">Année (Toutes)</option>` + 

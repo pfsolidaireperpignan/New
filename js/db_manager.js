@@ -1,11 +1,12 @@
 /* js/db_manager.js - VERSION FINALE (RECHERCHE ACTIVE) */
 import { db } from './config.js';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, getDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getVal, setVal } from './utils.js';
 
 let importCache = [];
 let dossiersCache = []; // dossiers_admin
 let clientsRefCache = []; // collection clients
+let selectedClientRef = null;
 const escapeHtml = (value) => String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -30,9 +31,179 @@ function renderClientsRefRows(refBody, rows) {
             <td><span class="badge badge-blue">${escapeHtml(c.type || 'particulier')}</span></td>
             <td>${escapeHtml(c.adresse || '-')}</td>
             <td>${escapeHtml(c.notes || '-')}</td>
+            <td style="text-align:center;">
+                <button class="btn-icon" onclick="window.openBaseClientDetails('${escapeHtml(c.id || '')}')" title="Ouvrir détails">
+                    <i class="fas fa-eye" style="color:#3b82f6;"></i>
+                </button>
+            </td>
         `;
         refBody.appendChild(tr);
     });
+}
+
+function getClientById(id) {
+    return clientsRefCache.find(c => String(c.id) === String(id)) || null;
+}
+
+function setClientDetailForm(c) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ""; };
+    set('detail_client_id', c?.id || "");
+    set('detail_client_nom', c?.nom || "");
+    set('detail_client_type', c?.type || "particulier");
+    set('detail_client_tel', c?.telephone || "");
+    set('detail_client_email', c?.email || "");
+    set('detail_client_adresse', c?.adresse || "");
+    set('detail_client_notes', c?.notes || "");
+    const title = document.getElementById('client-detail-title');
+    if (title) title.textContent = `Détails Client : ${c?.nom || "-"}`;
+}
+
+function formatDateFr(dateStr) {
+    try { return dateStr ? new Date(dateStr).toLocaleDateString('fr-FR') : "-"; } catch (_) { return String(dateStr || "-"); }
+}
+
+function parseTypeDoc(x) {
+    return String(x?.type || x?.info?.type || "DOC").toUpperCase();
+}
+
+function normalizeStatut(x) {
+    const s = String(x || "").trim().toUpperCase();
+    if (!s || s === "BROUILLON") return "ÉMIS";
+    if (s === "PAYE") return "PAYÉ";
+    if (s === "ANNULE") return "ANNULÉ";
+    return s;
+}
+
+async function renderClientFacturesDevis(clientObj) {
+    const tbody = document.getElementById('client-factures-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
+
+    let rows = [];
+    try {
+        if (clientObj?.id) {
+            const snap = await getDocs(query(collection(db, "factures_v2"), where("client_id", "==", clientObj.id), limit(200)));
+            snap.forEach(d => rows.push({ id: d.id, ...(d.data() || {}) }));
+        }
+    } catch (_) {}
+
+    if (!rows.length && clientObj?.nom) {
+        try {
+            const snap2 = await getDocs(query(collection(db, "factures_v2"), where("client_nom", "==", clientObj.nom), limit(200)));
+            snap2.forEach(d => rows.push({ id: d.id, ...(d.data() || {}) }));
+        } catch (_) {}
+    }
+
+    rows.sort((a, b) => String(b.date || b.date_creation || "").localeCompare(String(a.date || a.date_creation || "")));
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Aucun document lié.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = "";
+    rows.forEach(x => {
+        const type = parseTypeDoc(x);
+        const numero = x.numero || x.info?.numero || "-";
+        const date = x.date || x.info?.date || x.date_creation || "";
+        const statut = normalizeStatut(x.statut || (type === "FACTURE" ? "EMIS" : "EMIS"));
+        const total = parseFloat((x.total !== undefined) ? x.total : (x.info?.total || 0)) || 0;
+        const encodedId = encodeURIComponent(String(x.id || ""));
+        const canValider = type === "DEVIS" && String(x.statut_doc || "").toLowerCase() !== "validé";
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><span class="badge ${type === "FACTURE" ? "badge-facture" : "badge-devis"}">${escapeHtml(type)}</span></td>
+            <td><strong>${escapeHtml(numero)}</strong></td>
+            <td>${escapeHtml(formatDateFr(date))}</td>
+            <td>${escapeHtml(statut)}</td>
+            <td style="text-align:right;">${total.toFixed(2)} €</td>
+            <td style="text-align:center;">
+                <button class="btn-icon" onclick="window.openClientDocPdf('${encodedId}')" title="Voir PDF"><i class="fas fa-file-pdf"></i></button>
+                <button class="btn-icon" onclick="window.openClientDocEditor('${encodedId}')" title="Éditer"><i class="fas fa-pen"></i></button>
+                ${canValider
+                    ? `<button class="btn-icon" onclick="window.validerClientDoc('${encodedId}')" title="Valider devis"><i class="fas fa-check"></i></button>`
+                    : `<button class="btn-icon" style="opacity:0.35; cursor:not-allowed;" title="Validation non applicable"><i class="fas fa-check"></i></button>`}
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+export function openClientDocEditor(encodedDocId) {
+    const id = decodeURIComponent(String(encodedDocId || ""));
+    if (!id) return;
+    window.location.href = `facturation_v2.html?doc=${encodeURIComponent(id)}`;
+}
+
+export function openClientDocPdf(encodedDocId) {
+    const id = decodeURIComponent(String(encodedDocId || ""));
+    if (!id) return;
+    const url = `facturation_v2.html?preview=${encodeURIComponent(id)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export async function validerClientDoc(encodedDocId) {
+    const id = decodeURIComponent(String(encodedDocId || ""));
+    if (!id) return;
+    if (!confirm("Valider ce devis ?")) return;
+    try {
+        await updateDoc(doc(db, "factures_v2", id), { statut_doc: "Validé", updated_at: new Date().toISOString() });
+        if (selectedClientRef) await renderClientFacturesDevis(selectedClientRef);
+        alert("✅ Devis validé.");
+    } catch (e) {
+        alert("Erreur validation : " + (e?.message || e));
+    }
+}
+
+export function showBaseClientListView() {
+    document.getElementById('base-client-detail-view')?.classList.add('hidden');
+    document.getElementById('base-clients-list-view')?.classList.remove('hidden');
+}
+
+export function switchBaseClientDetailTab(tab) {
+    const tabs = ['prestations', 'factures', 'journal', 'technique', 'pieces'];
+    tabs.forEach(t => {
+        document.getElementById(`client-tab-${t}`)?.classList.remove('active');
+        document.getElementById(`client-tab-content-${t}`)?.classList.add('hidden');
+    });
+    document.getElementById(`client-tab-${tab}`)?.classList.add('active');
+    document.getElementById(`client-tab-content-${tab}`)?.classList.remove('hidden');
+}
+
+export async function openBaseClientDetails(clientId) {
+    const c = getClientById(clientId);
+    if (!c) return;
+    selectedClientRef = c;
+    setClientDetailForm(c);
+    document.getElementById('base-clients-list-view')?.classList.add('hidden');
+    document.getElementById('base-client-detail-view')?.classList.remove('hidden');
+    switchBaseClientDetailTab('factures');
+    await renderClientFacturesDevis(c);
+}
+
+export async function saveBaseClientDetails() {
+    const id = document.getElementById('detail_client_id')?.value || "";
+    if (!id) return alert("ID client manquant.");
+    const data = {
+        nom: document.getElementById('detail_client_nom')?.value || "",
+        type: document.getElementById('detail_client_type')?.value || "particulier",
+        telephone: document.getElementById('detail_client_tel')?.value || "",
+        email: document.getElementById('detail_client_email')?.value || "",
+        adresse: document.getElementById('detail_client_adresse')?.value || "",
+        notes: document.getElementById('detail_client_notes')?.value || "",
+        updated_at: new Date().toISOString()
+    };
+    if (!data.nom) return alert("Nom client obligatoire.");
+    try {
+        await updateDoc(doc(db, "clients", id), data);
+        const idx = clientsRefCache.findIndex(x => String(x.id) === String(id));
+        if (idx >= 0) clientsRefCache[idx] = { ...clientsRefCache[idx], ...data };
+        selectedClientRef = { ...(selectedClientRef || {}), id, ...data };
+        setClientDetailForm(selectedClientRef);
+        filtrerBaseClients();
+        alert("✅ Modifications client enregistrées.");
+    } catch (e) {
+        alert("Erreur enregistrement client : " + (e?.message || e));
+    }
 }
 
 function guessDossierCode(data, id) {
