@@ -44,6 +44,10 @@
                 <h3 style="margin:0; color:#111827;">Fiche Client</h3>
                 <button class="btn btn-grey" onclick="window.closeClientSheet()"><i class="fas fa-times"></i> Fermer</button>
             </div>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <input id="sheet_client_search" list="clients_suggestions" placeholder="Rechercher dans Base Clients..." style="flex:1;">
+                <button class="btn btn-blue" onclick="window.selectClientFromSheetSearch()"><i class="fas fa-search"></i> Choisir</button>
+            </div>
             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:12px;">
                 <input id="sheet_client_id" placeholder="ID client" readonly style="background:#f8fafc; border:1px dashed #cbd5e1;">
                 <input id="sheet_client_nom" placeholder="Nom client">
