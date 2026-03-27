@@ -422,7 +422,7 @@ export async function openBaseClientDetails(clientId) {
     setClientDetailForm(c);
     document.getElementById('base-clients-list-view')?.classList.add('hidden');
     document.getElementById('base-client-detail-view')?.classList.remove('hidden');
-    switchBaseClientDetailTab('factures');
+    switchBaseClientDetailTab('prestations');
     await renderClientPrestations(c);
     await renderClientFacturesDevis(c);
     await renderClientPiecesJointes(c);

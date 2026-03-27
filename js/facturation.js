@@ -225,6 +225,10 @@ function setEditorActionButtonsVisibility() {
     btnAnnuler.style.display = canAnnuler ? 'inline-flex' : 'none';
 }
 
+window.onDocStatutChange = function() {
+    setEditorActionButtonsVisibility();
+};
+
 function formatDateFR(value) {
     if (!value) return "-";
     try { return new Date(value).toLocaleDateString('fr-FR'); } catch(_) { return String(value); }
@@ -1056,12 +1060,16 @@ window.sauvegarderDocument = async function() {
     const totalPayeCalc = lettrage.totalPaye;
     const resteCalc = lettrage.reste;
     const existingStatut = String(currentDocSnapshot?.statut || "").trim().toUpperCase();
-    let statut = existingStatut || 'EMIS';
-    if (statut !== 'ANNULE') {
-        if (docType === 'FACTURE') {
-            if (totalPayeCalc <= 0) statut = 'EMIS';
-            else if (resteCalc > 0.01) statut = 'PARTIEL';
-            else statut = 'PAYE';
+    const selectedStatut = String(document.getElementById('doc_statut')?.value || "").trim().toUpperCase();
+    const allowed = new Set(["EMIS", "PARTIEL", "PAYE", "ANNULE"]);
+    let statut = allowed.has(selectedStatut) ? selectedStatut : (existingStatut || 'EMIS');
+    if (!allowed.has(selectedStatut)) {
+        if (statut !== 'ANNULE') {
+            if (docType === 'FACTURE') {
+                if (totalPayeCalc <= 0) statut = 'EMIS';
+                else if (resteCalc > 0.01) statut = 'PARTIEL';
+                else statut = 'PAYE';
+            }
         }
     }
 
