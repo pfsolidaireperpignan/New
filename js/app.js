@@ -424,7 +424,22 @@ window.toggleSections = function() {
 
 window.toggleVol2 = function() { const chk = document.getElementById('check_vol2'); const bloc = document.getElementById('bloc_vol2'); if(chk && bloc) { chk.checked ? bloc.classList.remove('hidden') : bloc.classList.add('hidden'); } };
 window.togglePolice = function() { const select = document.getElementById('type_presence_select'); const bP = document.getElementById('police_fields'); const bF = document.getElementById('famille_fields'); if(!select) return; if(select.value === 'police') { bP.classList.remove('hidden'); bF.classList.add('hidden'); } else { bP.classList.add('hidden'); bF.classList.remove('hidden'); } };
-window.copierMandant = function() { const chk = document.getElementById('copy_mandant'); if(chk && chk.checked) { document.getElementById('f_nom_prenom').value = document.getElementById('soussigne').value; document.getElementById('f_lien').value = document.getElementById('lien').value; } };
+window.copierMandant = function() {
+    const chk = document.getElementById('copy_mandant');
+    const fNom = document.getElementById('f_nom_prenom');
+    const fLien = document.getElementById('f_lien');
+    const mandantNom = document.getElementById('soussigne');
+    const mandantLien = document.getElementById('lien');
+    if (!chk || !fNom || !fLien || !mandantNom || !mandantLien) return;
+    if (chk.checked) {
+        fNom.value = mandantNom.value || "";
+        fLien.value = mandantLien.value || "";
+    }
+};
+window.syncTemoinFromMandantIfNeeded = function() {
+    const chk = document.getElementById('copy_mandant');
+    if (chk && chk.checked) window.copierMandant();
+};
 window.togglePayeurSection = function() {
     const chk = document.getElementById('payeur_different');
     const bloc = document.getElementById('bloc_payeur_different');
@@ -524,7 +539,7 @@ window.sauvegarderDossier = async function() {
                 adresse: getVal('adresse_fr'), pere: getVal('pere'), mere: getVal('mere'), situation: getVal('matrimoniale'), conjoint: getVal('conjoint'), profession: getVal('profession_libelle') 
             },
             mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), lien: getVal('lien'), telephone: getVal('tel_mandant'), adresse: getVal('demeurant') },
-            technique: { type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'), cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'), heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'), date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat') },
+            technique: { type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'), cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'), heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'), date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat'), is_mandant_copy: getChk('copy_mandant'), famille_nom_prenom: getVal('f_nom_prenom'), famille_lien: getVal('f_lien') },
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), av_date_dep: getVal('av_date_dep'), av_heure_dep: getVal('av_heure_dep'), av_date_arr: getVal('av_date_arr'), av_heure_arr: getVal('av_heure_arr'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), ap_date_dep: getVal('ap_date_dep'), ap_heure_dep: getVal('ap_heure_dep'), ap_date_arr: getVal('ap_date_arr'), ap_heure_arr: getVal('ap_heure_arr'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta'), vol1_num: getVal('vol1_num'), vol1_dep_aero: getVal('vol1_dep_aero'), vol1_arr_aero: getVal('vol1_arr_aero'), vol1_dep_time: getVal('vol1_dep_time'), vol1_arr_time: getVal('vol1_arr_time'), vol2_num: getVal('vol2_num'), vol2_dep_aero: getVal('vol2_dep_aero'), vol2_arr_aero: getVal('vol2_arr_aero'), vol2_dep_time: getVal('vol2_dep_time'), vol2_arr_time: getVal('vol2_arr_time'), rap_immat: getVal('rap_immat'), rap_date_dep_route: getVal('rap_date_dep_route'), rap_ville_dep: getVal('rap_ville_dep'), rap_ville_arr: getVal('rap_ville_arr'), attest_trajet_depart: getVal('attest_trajet_depart'), attest_trajet_arrivee: getVal('attest_trajet_arrivee'), attest_cercueil_option: document.querySelector('input[name="attest_cercueil_option"]:checked')?.value || 'funisorb' },
             protocole: {
                 cercueil: getVal('proto_cercueil'), urne: getVal('proto_urne'), salle_hommage: getChk('chk_salle_hommage'),
@@ -728,7 +743,7 @@ window.chargerDossier = async function(id) {
         set('payeur_adresse', data?.payeur?.adresse || "");
         if(window.togglePayeurSection) window.togglePayeurSection();
         if(window.updatePayeurLinkBadge) window.updatePayeurLinkBadge(!!(data?.details_op?.payeur_client_id), data?.details_op?.payeur_client_nom || data?.payeur?.nom || "");
-        if (data.technique) { const op = data.technique.type_operation || 'Inhumation'; set('prestation', op); set('lieu_mise_biere', data.technique.lieu_mise_biere); set('date_fermeture', data.technique.date_fermeture); set('cimetiere_nom', data.technique.cimetiere); set('crematorium_nom', data.technique.crematorium); set('num_concession', data.technique.num_concession); set('faita', data.technique.faita); set('dateSignature', data.technique.date_signature); set('p_nom_grade', data.technique.police_nom); set('p_commissariat', data.technique.police_commissariat); if (op === 'Inhumation') { set('date_inhumation', data.technique.date_ceremonie); set('heure_inhumation', data.technique.heure_ceremonie); } else if (op === 'Crémation') { set('date_cremation', data.technique.date_ceremonie); set('heure_cremation', data.technique.heure_ceremonie); } }
+        if (data.technique) { const op = data.technique.type_operation || 'Inhumation'; set('prestation', op); set('lieu_mise_biere', data.technique.lieu_mise_biere); set('date_fermeture', data.technique.date_fermeture); set('cimetiere_nom', data.technique.cimetiere); set('crematorium_nom', data.technique.crematorium); set('num_concession', data.technique.num_concession); set('faita', data.technique.faita); set('dateSignature', data.technique.date_signature); set('p_nom_grade', data.technique.police_nom); set('p_commissariat', data.technique.police_commissariat); setChk('copy_mandant', !!data.technique.is_mandant_copy); set('f_nom_prenom', data.technique.famille_nom_prenom); set('f_lien', data.technique.famille_lien); if (op === 'Inhumation') { set('date_inhumation', data.technique.date_ceremonie); set('heure_inhumation', data.technique.heure_ceremonie); } else if (op === 'Crémation') { set('date_cremation', data.technique.date_ceremonie); set('heure_cremation', data.technique.heure_ceremonie); } }
         if (data.transport) { set('av_lieu_depart', data.transport.av_dep); set('av_lieu_arrivee', data.transport.av_arr); set('av_date_dep', data.transport.av_date_dep); set('av_heure_dep', data.transport.av_heure_dep); set('av_date_arr', data.transport.av_date_arr); set('av_heure_arr', data.transport.av_heure_arr); set('ap_lieu_depart', data.transport.ap_dep); set('ap_lieu_arrivee', data.transport.ap_arr); set('ap_date_dep', data.transport.ap_date_dep); set('ap_heure_dep', data.transport.ap_heure_dep); set('ap_date_arr', data.transport.ap_date_arr); set('ap_heure_arr', data.transport.ap_heure_arr); set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta); set('vol1_num', data.transport.vol1_num); set('vol1_dep_aero', data.transport.vol1_dep_aero); set('vol1_arr_aero', data.transport.vol1_arr_aero); set('vol1_dep_time', data.transport.vol1_dep_time); set('vol1_arr_time', data.transport.vol1_arr_time); set('vol2_num', data.transport.vol2_num); set('vol2_dep_aero', data.transport.vol2_dep_aero); set('vol2_arr_aero', data.transport.vol2_arr_aero); set('vol2_dep_time', data.transport.vol2_dep_time); set('vol2_arr_time', data.transport.vol2_arr_time); set('rap_immat', data.transport.rap_immat); set('rap_date_dep_route', data.transport.rap_date_dep_route); set('rap_ville_dep', data.transport.rap_ville_dep); set('rap_ville_arr', data.transport.rap_ville_arr); set('attest_trajet_depart', data.transport.attest_trajet_depart); set('attest_trajet_arrivee', data.transport.attest_trajet_arrivee); const aco = data.transport.attest_cercueil_option || 'funisorb'; document.querySelectorAll('input[name="attest_cercueil_option"]').forEach((r) => { r.checked = r.value === aco; }); }
         
         if (data.protocole) {
@@ -779,7 +794,15 @@ window.chargerDossier = async function(id) {
         window.currentDossierId = id;
         const btn = document.getElementById('btn-save-bdd'); if (btn) { btn.innerHTML = `<i class="fas fa-pen"></i> MODIFIER LE DOSSIER`; btn.classList.remove('btn-green'); btn.classList.add('btn-warning'); btn.style.backgroundColor = "#f59e0b"; btn.onclick = function() { window.sauvegarderDossier(); }; }
         if(window.toggleSections) window.toggleSections(); if(window.togglePolice) window.togglePolice(); if(window.toggleVol2) window.toggleVol2();
+        if(window.copierMandant) window.copierMandant();
         window.showSection('admin');
         window.showAdminDetailView();
     } catch (e) { console.error(e); alert("Erreur : " + e.message); }
 };
+
+document.addEventListener("DOMContentLoaded", () => {
+    const mandantNom = document.getElementById('soussigne');
+    const mandantLien = document.getElementById('lien');
+    if (mandantNom) mandantNom.addEventListener('input', () => window.syncTemoinFromMandantIfNeeded && window.syncTemoinFromMandantIfNeeded());
+    if (mandantLien) mandantLien.addEventListener('input', () => window.syncTemoinFromMandantIfNeeded && window.syncTemoinFromMandantIfNeeded());
+});

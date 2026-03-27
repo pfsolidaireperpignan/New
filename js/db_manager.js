@@ -624,17 +624,25 @@ export async function chargerSelectImport() {
     select.innerHTML = '<option>Chargement...</option>';
     
     try {
-        const q = query(collection(db, "factures_v2"), orderBy("date_creation", "desc"), limit(20));
-        const snaps = await getDocs(q);
         importCache = [];
         select.innerHTML = '<option value="">Choisir un client...</option>';
-        
-        snaps.forEach(doc => {
-            const d = doc.data();
-            importCache.push({ id: doc.id, ...d });
-            const label = `${d.info?.type || 'DOC'} ${d.info?.numero || ''} - ${d.client?.nom || '?'} (Défunt: ${d.defunt?.nom || '?'})`;
+
+        let snaps = null;
+        try {
+            snaps = await getDocs(query(collection(db, "clients"), orderBy("nom"), limit(600)));
+        } catch (_) {
+            snaps = await getDocs(query(collection(db, "clients"), limit(600)));
+        }
+
+        const rows = [];
+        snaps.forEach(docSnap => rows.push({ id: docSnap.id, ...(docSnap.data() || {}) }));
+        rows.sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), 'fr'));
+        importCache = rows;
+
+        rows.forEach(c => {
+            const label = `${c.nom || "Client"}${c.telephone ? " — " + c.telephone : ""}`;
             const opt = document.createElement('option');
-            opt.value = doc.id;
+            opt.value = c.id;
             opt.innerText = label;
             select.appendChild(opt);
         });
@@ -646,20 +654,33 @@ export function importerClientSelectionne() {
     const id = select.value;
     if(!id) return alert("Sélectionnez un client.");
     
-    const data = importCache.find(d => d.id === id);
-    if(data) {
-        if(data.client) {
-            setVal('civilite_mandant', data.client.civility);
-            setVal('soussigne', data.client.nom);
-            setVal('demeurant', data.client.adresse);
+    const c = importCache.find(x => String(x.id) === String(id));
+    if(!c) return alert("Client introuvable.");
+
+    // Pré-remplissage dossier (mandant/signataire)
+    setVal('soussigne', c.nom || "");
+    setVal('tel_mandant', c.telephone || "");
+    setVal('demeurant', c.adresse || "");
+
+    // Par défaut payeur = mandant (ne force pas le toggle)
+    try {
+        const chkPayeur = document.getElementById('payeur_different');
+        if (chkPayeur && !chkPayeur.checked) {
+            const payeurIdEl = document.getElementById('payeur_client_id');
+            const payeurNomEl = document.getElementById('payeur_nom');
+            const payeurTelEl = document.getElementById('payeur_tel');
+            const payeurEmailEl = document.getElementById('payeur_email');
+            const payeurAdrEl = document.getElementById('payeur_adresse');
+            if (payeurIdEl) payeurIdEl.value = c.id || "";
+            if (payeurNomEl) payeurNomEl.value = c.nom || "";
+            if (payeurTelEl) payeurTelEl.value = c.telephone || "";
+            if (payeurEmailEl) payeurEmailEl.value = c.email || "";
+            if (payeurAdrEl) payeurAdrEl.value = c.adresse || "";
+            if (window.updatePayeurLinkBadge) window.updatePayeurLinkBadge(!!c.id, c.nom || "");
         }
-        if(data.defunt) {
-            setVal('nom', data.defunt.nom);
-            if(data.defunt.naiss) setVal('date_naiss', data.defunt.naiss);
-            if(data.defunt.deces) setVal('date_deces', data.defunt.deces);
-        }
-        alert("✅ Données importées depuis la facture !");
-    }
+    } catch (_) {}
+
+    alert("✅ Données importées depuis la Base Clients.");
 }
 
 // --- 3. SAUVEGARDE & GED ---
