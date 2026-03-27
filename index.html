@@ -38,6 +38,7 @@
         <option value="Inhumation">
         <option value="Remise de l'urne">
     </datalist>
+    <datalist id="payeurs_suggestions"></datalist>
 
     <div id="app-loader" style="position:fixed; inset:0; background:white; z-index:9999; display:flex; justify-content:center; align-items:center;">
         <div style="text-align:center;">
@@ -414,9 +415,13 @@
                                     </label>
                                 </div>
                                 <div id="bloc_payeur_different" class="span-2 hidden" style="overflow:hidden; transition:all .25s ease; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px;">
-                                    <div style="font-weight:700; color:#0f172a; margin-bottom:10px;">Payeur (distinct)</div>
+                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                        <div style="font-weight:700; color:#0f172a;">Payeur (distinct)</div>
+                                        <span id="payeur_link_badge" style="display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:700; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa;">Nouveau client</span>
+                                    </div>
+                                    <input type="hidden" id="payeur_client_id">
                                     <div class="form-grid">
-                                        <div class="span-2"><label>Nom entité / personne</label><input id="payeur_nom" placeholder="Nom payeur"></div>
+                                        <div class="span-2"><label>Nom entité / personne</label><input id="payeur_nom" list="payeurs_suggestions" oninput="window.onPayeurNomInput()" onchange="window.onPayeurNomInput()" placeholder="Nom payeur"></div>
                                         <div><label>Téléphone payeur</label><input id="payeur_tel" placeholder="06..."></div>
                                         <div><label>Email payeur</label><input id="payeur_email" placeholder="email@exemple.com"></div>
                                         <div class="span-2"><label>Adresse payeur</label><input id="payeur_adresse" placeholder="Adresse payeur" list="villes_list"></div>
