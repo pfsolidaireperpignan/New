@@ -220,9 +220,16 @@
                 <div class="card" style="padding:0; overflow:hidden;">
                     <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; font-weight:700; color:#0f172a;">Fiches Clients (Facturation)</div>
                     <table class="history-table">
-                        <thead><tr><th style="min-width:220px;">Nom</th><th>Téléphone</th><th>Email</th><th>Type</th><th style="min-width:280px;">Adresse</th><th>Notes</th><th style="text-align:center;">Actions</th></tr></thead>
+                        <thead><tr><th style="width:60px;">#</th><th style="min-width:220px;">Nom</th><th>Téléphone</th><th>Email</th><th>Type</th><th style="min-width:280px;">Adresse</th><th>Notes</th><th style="text-align:center;">Actions</th></tr></thead>
                         <tbody id="clients-ref-table-body"></tbody>
                     </table>
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-top:1px solid #e2e8f0; background:#f8fafc;">
+                        <div id="base-clients-range" style="color:#334155; font-weight:700; font-size:13px;">Affichage : 0-0 sur 0</div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-grey" id="btn-clients-prev" onclick="window.baseClientsPrevPage()"><i class="fas fa-chevron-left"></i> Précédent</button>
+                            <button class="btn btn-grey" id="btn-clients-next" onclick="window.baseClientsNextPage()">Suivant <i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
