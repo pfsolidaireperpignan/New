@@ -19,12 +19,15 @@ let lastFactureCursor = null;
 let hasMoreFactures = true;
 const FACTURES_PAGE_SIZE = 60;
 const FACTURES_TABLE_PAGE_SIZE = 20;
+const DEPENSES_TABLE_PAGE_SIZE = 20;
 let currentDocSnapshot = null;
 let quickFilter = "ALL"; // ALL | EN_RETARD | PAYE | PARTIEL | EMIS
 let tableSortKey = "date"; // date | numero
 let tableSortDir = "desc"; // asc | desc
 let deepLinkHandled = false;
 let facturesTablePage = 1;
+let depensesTablePage = 1;
+let lastDepensesFilterKey = "";
 let global_CA = 0; 
 let global_Depenses = 0; 
 let logoBase64 = null; 
@@ -101,19 +104,20 @@ function chargerLogoBase64() {
 
 // --- 1. FACTURES / DEVIS ---
 function computeFactureStatut(d) {
-    const raw = String(d.statut || "").trim().toUpperCase();
-    if (raw) return raw === "BROUILLON" ? "EMIS" : raw;
+    const type = String(d.finalType || d.type || d.info?.type || "").toUpperCase();
+    let raw = String(d.statut || "").trim().toUpperCase();
+    if (raw === "BROUILLON") raw = "EMIS";
 
-    // Compat ancien
-    if ((d.finalType || d.type || d.info?.type) === "DEVIS") {
+    if (raw === "ANNULE") return "ANNULE";
+
+    if (type === "DEVIS") {
         const legacy = String(d.statut_doc || "").toLowerCase();
-        if (legacy.includes("sans suite")) return "ANNULE";
-        if (legacy) return "EMIS";
+        if (legacy.includes("sans suite")) return "EMIS";
         return "EMIS";
     }
 
-    const total = Number.isFinite(d.finalTotal) ? d.finalTotal : parseFloat(d.total || d.info?.total || 0);
-    const paye = (d.finalPaiements || d.paiements || []).reduce((s, p) => s + parseFloat(p.montant), 0);
+    const total = Number.isFinite(d.finalTotal) ? d.finalTotal : (parseFloat(d.total || d.info?.total || 0) || 0);
+    const paye = (d.finalPaiements || d.paiements || []).reduce((s, p) => s + (parseFloat(p.montant) || 0), 0);
     const reste = total - paye;
 
     if (paye <= 0) return "EMIS";
@@ -228,6 +232,45 @@ function setEditorActionButtonsVisibility() {
 }
 
 window.onDocStatutChange = function() {
+    setEditorActionButtonsVisibility();
+};
+
+function setDocStatutSelectValue(val) {
+    const sel = document.getElementById('doc_statut');
+    if (!sel) return;
+    const v = String(val ?? "");
+    const ok = Array.from(sel.options).some(o => o.value === v);
+    sel.value = ok ? v : (sel.options[0] ? sel.options[0].value : "");
+}
+
+window.renderDocStatutOptionsForType = function(docType) {
+    const sel = document.getElementById('doc_statut');
+    if (!sel) return;
+    const t = String(docType || "").toUpperCase();
+    if (t === "DEVIS") {
+        sel.innerHTML = `
+            <option value="En cours">En cours</option>
+            <option value="Validé">Validé</option>
+            <option value="Sans suite">Sans suite</option>
+        `;
+    } else {
+        sel.innerHTML = `
+            <option value="EMIS">EMIS</option>
+            <option value="PARTIEL">PARTIEL</option>
+            <option value="PAYE">PAYE</option>
+            <option value="ANNULE">ANNULE</option>
+        `;
+    }
+};
+
+window.onDocTypeChange = function() {
+    const t = document.getElementById('doc_type')?.value || "DEVIS";
+    window.renderDocStatutOptionsForType(t);
+    if (String(t).toUpperCase() === "DEVIS") {
+        setDocStatutSelectValue("En cours");
+    } else {
+        setDocStatutSelectValue("EMIS");
+    }
     setEditorActionButtonsVisibility();
 };
 
@@ -493,13 +536,18 @@ window.filtrerFactures = function() {
         let statutMatch = true;
         if (fStatut && fStatut !== "") {
             if (d.finalType === 'FACTURE') {
+                const fs = String(d.finalStatut || "").toUpperCase();
+                if (fs === "ANNULE" && (fStatut === "Payé" || fStatut === "En attente")) {
+                    statutMatch = false;
+                } else {
                 const paye = d.finalPaiements.reduce((s, p) => s + parseFloat(p.montant), 0);
                 const reste = d.finalTotal - paye;
                 const isPaye = reste < 0.1;
                 
                 if (fStatut === "Payé" && !isPaye) statutMatch = false;
                 if (fStatut === "En attente" && isPaye) statutMatch = false;
-                if (fStatut.includes("Devis")) statutMatch = false; 
+                if (fStatut.includes("Devis")) statutMatch = false;
+                }
             }
             else if (d.finalType === 'DEVIS') {
                 if (fStatut === "Payé" || fStatut === "En attente") statutMatch = false;
@@ -694,6 +742,8 @@ window.chargerDepenses = async function() {
         }); 
         
         window.refreshPilotageFinancier();
+        depensesTablePage = 1;
+        lastDepensesFilterKey = "";
         window.filtrerDepenses(); 
         updateFournisseursList(suppliers); 
     } catch(e) {} 
@@ -704,12 +754,28 @@ function updateFournisseursList(suppliers) {
     if(dl) dl.innerHTML = Array.from(suppliers).map(s => `<option value="${s}">`).join(''); 
 }
 
+window.depensesNextPage = function() {
+    depensesTablePage += 1;
+    window.filtrerDepenses();
+};
+
+window.depensesPrevPage = function() {
+    depensesTablePage -= 1;
+    window.filtrerDepenses();
+};
+
 window.filtrerDepenses = function() { 
     const term = (document.getElementById('search_depense')?.value || "").toLowerCase();
     const selMonth = document.getElementById('filter_month')?.value; 
     const selYear = document.getElementById('filter_year')?.value;   
     const cat = document.getElementById('filter_cat')?.value;
     const statut = document.getElementById('filter_statut')?.value;
+
+    const filterKey = `${term}|${selMonth}|${selYear}|${cat}|${statut}`;
+    if (filterKey !== lastDepensesFilterKey) {
+        depensesTablePage = 1;
+        lastDepensesFilterKey = filterKey;
+    }
 
     const tbody = document.getElementById('depenses-body'); 
     if(!tbody) return;
@@ -732,7 +798,31 @@ window.filtrerDepenses = function() {
     const displayTotal = document.getElementById('total-filtre-display');
     if(displayTotal) displayTotal.innerText = totalFilter.toFixed(2) + " €"; 
 
-    filtered.forEach(d => { 
+    const total = filtered.length;
+    const maxPage = Math.max(1, Math.ceil(total / DEPENSES_TABLE_PAGE_SIZE));
+    if (depensesTablePage < 1) depensesTablePage = 1;
+    if (depensesTablePage > maxPage) depensesTablePage = maxPage;
+    const startIdx = (depensesTablePage - 1) * DEPENSES_TABLE_PAGE_SIZE;
+    const endIdx = Math.min(total, startIdx + DEPENSES_TABLE_PAGE_SIZE);
+    const pageRows = filtered.slice(startIdx, endIdx);
+
+    const rangeEl = document.getElementById('depenses-range');
+    if (rangeEl) {
+        const from = total === 0 ? 0 : startIdx + 1;
+        const to = total === 0 ? 0 : endIdx;
+        rangeEl.textContent = `Affichage : ${from}-${to} sur ${total}`;
+    }
+    const prevBtn = document.getElementById('btn-depenses-prev');
+    const nextBtn = document.getElementById('btn-depenses-next');
+    if (prevBtn) prevBtn.disabled = depensesTablePage <= 1;
+    if (nextBtn) nextBtn.disabled = depensesTablePage >= maxPage;
+
+    if (pageRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#94a3b8;">Aucune dépense trouvée.</td></tr>`;
+        return;
+    }
+
+    pageRows.forEach(d => { 
         const badge = d.statut==='Réglé' 
             ? `<span class="badge badge-regle">Réglé</span>` 
             : `<span class="badge badge-attente" onclick="window.marquerCommeRegle('${d.id}')">En attente</span>`; 
@@ -926,7 +1016,8 @@ window.nouveauDocument = function() {
     if(document.getElementById('client_info')) document.getElementById('client_info').value = "";
     document.getElementById('defunt_nom').value = "";
     document.getElementById('doc_type').value = "DEVIS";
-    if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = "EMIS";
+    window.renderDocStatutOptionsForType("DEVIS");
+    setDocStatutSelectValue("En cours");
     if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = "";
     if(document.getElementById('dossier_numero')) document.getElementById('dossier_numero').value = "";
     if(document.getElementById('dossier_id')) document.getElementById('dossier_id').value = "";
@@ -965,12 +1056,24 @@ window.chargerDocument = async (id) => {
         document.getElementById('defunt_nom').value = data.defunt_nom || data.defunt?.nom || "";
         document.getElementById('defunt_date_naiss').value = data.defunt_date_naiss || data.defunt?.date_naiss || "";
         document.getElementById('defunt_date_deces').value = data.defunt_date_deces || data.defunt?.date_deces || "";
-        if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = (data.statut === "BROUILLON" ? "EMIS" : (data.statut || computeFactureStatut({ ...data, finalType: (data.type || data.info?.type), finalTotal: parseFloat(data.total || data.info?.total || 0), finalPaiements: (data.paiements || []) }) || "EMIS"));
         if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = data.date_echeance || "";
         if(document.getElementById('dossier_numero')) document.getElementById('dossier_numero').value = data.dossier_numero || "";
         if(document.getElementById('dossier_id')) document.getElementById('dossier_id').value = data.dossier_id || "";
         
-        document.getElementById('doc_type').value = data.type || data.info?.type; 
+        document.getElementById('doc_type').value = data.type || data.info?.type;
+        window.renderDocStatutOptionsForType(document.getElementById('doc_type').value);
+        const dtype = document.getElementById('doc_type').value;
+        if (dtype === 'DEVIS') {
+            setDocStatutSelectValue(data.statut_doc || 'En cours');
+        } else {
+            const merged = {
+                ...data,
+                finalType: data.type || data.info?.type,
+                finalTotal: parseFloat(data.total || data.info?.total || 0),
+                finalPaiements: data.paiements || []
+            };
+            setDocStatutSelectValue(computeFactureStatut(merged) || 'EMIS');
+        }
         document.getElementById('doc_date').value = data.date || data.info?.date; 
         document.getElementById('tbody_lignes').innerHTML = ""; 
         
@@ -1087,23 +1190,21 @@ window.sauvegarderDocument = async function() {
     }); 
 
     const docType = document.getElementById('doc_type').value;
+    const id = document.getElementById('current_doc_id').value;
     const docDate = document.getElementById('doc_date').value;
     const totalValue = parseFloat(document.getElementById('total_display').innerText);
     const lettrage = summarizePaiements(paiements, totalValue);
     const totalPayeCalc = lettrage.totalPaye;
     const resteCalc = lettrage.reste;
-    const existingStatut = String(currentDocSnapshot?.statut || "").trim().toUpperCase();
     const selectedStatut = String(document.getElementById('doc_statut')?.value || "").trim().toUpperCase();
-    const allowed = new Set(["EMIS", "PARTIEL", "PAYE", "ANNULE"]);
-    let statut = allowed.has(selectedStatut) ? selectedStatut : (existingStatut || 'EMIS');
-    if (!allowed.has(selectedStatut)) {
-        if (statut !== 'ANNULE') {
-            if (docType === 'FACTURE') {
-                if (totalPayeCalc <= 0) statut = 'EMIS';
-                else if (resteCalc > 0.01) statut = 'PARTIEL';
-                else statut = 'PAYE';
-            }
-        }
+    let statut = "EMIS";
+    if (docType === "FACTURE") {
+        if (selectedStatut === "ANNULE") statut = "ANNULE";
+        else if (totalPayeCalc <= 0) statut = "EMIS";
+        else if (resteCalc > 0.01) statut = "PARTIEL";
+        else statut = "PAYE";
+    } else {
+        statut = "EMIS";
     }
 
     // Émission / échéance (sans relances)
@@ -1132,9 +1233,15 @@ window.sauvegarderDocument = async function() {
         date_dernier_paiement: lettrage.lastDate === "-" ? "" : lettrage.lastDate,
         mode_paiement_principal: lettrage.mainMode === "-" ? "" : lettrage.mainMode,
         total: totalValue, total_paye: totalPayeCalc, reste_a_payer: resteCalc,
-        lignes: lignes, paiements: paiements, date_creation: new Date().toISOString(),
-        statut_doc: document.getElementById('doc_type').value === 'DEVIS' ? 'En cours' : 'Validé'
+        lignes: lignes, paiements: paiements,
+        statut_doc: document.getElementById('doc_type').value === 'DEVIS'
+            ? (document.getElementById('doc_statut')?.value || 'En cours')
+            : 'Validé'
     }; 
+
+    if (!id) {
+        docData.date_creation = new Date().toISOString();
+    }
 
     // Renforce la liaison facture -> dossier si champs encore vides
     if (!docData.dossier_id) {
@@ -1151,7 +1258,6 @@ window.sauvegarderDocument = async function() {
         }
     }
 
-    const id = document.getElementById('current_doc_id').value; 
     try { 
         docData.client_id = await ensureClientLinkOnSave();
 
@@ -1219,7 +1325,10 @@ window.supprimerDocument = async (id) => { if(confirm("Supprimer ?")) { await de
 window.transformerEnFacture = async function() { if(confirm("Créer une FACTURE à partir de ce devis ?")) { 
     const idDevis = document.getElementById('current_doc_id').value;
     if(idDevis) { try { await updateDoc(doc(db, "factures_v2", idDevis), { statut_doc: 'Validé' }); } catch(e) { console.log(e); } }
-    document.getElementById('doc_type').value = "FACTURE"; document.getElementById('doc_date').valueAsDate = new Date(); document.getElementById('current_doc_id').value = ""; document.getElementById('doc_numero').value = "Auto"; window.sauvegarderDocument(); 
+    document.getElementById('doc_type').value = "FACTURE";
+    window.renderDocStatutOptionsForType("FACTURE");
+    setDocStatutSelectValue("EMIS");
+    document.getElementById('doc_date').valueAsDate = new Date(); document.getElementById('current_doc_id').value = ""; document.getElementById('doc_numero').value = "Auto"; window.sauvegarderDocument(); 
 } };
 
 window.annulerDocumentById = async function(id) {
