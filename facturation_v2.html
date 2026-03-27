@@ -418,7 +418,12 @@
                         <input type="date" id="doc_date" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
                     <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <input id="doc_statut" placeholder="Statut" readonly style="background:#f8fafc; font-weight:700; width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                        <select id="doc_statut" onchange="window.onDocStatutChange && window.onDocStatutChange()" style="font-weight:700; width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+                            <option value="EMIS">EMIS</option>
+                            <option value="PARTIEL">PARTIEL</option>
+                            <option value="PAYE">PAYE</option>
+                            <option value="ANNULE">ANNULE</option>
+                        </select>
                         <input type="date" id="doc_echeance" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
                     <input id="dossier_numero" type="hidden">

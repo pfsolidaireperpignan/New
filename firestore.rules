@@ -178,10 +178,10 @@ service cloud.firestore {
       && (!('mode' in request.resource.data) || isString(request.resource.data.mode))
       && (!('statut' in request.resource.data) || isString(request.resource.data.statut))
       && (!('montant' in request.resource.data) || isNumber(request.resource.data.montant))
-          && (!('date_reglement' in request.resource.data) || isString(request.resource.data.date_reglement))
-          && (!('avance_versee' in request.resource.data) || isNumber(request.resource.data.avance_versee))
-          && (!('date_avance' in request.resource.data) || isString(request.resource.data.date_avance))
-          && (!('reste_a_payer' in request.resource.data) || isNumber(request.resource.data.reste_a_payer));
+      && (!('date_reglement' in request.resource.data) || isString(request.resource.data.date_reglement))
+      && (!('avance_versee' in request.resource.data) || isNumber(request.resource.data.avance_versee))
+      && (!('date_avance' in request.resource.data) || isString(request.resource.data.date_avance))
+      && (!('reste_a_payer' in request.resource.data) || isNumber(request.resource.data.reste_a_payer));
     }
 
     match /depenses/{docId} {
