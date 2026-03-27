@@ -388,6 +388,13 @@
                         <tbody id="depenses-body"></tbody>
                     </table>
                 </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px;">
+                    <div id="depenses-range" style="color:#334155; font-weight:700; font-size:13px;">Affichage : 0-0 sur 0</div>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn btn-grey" id="btn-depenses-prev" onclick="window.depensesPrevPage()"><i class="fas fa-chevron-left"></i> Précédent</button>
+                        <button type="button" class="btn btn-grey" id="btn-depenses-next" onclick="window.depensesNextPage()">Suivant <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -420,7 +427,7 @@
                 <div class="card" style="padding:24px; margin-bottom:0;">
                     <h3 style="margin-top:0; color:#111827; border-bottom:1px solid #eee; padding-bottom:10px;">INFOS DOCUMENT</h3>
                     <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <select id="doc_type" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;"><option>DEVIS</option><option>FACTURE</option></select>
+                        <select id="doc_type" onchange="window.onDocTypeChange && window.onDocTypeChange()" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;"><option>DEVIS</option><option>FACTURE</option></select>
                         <input id="doc_numero" placeholder="Numéro Auto (Laisser vide pour auto)" style="background:#f3f4f6; font-weight:bold; width:100%; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                         <input type="date" id="doc_date" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
                     </div>
