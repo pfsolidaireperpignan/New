@@ -198,7 +198,7 @@ async function renderClientPiecesJointes(clientObj) {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
     if (!clientObj?.id) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Enregistrez d\\'abord le client.</td></tr>';
+        tbody.innerHTML = "<tr><td colspan=\"3\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client.</td></tr>";
         const c0 = document.getElementById('client-pieces-count');
         if (c0) c0.textContent = "0";
         return;
@@ -345,9 +345,9 @@ export function createBaseClient() {
     document.getElementById('base-client-detail-view')?.classList.remove('hidden');
     switchBaseClientDetailTab('prestations');
     const p = document.getElementById('client-prestations-table-body');
-    if (p) p.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Enregistrez d\\'abord le client pour lier des prestations.</td></tr>';
+    if (p) p.innerHTML = "<tr><td colspan=\"4\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client pour lier des prestations.</td></tr>";
     const pj = document.getElementById('client-pieces-table-body');
-    if (pj) pj.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Enregistrez d\\'abord le client pour ajouter des pièces.</td></tr>';
+    if (pj) pj.innerHTML = "<tr><td colspan=\"3\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client pour ajouter des pièces.</td></tr>";
 }
 
 export async function deleteBaseClient(clientId) {
