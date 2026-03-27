@@ -34,6 +34,8 @@ service cloud.firestore {
         'date_modification',
         'defunt',
         'mandant',
+        'signataire',
+        'payeur',
         'technique',
         'transport',
         'details_op',
@@ -43,6 +45,8 @@ service cloud.firestore {
       ])
       && (!('defunt' in request.resource.data) || isMap(request.resource.data.defunt))
       && (!('mandant' in request.resource.data) || isMap(request.resource.data.mandant))
+      && (!('signataire' in request.resource.data) || isMap(request.resource.data.signataire))
+      && (!('payeur' in request.resource.data) || isMap(request.resource.data.payeur))
       && (!('technique' in request.resource.data) || isMap(request.resource.data.technique))
       && (!('transport' in request.resource.data) || isMap(request.resource.data.transport))
       && (!('details_op' in request.resource.data) || isMap(request.resource.data.details_op))

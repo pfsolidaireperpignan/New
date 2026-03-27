@@ -400,17 +400,28 @@
                                     <label>Civilité & Nom Prénom</label>
                                     <div style="display:flex; gap:10px;">
                                         <select id="civilite_mandant" style="width:90px;"><option>M.</option><option>Mme</option></select>
-                                        <input id="soussigne" placeholder="Nom et Prénom" style="flex:1; font-weight:600;">
+                                        <input id="soussigne" placeholder="Nom" style="flex:1; font-weight:600;">
+                                        <input id="mandant_prenom" placeholder="Prénom" style="flex:1;">
                                     </div>
                                 </div>
                                 <div><label>Lien de parenté</label><input id="lien" placeholder="Sélectionnez..." list="liens_list"></div>
                                 <div><label>Téléphone</label><input id="tel_mandant" placeholder="06..."></div>
                                 <div class="span-2"><label>Adresse Complète</label><input id="demeurant" placeholder="Numéro, Rue, Code Postal, Ville" list="villes_list"></div>
-                                <div class="span-2" style="margin-top:10px; padding-top:10px; border-top:1px dashed #cbd5e1;"><small style="color:#64748b; font-weight:700;">SIGNATAIRE DU POUVOIR (distinct)</small></div>
-                                <div class="span-2"><label>Nom & Prénom Signataire</label><input id="signataire_nom" placeholder="Ex: Conjoint / Épouse / Fils..."></div>
-                                <div><label>Téléphone Signataire</label><input id="signataire_tel" placeholder="06..."></div>
-                                <div><label>Lien Signataire</label><input id="signataire_lien" placeholder="Conjoint, fille..." list="liens_list"></div>
-                                <div class="span-2"><label>Adresse Signataire</label><input id="signataire_adresse" placeholder="Adresse signataire" list="villes_list"></div>
+                                <div class="span-2" style="margin-top:10px; padding-top:10px; border-top:1px dashed #cbd5e1;">
+                                    <label style="display:flex; align-items:center; gap:8px; font-weight:700; color:#334155;">
+                                        <input type="checkbox" id="payeur_different" onchange="window.togglePayeurSection()" style="width:auto;">
+                                        Le payeur de la facture est différent du signataire
+                                    </label>
+                                </div>
+                                <div id="bloc_payeur_different" class="span-2 hidden" style="overflow:hidden; transition:all .25s ease; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px;">
+                                    <div style="font-weight:700; color:#0f172a; margin-bottom:10px;">Payeur (distinct)</div>
+                                    <div class="form-grid">
+                                        <div class="span-2"><label>Nom entité / personne</label><input id="payeur_nom" placeholder="Nom payeur"></div>
+                                        <div><label>Téléphone payeur</label><input id="payeur_tel" placeholder="06..."></div>
+                                        <div><label>Email payeur</label><input id="payeur_email" placeholder="email@exemple.com"></div>
+                                        <div class="span-2"><label>Adresse payeur</label><input id="payeur_adresse" placeholder="Adresse payeur" list="villes_list"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
