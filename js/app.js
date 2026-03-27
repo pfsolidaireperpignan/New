@@ -169,6 +169,11 @@ window.openBaseClientDetails = DB.openBaseClientDetails;
 window.showBaseClientListView = DB.showBaseClientListView;
 window.switchBaseClientDetailTab = DB.switchBaseClientDetailTab;
 window.saveBaseClientDetails = DB.saveBaseClientDetails;
+window.createBaseClient = DB.createBaseClient;
+window.deleteBaseClient = DB.deleteBaseClient;
+window.uploadClientAttachment = DB.uploadClientAttachment;
+window.deleteClientAttachment = DB.deleteClientAttachment;
+window.openClientNewPrestation = DB.openClientNewPrestation;
 window.openClientDocEditor = DB.openClientDocEditor;
 window.openClientDocPdf = DB.openClientDocPdf;
 window.validerClientDoc = DB.validerClientDoc;
@@ -188,6 +193,27 @@ window.nouveauDossier = function() {
     DB.viderFormulaire();
     window.showSection('admin');
     window.showAdminDetailView();
+};
+window.prefillClientContext = null;
+window.startNewPrestationFromClient = async function(clientId, clientObj) {
+    let resolved = clientObj || null;
+    if (!resolved && clientId) {
+        try {
+            const cSnap = await getDoc(doc(db, "clients", clientId));
+            if (cSnap.exists()) resolved = { id: cSnap.id, ...(cSnap.data() || {}) };
+        } catch (_) {}
+    }
+    window.prefillClientContext = {
+        id: clientId || resolved?.id || "",
+        nom: resolved?.nom || "",
+        tel: resolved?.telephone || "",
+        adresse: resolved?.adresse || ""
+    };
+    window.nouveauDossier();
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
+    setVal('soussigne', window.prefillClientContext.nom);
+    setVal('tel_mandant', window.prefillClientContext.tel);
+    setVal('demeurant', window.prefillClientContext.adresse);
 };
 window.viderFormulaire = function() {
     window.currentDossierId = null;
@@ -269,6 +295,21 @@ window.switchAdminTab = function(tabName) {
 };
 window.toggleSidebar = function() { const sb = document.querySelector('.sidebar'); if(sb) sb.classList.toggle('collapsed'); };
 
+function handleIndexDeepLinks() {
+    try {
+        const params = new URLSearchParams(window.location.search || "");
+        const targetView = params.get("view");
+        const clientForPrestation = params.get("new_prestation_client");
+        if (targetView === "admin" || clientForPrestation) {
+            window.showSection('admin');
+        }
+        if (clientForPrestation) {
+            window.startNewPrestationFromClient(clientForPrestation, null);
+        }
+    } catch (_) {}
+}
+setTimeout(handleIndexDeepLinks, 250);
+
 // GESTION PLANNING DYNAMIQUE
 window.ajouterLignePlanning = function(heure="", desc="") {
     const container = document.getElementById('container_planning');
@@ -343,6 +384,14 @@ window.sauvegarderDossier = async function() {
                 columbarium: getVal('proto_columbarium'), instructions: getVal('proto_instructions'), planning_dyn: planningData 
             }
         };
+        // Lien logique dossier -> client pour l'onglet Prestations
+        if (window.prefillClientContext?.id || window.prefillClientContext?.nom) {
+            data.details_op = {
+                ...(data.details_op || {}),
+                client_id: window.prefillClientContext.id || "",
+                client_nom: window.prefillClientContext.nom || ""
+            };
+        }
         let finalId = idDossier;
         if(idDossier) { await updateDoc(doc(db, "dossiers_admin", idDossier), data); } 
         else { data.date_creation = new Date().toISOString(); const docRef = await addDoc(collection(db, "dossiers_admin"), data); finalId = docRef.id; document.getElementById('dossier_id').value = finalId; }
@@ -402,6 +451,7 @@ window.sauvegarderDossier = async function() {
         alert("✅ Sauvegarde réussie !");
         window.chargerDossier(finalId);
         if(window.chargerBaseClients) window.chargerBaseClients();
+        window.prefillClientContext = null;
     } catch(e) {
         console.error(e);
         alert(`❌ Sauvegarde impossible.\n\n${formatFirebaseError(e)}`);

@@ -66,6 +66,9 @@ async function handleDeepLinkAction() {
         }
         if (params.get("preview") && typeof window.apercuDocument === "function") {
             await window.apercuDocument(docId);
+            if (params.get("autoclose") === "1") {
+                setTimeout(() => { try { window.close(); } catch (_) {} }, 250);
+            }
         }
     } catch (_) {}
 }

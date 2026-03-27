@@ -13,32 +13,43 @@ const escapeHtml = (value) => String(value ?? "")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+const truncateText = (value, max = 48) => {
+    const s = String(value ?? "");
+    if (s.length <= max) return s;
+    return s.slice(0, max - 1) + "…";
+};
 
 function renderClientsRefRows(refBody, rows) {
     if (!refBody) return;
     if (!rows || !rows.length) {
-        refBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Aucune fiche client.</td></tr>';
+        refBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#94a3b8;">Aucune fiche client.</td></tr>';
         return;
     }
     refBody.innerHTML = "";
     rows.forEach(c => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><code>${escapeHtml(c.id || '-')}</code></td>
             <td><strong>${escapeHtml(c.nom || '-')}</strong></td>
             <td>${escapeHtml(c.telephone || '-')}</td>
             <td>${escapeHtml(c.email || '-')}</td>
             <td><span class="badge badge-blue">${escapeHtml(c.type || 'particulier')}</span></td>
             <td>${escapeHtml(c.adresse || '-')}</td>
-            <td>${escapeHtml(c.notes || '-')}</td>
+            <td title="${escapeHtml(c.notes || '-')}" style="max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(truncateText(c.notes || '-', 55))}</td>
             <td style="text-align:center;">
                 <button class="btn-icon" onclick="window.openBaseClientDetails('${escapeHtml(c.id || '')}')" title="Ouvrir détails">
                     <i class="fas fa-eye" style="color:#3b82f6;"></i>
+                </button>
+                <button class="btn-icon" onclick="window.deleteBaseClient('${escapeHtml(c.id || '')}')" title="Supprimer client">
+                    <i class="fas fa-trash" style="color:#ef4444;"></i>
                 </button>
             </td>
         `;
         refBody.appendChild(tr);
     });
+    const totalEl = document.getElementById('base-clients-count');
+    const filteredEl = document.getElementById('base-clients-filtered-count');
+    if (totalEl) totalEl.textContent = String(clientsRefCache.length || 0);
+    if (filteredEl) filteredEl.textContent = String(rows.length || 0);
 }
 
 function getClientById(id) {
@@ -64,6 +75,17 @@ function formatDateFr(dateStr) {
 
 function parseTypeDoc(x) {
     return String(x?.type || x?.info?.type || "DOC").toUpperCase();
+}
+
+function formatIsoDate(d) {
+    if (!d) return "-";
+    try {
+        const dt = new Date(d);
+        if (Number.isNaN(dt.getTime())) return String(d);
+        return dt.toLocaleDateString("fr-FR");
+    } catch (_) {
+        return String(d);
+    }
 }
 
 function normalizeStatut(x) {
@@ -128,6 +150,94 @@ async function renderClientFacturesDevis(clientObj) {
     });
 }
 
+async function renderClientPrestations(clientObj) {
+    const tbody = document.getElementById('client-prestations-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
+
+    let rows = [];
+    try {
+        if (clientObj?.id) {
+            const s1 = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.client_id", "==", clientObj.id), limit(200)));
+            s1.forEach(d => rows.push({ id: d.id, ...(d.data() || {}) }));
+        }
+    } catch (_) {}
+    if (!rows.length && clientObj?.nom) {
+        try {
+            const s2 = await getDocs(query(collection(db, "dossiers_admin"), where("mandant.nom", "==", clientObj.nom), limit(200)));
+            s2.forEach(d => rows.push({ id: d.id, ...(d.data() || {}) }));
+        } catch (_) {}
+    }
+
+    rows.sort((a, b) => String(b.date_creation || "").localeCompare(String(a.date_creation || "")));
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Aucune prestation liée.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = "";
+    rows.forEach(d => {
+        const prestation = d?.technique?.type_operation || "Dossier";
+        const defunt = `${d?.defunt?.nom || ""} ${d?.defunt?.prenom || ""}`.trim() || "-";
+        const dte = formatIsoDate(d?.date_creation || d?.date_modification || "");
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><span class="badge badge-blue">${escapeHtml(prestation)}</span></td>
+            <td>${escapeHtml(defunt)}</td>
+            <td>${escapeHtml(dte)}</td>
+            <td style="text-align:center;">
+                <button class="btn-icon" onclick="window.chargerDossier('${escapeHtml(d.id)}')" title="Ouvrir dossier"><i class="fas fa-eye"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function renderClientPiecesJointes(clientObj) {
+    const tbody = document.getElementById('client-pieces-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
+    if (!clientObj?.id) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Enregistrez d\\'abord le client.</td></tr>';
+        const c0 = document.getElementById('client-pieces-count');
+        if (c0) c0.textContent = "0";
+        return;
+    }
+    try {
+        const parentKey = `client_${clientObj.id}`;
+        const snap = await getDocs(query(collection(db, "ged_files"), where("dossier_parent", "==", parentKey), limit(300)));
+        const rows = [];
+        snap.forEach(d => rows.push({ id: d.id, ...(d.data() || {}) }));
+        rows.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Aucune pièce jointe.</td></tr>';
+            const c1 = document.getElementById('client-pieces-count');
+            if (c1) c1.textContent = "0";
+            return;
+        }
+        tbody.innerHTML = "";
+        rows.forEach(x => {
+            const href = x.url || x.content || "#";
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(x.nom || "Document")}</td>
+                <td>${escapeHtml(formatIsoDate(x.date || ""))}</td>
+                <td style="text-align:center;">
+                    <a class="btn-icon" href="${escapeHtml(href)}" target="_blank" rel="noopener" title="Voir"><i class="fas fa-eye"></i></a>
+                    <button class="btn-icon" onclick="window.deleteClientAttachment('${escapeHtml(x.id)}')" title="Supprimer"><i class="fas fa-trash" style="color:#ef4444;"></i></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+        const c2 = document.getElementById('client-pieces-count');
+        if (c2) c2.textContent = String(rows.length || 0);
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#ef4444;">Erreur chargement pièces jointes.</td></tr>';
+        const c3 = document.getElementById('client-pieces-count');
+        if (c3) c3.textContent = "0";
+    }
+}
+
 export function openClientDocEditor(encodedDocId) {
     const id = decodeURIComponent(String(encodedDocId || ""));
     if (!id) return;
@@ -137,8 +247,18 @@ export function openClientDocEditor(encodedDocId) {
 export function openClientDocPdf(encodedDocId) {
     const id = decodeURIComponent(String(encodedDocId || ""));
     if (!id) return;
-    const url = `facturation_v2.html?preview=${encodeURIComponent(id)}`;
+    const url = `facturation_v2.html?preview=${encodeURIComponent(id)}&autoclose=1`;
     window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export function openClientNewPrestation() {
+    const id = selectedClientRef?.id || "";
+    if (!id) return alert("Aucun client sélectionné.");
+    if (typeof window.startNewPrestationFromClient === "function") {
+        window.startNewPrestationFromClient(id, selectedClientRef);
+        return;
+    }
+    window.location.href = `index.html?view=admin&new_prestation_client=${encodeURIComponent(id)}`;
 }
 
 export async function validerClientDoc(encodedDocId) {
@@ -160,13 +280,15 @@ export function showBaseClientListView() {
 }
 
 export function switchBaseClientDetailTab(tab) {
-    const tabs = ['prestations', 'factures', 'journal', 'technique', 'pieces'];
+    const tabs = ['prestations', 'factures', 'pieces'];
     tabs.forEach(t => {
         document.getElementById(`client-tab-${t}`)?.classList.remove('active');
         document.getElementById(`client-tab-content-${t}`)?.classList.add('hidden');
     });
     document.getElementById(`client-tab-${tab}`)?.classList.add('active');
     document.getElementById(`client-tab-content-${tab}`)?.classList.remove('hidden');
+    if (tab === 'prestations' && selectedClientRef) renderClientPrestations(selectedClientRef);
+    if (tab === 'pieces' && selectedClientRef) renderClientPiecesJointes(selectedClientRef);
 }
 
 export async function openBaseClientDetails(clientId) {
@@ -177,12 +299,13 @@ export async function openBaseClientDetails(clientId) {
     document.getElementById('base-clients-list-view')?.classList.add('hidden');
     document.getElementById('base-client-detail-view')?.classList.remove('hidden');
     switchBaseClientDetailTab('factures');
+    await renderClientPrestations(c);
     await renderClientFacturesDevis(c);
+    await renderClientPiecesJointes(c);
 }
 
 export async function saveBaseClientDetails() {
     const id = document.getElementById('detail_client_id')?.value || "";
-    if (!id) return alert("ID client manquant.");
     const data = {
         nom: document.getElementById('detail_client_nom')?.value || "",
         type: document.getElementById('detail_client_type')?.value || "particulier",
@@ -194,15 +317,94 @@ export async function saveBaseClientDetails() {
     };
     if (!data.nom) return alert("Nom client obligatoire.");
     try {
-        await updateDoc(doc(db, "clients", id), data);
-        const idx = clientsRefCache.findIndex(x => String(x.id) === String(id));
-        if (idx >= 0) clientsRefCache[idx] = { ...clientsRefCache[idx], ...data };
-        selectedClientRef = { ...(selectedClientRef || {}), id, ...data };
+        if (id) {
+            await updateDoc(doc(db, "clients", id), data);
+            const idx = clientsRefCache.findIndex(x => String(x.id) === String(id));
+            if (idx >= 0) clientsRefCache[idx] = { ...clientsRefCache[idx], ...data };
+            selectedClientRef = { ...(selectedClientRef || {}), id, ...data };
+        } else {
+            const payload = { ...data, created_at: new Date().toISOString() };
+            const created = await addDoc(collection(db, "clients"), payload);
+            selectedClientRef = { id: created.id, ...payload };
+            clientsRefCache.unshift(selectedClientRef);
+            const idEl = document.getElementById('detail_client_id');
+            if (idEl) idEl.value = created.id;
+        }
         setClientDetailForm(selectedClientRef);
         filtrerBaseClients();
         alert("✅ Modifications client enregistrées.");
     } catch (e) {
         alert("Erreur enregistrement client : " + (e?.message || e));
+    }
+}
+
+export function createBaseClient() {
+    selectedClientRef = { id: "", nom: "", type: "particulier", telephone: "", email: "", adresse: "", notes: "" };
+    setClientDetailForm(selectedClientRef);
+    document.getElementById('base-clients-list-view')?.classList.add('hidden');
+    document.getElementById('base-client-detail-view')?.classList.remove('hidden');
+    switchBaseClientDetailTab('prestations');
+    const p = document.getElementById('client-prestations-table-body');
+    if (p) p.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Enregistrez d\\'abord le client pour lier des prestations.</td></tr>';
+    const pj = document.getElementById('client-pieces-table-body');
+    if (pj) pj.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Enregistrez d\\'abord le client pour ajouter des pièces.</td></tr>';
+}
+
+export async function deleteBaseClient(clientId) {
+    const id = String(clientId || "");
+    if (!id) return;
+    if (!confirm("Supprimer ce client ? Cette action est définitive.")) return;
+    try {
+        await deleteDoc(doc(db, "clients", id));
+        clientsRefCache = clientsRefCache.filter(x => String(x.id) !== id);
+        filtrerBaseClients();
+        alert("✅ Client supprimé.");
+    } catch (e) {
+        alert("Erreur suppression client : " + (e?.message || e));
+    }
+}
+
+export async function uploadClientAttachment() {
+    if (!selectedClientRef?.id) return alert("Enregistrez d'abord le client.");
+    const fileInput = document.getElementById('client_piece_input');
+    const nameInput = document.getElementById('client_piece_name');
+    const file = fileInput?.files?.[0];
+    if (!file) return alert("Sélectionnez un fichier.");
+    const isOk = (file.type || "").startsWith("image/") || file.type === "application/pdf";
+    if (!isOk) return alert("Format non supporté. Utilisez PDF ou image.");
+    const parentKey = `client_${selectedClientRef.id}`;
+    const fileName = (nameInput?.value || file.name || "Document").trim();
+    try {
+        const b64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(String(e?.target?.result || ""));
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        await addDoc(collection(db, "ged_files"), {
+            nom: fileName,
+            content: b64,
+            dossier_parent: parentKey,
+            date: new Date().toISOString()
+        });
+        if (fileInput) fileInput.value = "";
+        if (nameInput) nameInput.value = "";
+        await renderClientPiecesJointes(selectedClientRef);
+        alert("✅ Pièce jointe ajoutée.");
+    } catch (e) {
+        alert("Erreur ajout pièce jointe : " + (e?.message || e));
+    }
+}
+
+export async function deleteClientAttachment(fileId) {
+    const id = String(fileId || "");
+    if (!id) return;
+    if (!confirm("Supprimer cette pièce jointe ?")) return;
+    try {
+        await deleteDoc(doc(db, "ged_files", id));
+        if (selectedClientRef) await renderClientPiecesJointes(selectedClientRef);
+    } catch (e) {
+        alert("Erreur suppression pièce jointe : " + (e?.message || e));
     }
 }
 
@@ -213,7 +415,7 @@ function guessDossierCode(data, id) {
 function renderDossiersAdminRows(tbody, rows) {
     if (!tbody) return;
     if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Aucun dossier trouvé.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Aucun dossier trouvé.</td></tr>';
         return;
     }
     tbody.innerHTML = "";
@@ -224,10 +426,8 @@ function renderDossiersAdminRows(tbody, rows) {
             try { dateCreation = new Date(data.date_creation).toLocaleDateString(); } catch (_) {}
         }
         const defuntNomComplet = `${data.defunt?.nom || ''} ${data.defunt?.prenom || ''}`.trim();
-        const codeDossier = guessDossierCode(data, data.id);
         tr.innerHTML = `
             <td>${dateCreation}</td>
-            <td><strong>${escapeHtml(codeDossier)}</strong></td>
             <td><strong>${escapeHtml(defuntNomComplet || 'Inconnu')}</strong></td>
             <td>${escapeHtml(data.mandant?.nom || '-')}</td>
             <td><span class="badge badge-blue">${escapeHtml(data.technique?.type_operation || 'Dossier')}</span></td>
@@ -290,7 +490,7 @@ export function filtrerBaseClients() {
 export async function chargerDossiersAdminList() {
     const tbody = document.getElementById('dossiers-admin-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">Chargement des dossiers...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Chargement des dossiers...</td></tr>';
     try {
         const q = query(collection(db, "dossiers_admin"), orderBy("date_creation", "desc"), limit(200));
         const snapshot = await getDocs(q);
@@ -303,7 +503,7 @@ export async function chargerDossiersAdminList() {
         filtrerDossiersAdmin();
     } catch (e) {
         console.error(e);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#ef4444;">Erreur chargement dossiers.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ef4444;">Erreur chargement dossiers.</td></tr>';
     }
 }
 
