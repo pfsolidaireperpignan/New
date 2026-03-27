@@ -9,6 +9,8 @@ let clientsRefCache = []; // collection clients
 let selectedClientRef = null;
 let clientsPage = 1;
 const CLIENTS_PAGE_SIZE = 20;
+let dossiersPage = 1;
+const DOSSIERS_PAGE_SIZE = 20;
 const escapeHtml = (value) => String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -536,12 +538,28 @@ function guessDossierCode(data, id) {
 
 function renderDossiersAdminRows(tbody, rows) {
     if (!tbody) return;
+    const total = Math.max(0, parseInt(rows?.length || 0, 10) || 0);
+    const maxPage = Math.max(1, Math.ceil(total / DOSSIERS_PAGE_SIZE));
+    if (dossiersPage < 1) dossiersPage = 1;
+    if (dossiersPage > maxPage) dossiersPage = maxPage;
+
+    const start = total === 0 ? 0 : ((dossiersPage - 1) * DOSSIERS_PAGE_SIZE + 1);
+    const end = total === 0 ? 0 : Math.min(total, dossiersPage * DOSSIERS_PAGE_SIZE);
+    const rangeEl = document.getElementById('admin-dossiers-range');
+    if (rangeEl) rangeEl.textContent = `Affichage : ${start}-${end} sur ${total}`;
+    const prevBtn = document.getElementById('btn-admin-prev');
+    const nextBtn = document.getElementById('btn-admin-next');
+    if (prevBtn) prevBtn.disabled = dossiersPage <= 1;
+    if (nextBtn) nextBtn.disabled = dossiersPage >= maxPage;
+
     if (!rows.length) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Aucun dossier trouvé.</td></tr>';
         return;
     }
+    const startIdx = (dossiersPage - 1) * DOSSIERS_PAGE_SIZE;
+    const pageRows = rows.slice(startIdx, startIdx + DOSSIERS_PAGE_SIZE);
     tbody.innerHTML = "";
-    rows.forEach(data => {
+    pageRows.forEach(data => {
         const tr = document.createElement('tr');
         let dateCreation = '-';
         if (data.date_creation) {
@@ -643,6 +661,7 @@ export async function chargerDossiersAdminList() {
             data.id = docSnap.id;
             dossiersCache.push(data);
         });
+        dossiersPage = 1;
         filtrerDossiersAdmin();
     } catch (e) {
         console.error(e);
@@ -662,6 +681,16 @@ export function filtrerDossiersAdmin() {
         return txt.includes(term);
     });
     renderDossiersAdminRows(tbody, rows);
+}
+
+export function adminDossiersNextPage() {
+    dossiersPage += 1;
+    filtrerDossiersAdmin();
+}
+
+export function adminDossiersPrevPage() {
+    dossiersPage -= 1;
+    filtrerDossiersAdmin();
 }
 
 // --- 3. IMPORT (FACTURATION -> DOSSIER) ---
