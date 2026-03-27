@@ -18,11 +18,13 @@ let cacheDossiersAdmin = [];
 let lastFactureCursor = null;
 let hasMoreFactures = true;
 const FACTURES_PAGE_SIZE = 60;
+const FACTURES_TABLE_PAGE_SIZE = 20;
 let currentDocSnapshot = null;
 let quickFilter = "ALL"; // ALL | EN_RETARD | PAYE | PARTIEL | EMIS
 let tableSortKey = "date"; // date | numero
 let tableSortDir = "desc"; // asc | desc
 let deepLinkHandled = false;
+let facturesTablePage = 1;
 let global_CA = 0; 
 let global_Depenses = 0; 
 let logoBase64 = null; 
@@ -260,6 +262,17 @@ window.sortFacturesBy = function(key) {
         sel.value = `${tableSortKey}_${tableSortDir}`;
     }
     updateFactureSortHeaders();
+    facturesTablePage = 1;
+    window.filtrerFactures();
+};
+
+window.facturesNextPage = function() {
+    facturesTablePage += 1;
+    window.filtrerFactures();
+};
+
+window.facturesPrevPage = function() {
+    facturesTablePage -= 1;
     window.filtrerFactures();
 };
 
@@ -426,6 +439,7 @@ window.setQuickFilter = function(value) {
     const idx = map[quickFilter];
     const list = document.querySelectorAll('.quick-filter');
     if (Number.isInteger(idx) && list[idx]) list[idx].classList.add('active');
+    facturesTablePage = 1;
     window.filtrerFactures();
 };
 
@@ -516,8 +530,27 @@ window.filtrerFactures = function() {
         if (fSort === "numero_desc") return numB.localeCompare(numA, 'fr', { numeric: true, sensitivity: 'base' });
         return dateB - dateA; // date_desc (défaut)
     });
+
+    const total = results.length;
+    const maxPage = Math.max(1, Math.ceil(total / FACTURES_TABLE_PAGE_SIZE));
+    if (facturesTablePage < 1) facturesTablePage = 1;
+    if (facturesTablePage > maxPage) facturesTablePage = maxPage;
+    const startIdx = (facturesTablePage - 1) * FACTURES_TABLE_PAGE_SIZE;
+    const endIdx = Math.min(total, startIdx + FACTURES_TABLE_PAGE_SIZE);
+    const pageRows = results.slice(startIdx, endIdx);
+
+    const rangeEl = document.getElementById('factures-range');
+    if (rangeEl) {
+        const from = total === 0 ? 0 : startIdx + 1;
+        const to = total === 0 ? 0 : endIdx;
+        rangeEl.textContent = `Affichage : ${from}-${to} sur ${total}`;
+    }
+    const prevBtn = document.getElementById('btn-factures-prev');
+    const nextBtn = document.getElementById('btn-factures-next');
+    if (prevBtn) prevBtn.disabled = facturesTablePage <= 1;
+    if (nextBtn) nextBtn.disabled = facturesTablePage >= maxPage;
     
-    if(results.length === 0) {
+    if(pageRows.length === 0) {
         tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#94a3b8;">Aucun document trouvé.</td></tr>';
         return;
     }
@@ -536,7 +569,7 @@ window.filtrerFactures = function() {
         try { return new Date(iso).toLocaleDateString('fr-FR'); } catch(e) { return String(iso); }
     }
 
-    results.forEach(d => {
+    pageRows.forEach(d => {
         const paye = d.finalPaiements.reduce((s, p) => s + parseFloat(p.montant), 0);
         const reste = d.finalTotal - paye;
         let dateAffiche = "-";
