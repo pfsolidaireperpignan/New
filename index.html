@@ -222,11 +222,11 @@
             <div class="page-header">
                 <h1>Dossier Administratif</h1>
                 <div style="display:flex; gap:10px;">
-                    <button class="btn btn-red" onclick="window.viderFormulaire()"><i class="fas fa-trash-alt"></i> NOUVEAU</button>
-                    <button class="btn btn-green" id="btn-save-bdd" onclick="window.sauvegarderDossier()"><i class="fas fa-save"></i> ENREGISTRER</button>
+                    <button class="btn btn-blue" onclick="window.nouveauDossier()"><i class="fas fa-plus"></i> Nouveau dossier</button>
                 </div>
             </div>
 
+            <div id="admin-list-view">
             <div class="card" style="padding:0; overflow:hidden;">
                 <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <strong style="color:#0f172a;">Dossiers Administratifs</strong>
@@ -240,7 +240,16 @@
                     <tbody id="dossiers-admin-table-body"></tbody>
                 </table>
             </div>
+            </div>
 
+            <div id="admin-detail-view" class="hidden">
+            <div class="page-header" style="margin-top:8px;">
+                <button class="btn btn-grey" onclick="window.showAdminListView()"><i class="fas fa-arrow-left"></i> Retour à la liste</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-red" onclick="window.viderFormulaire()"><i class="fas fa-trash-alt"></i> NOUVEAU</button>
+                    <button class="btn btn-green" id="btn-save-bdd" onclick="window.sauvegarderDossier()"><i class="fas fa-save"></i> ENREGISTRER</button>
+                </div>
+            </div>
             <div class="card" style="background:#f0f9ff; border:1px solid #bae6fd; margin-bottom:20px;">
                 <div style="display:flex; align-items:center; gap:20px;">
                     <div style="width:50px; height:50px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--secondary); font-size:1.5rem;"><i class="fas fa-cloud-download-alt"></i></div>
@@ -618,6 +627,7 @@
                         <button class="btn btn-blue" onclick="window.genererDemandeOuverture()">Ouverture Sépulture</button>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     </main>
