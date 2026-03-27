@@ -154,7 +154,7 @@ async function renderClientFacturesDevis(clientObj) {
 async function renderClientPrestations(clientObj) {
     const tbody = document.getElementById('client-prestations-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
 
     let rows = [];
     const seen = new Set();
@@ -171,12 +171,16 @@ async function renderClientPrestations(clientObj) {
         if (clientId) {
             const s1 = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.client_id", "==", clientId), limit(300)));
             s1.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
+            const s1b = await getDocs(query(collection(db, "dossiers_admin"), where("details_op.signataire_client_id", "==", clientId), limit(300)));
+            s1b.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
         }
     } catch (_) {}
     if (!rows.length && clientNom) {
         try {
             const s2 = await getDocs(query(collection(db, "dossiers_admin"), where("mandant.nom", "==", clientNom), limit(300)));
             s2.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
+            const s2b = await getDocs(query(collection(db, "dossiers_admin"), where("signataire.nom", "==", clientNom), limit(300)));
+            s2b.forEach(d => pushUnique({ id: d.id, ...(d.data() || {}) }));
         } catch (_) {}
     }
     if (!rows.length && clientNom) {
@@ -221,10 +225,14 @@ async function renderClientPrestations(clientObj) {
                 allDossiers2.forEach(d => {
                     const item = { id: d.id, ...(d.data() || {}) };
                     const mandantNom = normalizeText(item?.mandant?.nom || "");
+                    const signataireNom = normalizeText(item?.signataire?.nom || "");
                     const linkedNom = normalizeText(item?.details_op?.client_nom || "");
+                    const linkedSignataireNom = normalizeText(item?.details_op?.signataire_client_nom || "");
                     const isMatch =
                         (mandantNom && (mandantNom.includes(clientNomNorm) || clientNomNorm.includes(mandantNom))) ||
-                        (linkedNom && (linkedNom.includes(clientNomNorm) || clientNomNorm.includes(linkedNom)));
+                        (linkedNom && (linkedNom.includes(clientNomNorm) || clientNomNorm.includes(linkedNom))) ||
+                        (signataireNom && (signataireNom.includes(clientNomNorm) || clientNomNorm.includes(signataireNom))) ||
+                        (linkedSignataireNom && (linkedSignataireNom.includes(clientNomNorm) || clientNomNorm.includes(linkedSignataireNom)));
                     if (isMatch) pushUnique(item);
                 });
             }
@@ -233,7 +241,7 @@ async function renderClientPrestations(clientObj) {
 
     rows.sort((a, b) => String(b.date_creation || "").localeCompare(String(a.date_creation || "")));
     if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Aucune prestation liée.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Aucune prestation liée.</td></tr>';
         return;
     }
 
@@ -242,11 +250,15 @@ async function renderClientPrestations(clientObj) {
         const prestation = d?.technique?.type_operation || "Dossier";
         const defunt = `${d?.defunt?.nom || ""} ${d?.defunt?.prenom || ""}`.trim() || "-";
         const dte = formatIsoDate(d?.date_creation || d?.date_modification || "");
+        const isPayeur = String(d?.details_op?.client_id || "") === String(clientObj?.id || "") || normalizeText(d?.mandant?.nom || "") === normalizeText(clientObj?.nom || "");
+        const isSignataire = String(d?.details_op?.signataire_client_id || "") === String(clientObj?.id || "") || normalizeText(d?.signataire?.nom || "") === normalizeText(clientObj?.nom || "");
+        const role = isPayeur && isSignataire ? "Payeur + Signataire" : (isPayeur ? "Payeur/Demandeur" : (isSignataire ? "Signataire pouvoir" : "Lié"));
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><span class="badge badge-blue">${escapeHtml(prestation)}</span></td>
             <td>${escapeHtml(defunt)}</td>
             <td>${escapeHtml(dte)}</td>
+            <td><span class="badge badge-gris">${escapeHtml(role)}</span></td>
             <td style="text-align:center;">
                 <button class="btn-icon" onclick="window.chargerDossier('${escapeHtml(d.id)}')" title="Ouvrir dossier"><i class="fas fa-eye"></i></button>
             </td>
@@ -407,7 +419,7 @@ export function createBaseClient() {
     document.getElementById('base-client-detail-view')?.classList.remove('hidden');
     switchBaseClientDetailTab('prestations');
     const p = document.getElementById('client-prestations-table-body');
-    if (p) p.innerHTML = "<tr><td colspan=\"4\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client pour lier des prestations.</td></tr>";
+    if (p) p.innerHTML = "<tr><td colspan=\"5\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client pour lier des prestations.</td></tr>";
     const pj = document.getElementById('client-pieces-table-body');
     if (pj) pj.innerHTML = "<tr><td colspan=\"3\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client pour ajouter des pièces.</td></tr>";
 }
