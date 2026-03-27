@@ -89,6 +89,14 @@
                 <div><label>Avance versée</label><input type="number" id="dep_modal_avance" step="0.01" oninput="window.calculerResteDepenseModal()"></div>
                 <div><label>Date avance payée</label><input type="date" id="dep_modal_date_avance"></div>
                 <div><label>Reste à payer</label><input type="number" id="dep_modal_reste" readonly style="background:#fff7ed; border:1px dashed #fca5a5; font-weight:700;"></div>
+                <div style="grid-column: span 4;">
+                    <label>Justificatif (optionnel, image ou PDF)</label>
+                    <input type="file" id="dep_modal_justif" accept="image/*,application/pdf" style="max-width:100%; padding:8px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc;">
+                    <input type="hidden" id="dep_modal_justif_url" value="">
+                    <input type="hidden" id="dep_modal_justif_path" value="">
+                    <input type="hidden" id="dep_modal_justif_nom" value="">
+                    <div id="dep_modal_justif_status" style="margin-top:8px; font-size:0.9rem;"></div>
+                </div>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
                 <button class="btn btn-grey" onclick="window.closeDepenseEditModal()">Annuler</button>
@@ -472,11 +480,13 @@
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
                 <div class="card" style="background:#ecfccb; border:1px solid #bef264; padding:24px; margin-bottom:0;">
                     <h3 style="margin-top:0; color:#365314;">ENREGISTRER UN PAIEMENT</h3>
-                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <p style="font-size:0.82rem; color:#3f6212; margin:0 0 10px 0;">Pour solder un reliquat sans entrée d’argent (geste commercial, abandon), utilisez <strong>Libérer le reliquat</strong> ou le mode <strong>Libération / Geste</strong> — il n’est pas compté dans le CA encaissé.</p>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; align-items:center;">
                         <input type="date" id="pay_date" style="padding:8px; border-radius:6px; border:1px solid #84cc16;">
-                        <select id="pay_mode" style="padding:8px; border-radius:6px; border:1px solid #84cc16;"><option>Virement</option><option>Chèque</option><option>Espèces</option><option>CB</option></select>
+                        <select id="pay_mode" style="padding:8px; border-radius:6px; border:1px solid #84cc16; min-width:160px;"><option>Virement</option><option>Chèque</option><option>Espèces</option><option>CB</option><option>Libération / Geste</option></select>
                         <input type="number" id="pay_amount" placeholder="€" step="0.01" style="padding:8px; border-radius:6px; border:1px solid #84cc16; font-weight:bold;">
                         <button class="btn btn-green" onclick="window.ajouterPaiement()">+</button>
+                        <button type="button" class="btn btn-grey" style="border:1px solid #7c3aed; color:#5b21b6;" onclick="window.libererReliquat()" title="Solde le reste sans encaissement">Libérer tout le reliquat</button>
                     </div>
                     <div style="display:flex; gap:10px; margin-bottom:10px;">
                         <input type="file" id="pay_receipt" accept="image/*,application/pdf" style="padding:8px; border-radius:6px; border:1px solid #84cc16; background:white;">
@@ -486,7 +496,8 @@
                 </div>
                 <div class="card" style="text-align:right; padding:24px; margin-bottom:0; display:flex; flex-direction:column; justify-content:center;">
                     <div style="font-size:1.5rem; font-weight:800; margin-bottom:10px; color:#111827;">TOTAL : <span id="total_general">0.00 €</span></div>
-                    <div style="color:#059669; font-weight:600;">REGLÉ : <span id="total_paye">0.00 €</span></div>
+                    <div style="color:#059669; font-weight:600;">ENCAISSÉ (trésorerie) : <span id="total_paye">0.00 €</span></div>
+                    <div id="liberation_row" class="hidden" style="color:#6d28d9; font-weight:600; font-size:0.95rem;">Libération / geste : <span id="pay_liberation">0.00 €</span></div>
                     <div style="color:#dc2626; font-weight:800; font-size:1.2rem; border-top:1px solid #eee; margin-top:10px; padding-top:10px;">RESTE : <span id="reste_a_payer">0.00 €</span></div>
                     <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #d1d5db; text-align:left; font-size:0.86rem; color:#475569;">
                         <div><strong>Date dernier paiement :</strong> <span id="pay_last_date">-</span></div>

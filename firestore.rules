@@ -181,7 +181,10 @@ service cloud.firestore {
       && (!('date_reglement' in request.resource.data) || isString(request.resource.data.date_reglement))
       && (!('avance_versee' in request.resource.data) || isNumber(request.resource.data.avance_versee))
       && (!('date_avance' in request.resource.data) || isString(request.resource.data.date_avance))
-      && (!('reste_a_payer' in request.resource.data) || isNumber(request.resource.data.reste_a_payer));
+      && (!('reste_a_payer' in request.resource.data) || isNumber(request.resource.data.reste_a_payer))
+      && (!('justificatif_url' in request.resource.data) || isString(request.resource.data.justificatif_url))
+      && (!('justificatif_path' in request.resource.data) || isString(request.resource.data.justificatif_path))
+      && (!('justificatif_nom' in request.resource.data) || isString(request.resource.data.justificatif_nom));
     }
 
     match /depenses/{docId} {
