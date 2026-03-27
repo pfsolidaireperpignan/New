@@ -206,15 +206,20 @@
                 <div class="page-header">
                     <h1>Base Clients</h1>
                     <div style="display:flex; gap:10px;">
+                        <button class="btn btn-green" onclick="window.createBaseClient()"><i class="fas fa-plus"></i> Ajouter un client</button>
                         <input type="text" id="search-client" placeholder="Rechercher une fiche client..." style="width:250px;">
                         <button class="btn btn-blue" onclick="window.chargerBaseClients()"><i class="fas fa-sync"></i> Actualiser</button>
                     </div>
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:700;">Clients : <span id="base-clients-count">0</span></span>
+                    <span style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:700;">Affichés : <span id="base-clients-filtered-count">0</span></span>
                 </div>
 
                 <div class="card" style="padding:0; overflow:hidden;">
                     <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; font-weight:700; color:#0f172a;">Fiches Clients (Facturation)</div>
                     <table class="history-table">
-                        <thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Type</th><th>Adresse</th><th>Notes</th><th style="text-align:center;">Actions</th></tr></thead>
+                        <thead><tr><th style="min-width:220px;">Nom</th><th>Téléphone</th><th>Email</th><th>Type</th><th style="min-width:280px;">Adresse</th><th>Notes</th><th style="text-align:center;">Actions</th></tr></thead>
                         <tbody id="clients-ref-table-body"></tbody>
                     </table>
                 </div>
@@ -233,10 +238,7 @@
                         <button class="btn btn-green" onclick="window.saveBaseClientDetails()"><i class="fas fa-save"></i> Enregistrer les modifications</button>
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:12px;">
-                        <div>
-                            <label>ID</label>
-                            <input id="detail_client_id" readonly style="background:#f8fafc; border:1px dashed #cbd5e1;">
-                        </div>
+                        <input id="detail_client_id" type="hidden">
                         <div>
                             <label>NOM</label>
                             <input id="detail_client_nom" placeholder="Nom client">
@@ -271,13 +273,25 @@
                     <div class="tabs-container" style="margin-bottom:14px;">
                         <button id="client-tab-prestations" class="tab-btn active" onclick="window.switchBaseClientDetailTab('prestations')">Prestations</button>
                         <button id="client-tab-factures" class="tab-btn" onclick="window.switchBaseClientDetailTab('factures')">Factures & Devis</button>
-                        <button id="client-tab-journal" class="tab-btn" onclick="window.switchBaseClientDetailTab('journal')">Journal d'Actions</button>
-                        <button id="client-tab-technique" class="tab-btn" onclick="window.switchBaseClientDetailTab('technique')">Détails Techniques</button>
                         <button id="client-tab-pieces" class="tab-btn" onclick="window.switchBaseClientDetailTab('pieces')">Pièces Jointes</button>
                     </div>
 
                     <div id="client-tab-content-prestations">
-                        <div style="color:#64748b;">Prestations liées au client (bientôt disponible).</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <div style="color:#64748b;">Dossiers/prestations liés à ce client.</div>
+                            <button class="btn btn-blue" onclick="window.openClientNewPrestation()"><i class="fas fa-plus"></i> Nouvelle Prestation</button>
+                        </div>
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>PRESTATION</th>
+                                    <th>DÉFUNT</th>
+                                    <th>DATE</th>
+                                    <th style="text-align:center;">ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="client-prestations-table-body"></tbody>
+                        </table>
                     </div>
                     <div id="client-tab-content-factures" class="hidden">
                         <table class="history-table">
@@ -294,14 +308,28 @@
                             <tbody id="client-factures-table-body"></tbody>
                         </table>
                     </div>
-                    <div id="client-tab-content-journal" class="hidden">
-                        <div style="color:#64748b;">Journal d'actions (bientôt disponible).</div>
-                    </div>
-                    <div id="client-tab-content-technique" class="hidden">
-                        <div style="color:#64748b;">Détails techniques liés (bientôt disponible).</div>
-                    </div>
                     <div id="client-tab-content-pieces" class="hidden">
-                        <div style="color:#64748b;">Pièces jointes liées (bientôt disponible).</div>
+                        <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+                            <span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:700;">Pièces : <span id="client-pieces-count">0</span></span>
+                        </div>
+                        <div style="background:#eff6ff; border:1px dashed #93c5fd; border-radius:10px; padding:14px; margin-bottom:12px;">
+                            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                <input type="file" id="client_piece_input" accept="image/*,application/pdf" style="flex:1; min-width:250px;">
+                                <input type="text" id="client_piece_name" placeholder="Nom du document (optionnel)" style="flex:1; min-width:220px;">
+                                <button class="btn btn-blue" onclick="window.uploadClientAttachment()"><i class="fas fa-upload"></i> Ajouter</button>
+                            </div>
+                            <small style="color:#64748b; display:block; margin-top:8px;">PDF et images autorisés.</small>
+                        </div>
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Date</th>
+                                    <th style="text-align:center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="client-pieces-table-body"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -325,7 +353,7 @@
                     </div>
                 </div>
                 <table class="history-table">
-                    <thead><tr><th>Date</th><th>Code Dossier</th><th>Défunt</th><th>Mandant</th><th>Opération</th><th style="text-align:center;">Actions</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Défunt</th><th>Mandant</th><th>Opération</th><th style="text-align:center;">Actions</th></tr></thead>
                     <tbody id="dossiers-admin-table-body"></tbody>
                 </table>
             </div>
