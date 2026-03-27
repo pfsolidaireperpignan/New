@@ -154,7 +154,7 @@ async function renderClientFacturesDevis(clientObj) {
 async function renderClientPrestations(clientObj) {
     const tbody = document.getElementById('client-prestations-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Chargement...</td></tr>';
 
     let rows = [];
     const seen = new Set();
@@ -245,9 +245,24 @@ async function renderClientPrestations(clientObj) {
 
     rows.sort((a, b) => String(b.date_creation || "").localeCompare(String(a.date_creation || "")));
     if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Aucune prestation liée.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">Aucune prestation liée.</td></tr>';
         return;
     }
+
+    const facturesByDossier = new Map();
+    try {
+        const fSnap = await getDocs(query(collection(db, "factures_v2"), limit(800)));
+        fSnap.forEach(fd => {
+            const x = fd.data() || {};
+            const dossierId = String(x.dossier_id || "");
+            if (!dossierId) return;
+            const total = parseFloat((x.total !== undefined) ? x.total : (x.info?.total || 0)) || 0;
+            const prev = facturesByDossier.get(dossierId);
+            if (!prev || total > prev.total) {
+                facturesByDossier.set(dossierId, { total, date: String(x.date || x.date_creation || "") });
+            }
+        });
+    } catch (_) {}
 
     tbody.innerHTML = "";
     rows.forEach(d => {
@@ -257,12 +272,15 @@ async function renderClientPrestations(clientObj) {
         const isPayeur = String(d?.details_op?.payeur_client_id || d?.details_op?.client_id || "") === String(clientObj?.id || "") || normalizeText(d?.payeur?.nom || d?.mandant?.nom || "") === normalizeText(clientObj?.nom || "");
         const isSignataire = String(d?.details_op?.signataire_client_id || "") === String(clientObj?.id || "") || normalizeText(d?.signataire?.nom || "") === normalizeText(clientObj?.nom || "");
         const role = isPayeur && isSignataire ? "Payeur + Signataire" : (isPayeur ? "Payeur/Demandeur" : (isSignataire ? "Signataire pouvoir" : "Lié"));
+        const fact = facturesByDossier.get(String(d?.id || ""));
+        const montant = fact ? `${(fact.total || 0).toFixed(2)} €` : "-";
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><span class="badge badge-blue">${escapeHtml(prestation)}</span></td>
             <td>${escapeHtml(defunt)}</td>
             <td>${escapeHtml(dte)}</td>
             <td><span class="badge badge-gris">${escapeHtml(role)}</span></td>
+            <td style="text-align:right; font-weight:700;">${escapeHtml(montant)}</td>
             <td style="text-align:center;">
                 <button class="btn-icon" onclick="window.chargerDossier('${escapeHtml(d.id)}')" title="Ouvrir dossier"><i class="fas fa-eye"></i></button>
             </td>
@@ -423,7 +441,7 @@ export function createBaseClient() {
     document.getElementById('base-client-detail-view')?.classList.remove('hidden');
     switchBaseClientDetailTab('prestations');
     const p = document.getElementById('client-prestations-table-body');
-    if (p) p.innerHTML = "<tr><td colspan=\"5\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client pour lier des prestations.</td></tr>";
+    if (p) p.innerHTML = "<tr><td colspan=\"6\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client pour lier des prestations.</td></tr>";
     const pj = document.getElementById('client-pieces-table-body');
     if (pj) pj.innerHTML = "<tr><td colspan=\"3\" style=\"text-align:center; color:#94a3b8;\">Enregistrez d'abord le client pour ajouter des pièces.</td></tr>";
 }

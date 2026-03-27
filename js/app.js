@@ -285,7 +285,6 @@ window.startNewPrestationFromClient = async function(clientId, clientObj) {
     window.nouveauDossier();
     const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
     setVal('soussigne', window.prefillClientContext.nom);
-    setVal('mandant_prenom', "");
     setVal('tel_mandant', window.prefillClientContext.tel);
     setVal('demeurant', window.prefillClientContext.adresse);
     const chkPayeur = document.getElementById('payeur_different');
@@ -458,7 +457,7 @@ window.sauvegarderDossier = async function() {
                 lieu_naiss: getVal('lieu_naiss'), nationalite: getVal('nationalite'),
                 adresse: getVal('adresse_fr'), pere: getVal('pere'), mere: getVal('mere'), situation: getVal('matrimoniale'), conjoint: getVal('conjoint'), profession: getVal('profession_libelle') 
             },
-            mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), prenom: getVal('mandant_prenom'), lien: getVal('lien'), telephone: getVal('tel_mandant'), adresse: getVal('demeurant') },
+            mandant: { civility: getVal('civilite_mandant'), nom: getVal('soussigne'), lien: getVal('lien'), telephone: getVal('tel_mandant'), adresse: getVal('demeurant') },
             technique: { type_operation: document.getElementById('prestation').value, lieu_mise_biere: getVal('lieu_mise_biere'), date_fermeture: getVal('date_fermeture'), cimetiere: getVal('cimetiere_nom'), crematorium: getVal('crematorium_nom'), date_ceremonie: getVal('date_inhumation') || getVal('date_cremation'), heure_ceremonie: getVal('heure_inhumation') || getVal('heure_cremation'), num_concession: getVal('num_concession'), faita: getVal('faita'), date_signature: getVal('dateSignature'), police_nom: getVal('p_nom_grade'), police_commissariat: getVal('p_commissariat') },
             transport: { av_dep: getVal('av_lieu_depart'), av_arr: getVal('av_lieu_arrivee'), av_date_dep: getVal('av_date_dep'), av_heure_dep: getVal('av_heure_dep'), av_date_arr: getVal('av_date_arr'), av_heure_arr: getVal('av_heure_arr'), ap_dep: getVal('ap_lieu_depart'), ap_arr: getVal('ap_lieu_arrivee'), ap_date_dep: getVal('ap_date_dep'), ap_heure_dep: getVal('ap_heure_dep'), ap_date_arr: getVal('ap_date_arr'), ap_heure_arr: getVal('ap_heure_arr'), rap_pays: getVal('rap_pays'), rap_ville: getVal('rap_ville'), rap_lta: getVal('rap_lta'), vol1_num: getVal('vol1_num'), vol1_dep_aero: getVal('vol1_dep_aero'), vol1_arr_aero: getVal('vol1_arr_aero'), vol1_dep_time: getVal('vol1_dep_time'), vol1_arr_time: getVal('vol1_arr_time'), vol2_num: getVal('vol2_num'), vol2_dep_aero: getVal('vol2_dep_aero'), vol2_arr_aero: getVal('vol2_arr_aero'), vol2_dep_time: getVal('vol2_dep_time'), vol2_arr_time: getVal('vol2_arr_time'), rap_immat: getVal('rap_immat'), rap_date_dep_route: getVal('rap_date_dep_route'), rap_ville_dep: getVal('rap_ville_dep'), rap_ville_arr: getVal('rap_ville_arr'), attest_trajet_depart: getVal('attest_trajet_depart'), attest_trajet_arrivee: getVal('attest_trajet_arrivee'), attest_cercueil_option: document.querySelector('input[name="attest_cercueil_option"]:checked')?.value || 'funisorb' },
             protocole: {
@@ -597,7 +596,7 @@ window.chargerDossier = async function(id) {
             set('lieu_naiss', data.defunt.lieu_naiss); set('nationalite', data.defunt.nationalite);
             set('adresse_fr', data.defunt.adresse); set('pere', data.defunt.pere); set('mere', data.defunt.mere); set('matrimoniale', data.defunt.situation); set('conjoint', data.defunt.conjoint); set('profession_libelle', data.defunt.profession); 
         }
-        if (data.mandant) { set('civilite_mandant', data.mandant.civility); set('soussigne', data.mandant.nom); set('mandant_prenom', data.mandant.prenom); set('lien', data.mandant.lien); set('tel_mandant', data.mandant.telephone); set('demeurant', data.mandant.adresse); }
+        if (data.mandant) { set('civilite_mandant', data.mandant.civility); set('soussigne', data.mandant.nom); set('lien', data.mandant.lien); set('tel_mandant', data.mandant.telephone); set('demeurant', data.mandant.adresse); }
         setChk('payeur_different', !!data?.payeur?.different);
         set('payeur_nom', data?.payeur?.nom || "");
         set('payeur_tel', data?.payeur?.telephone || "");

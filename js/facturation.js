@@ -35,6 +35,11 @@ const escapeHtml = (value) => String(value ?? "")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 const normalizeText = (v) => String(v || "").trim().toLowerCase();
+const safeText = (v) => {
+    const s = String(v ?? "").trim();
+    if (!s || s.toLowerCase() === "undefined" || s.toLowerCase() === "null") return "";
+    return s;
+};
 
 // --- INIT ---
 onAuthStateChanged(auth, (user) => {
@@ -913,14 +918,14 @@ window.chargerDocument = async (id) => {
         // COMPATIBILITÉ CHARGEMENT
         document.getElementById('doc_numero').value = data.numero || data.info?.numero; 
         if(document.getElementById('client_id')) document.getElementById('client_id').value = data.client_id || "";
-        document.getElementById('client_nom').value = data.client_nom || data.client?.nom; 
-        document.getElementById('client_adresse').value = data.client_adresse || data.client?.adresse; 
+        document.getElementById('client_nom').value = data.client_nom || data.client?.nom || ""; 
+        document.getElementById('client_adresse').value = data.client_adresse || data.client?.adresse || ""; 
         const clientInfoEl = document.getElementById('client_info');
         if (clientInfoEl) clientInfoEl.value = data.client_info || data.client?.info || "";
         const civility = data.client_civility || data.client?.civility || 'M.';
         document.getElementById('client_civility').value = civility;
 
-        document.getElementById('defunt_nom').value = data.defunt_nom || data.defunt?.nom;
+        document.getElementById('defunt_nom').value = data.defunt_nom || data.defunt?.nom || "";
         document.getElementById('defunt_date_naiss').value = data.defunt_date_naiss || data.defunt?.date_naiss || "";
         document.getElementById('defunt_date_deces').value = data.defunt_date_deces || data.defunt?.date_deces || "";
         if(document.getElementById('doc_statut')) document.getElementById('doc_statut').value = (data.statut === "BROUILLON" ? "EMIS" : (data.statut || computeFactureStatut({ ...data, finalType: (data.type || data.info?.type), finalTotal: parseFloat(data.total || data.info?.total || 0), finalPaiements: (data.paiements || []) }) || "EMIS"));
@@ -1089,6 +1094,22 @@ window.sauvegarderDocument = async function() {
         lignes: lignes, paiements: paiements, date_creation: new Date().toISOString(),
         statut_doc: document.getElementById('doc_type').value === 'DEVIS' ? 'En cours' : 'Validé'
     }; 
+
+    // Renforce la liaison facture -> dossier si champs encore vides
+    if (!docData.dossier_id) {
+        const byDefunt = findDossierByDefuntName(docData.defunt_nom || "");
+        const byClient = byDefunt ? null : findDossierByClientName(docData.client_nom || "");
+        const dossierFound = byDefunt || byClient || null;
+        if (dossierFound) {
+            docData.dossier_id = dossierFound.id || "";
+            docData.dossier_numero = dossierFound.numero || guessDossierNumero(dossierFound.data || {}, dossierFound.id || "");
+            const dossierIdEl = document.getElementById('dossier_id');
+            const dossierNumEl = document.getElementById('dossier_numero');
+            if (dossierIdEl) dossierIdEl.value = docData.dossier_id || "";
+            if (dossierNumEl) dossierNumEl.value = docData.dossier_numero || "";
+        }
+    }
+
     const id = document.getElementById('current_doc_id').value; 
     try { 
         docData.client_id = await ensureClientLinkOnSave();
@@ -1240,10 +1261,10 @@ function applyClientToForm(clientDoc) {
     const nomEl = document.getElementById('client_nom');
     const adrEl = document.getElementById('client_adresse');
     const infoEl = document.getElementById('client_info');
-    if (idEl) idEl.value = clientDoc.id || "";
-    if (nomEl && !nomEl.value) nomEl.value = clientDoc.nom || "";
-    if (adrEl && !adrEl.value) adrEl.value = clientDoc.adresse || "";
-    if (infoEl && !infoEl.value) infoEl.value = clientDoc.telephone || clientDoc.notes || "";
+    if (idEl) idEl.value = safeText(clientDoc.id);
+    if (nomEl) nomEl.value = safeText(clientDoc.nom) || nomEl.value || "";
+    if (adrEl) adrEl.value = safeText(clientDoc.adresse);
+    if (infoEl) infoEl.value = safeText(clientDoc.telephone || clientDoc.notes || "");
 }
 
 function findClientByName(name) {
@@ -1322,7 +1343,6 @@ window.closeClientSheet = function() {
 
 window.openClientSheet = async function() {
     const nom = document.getElementById('client_nom')?.value || "";
-    if (!nom) return alert("Renseigne d'abord le nom du client.");
 
     // On essaie de lier automatiquement avant ouverture (non bloquant)
     const linkedId = await ensureClientLinkOnSave();
@@ -1338,15 +1358,33 @@ window.openClientSheet = async function() {
 
     const id = client?.id || clientId || "";
     document.getElementById('sheet_client_id').value = id;
-    document.getElementById('sheet_client_nom').value = client?.nom || nom || "";
-    document.getElementById('sheet_client_type').value = client?.type || "particulier";
-    document.getElementById('sheet_client_tel').value = client?.telephone || "";
-    document.getElementById('sheet_client_email').value = client?.email || "";
-    document.getElementById('sheet_client_adresse').value = client?.adresse || document.getElementById('client_adresse')?.value || "";
-    document.getElementById('sheet_client_notes').value = client?.notes || document.getElementById('client_info')?.value || "";
+    document.getElementById('sheet_client_nom').value = safeText(client?.nom || nom || "");
+    document.getElementById('sheet_client_type').value = safeText(client?.type) || "particulier";
+    document.getElementById('sheet_client_tel').value = safeText(client?.telephone);
+    document.getElementById('sheet_client_email').value = safeText(client?.email);
+    document.getElementById('sheet_client_adresse').value = safeText(client?.adresse || document.getElementById('client_adresse')?.value || "");
+    document.getElementById('sheet_client_notes').value = safeText(client?.notes || document.getElementById('client_info')?.value || "");
+    const searchEl = document.getElementById('sheet_client_search');
+    if (searchEl) searchEl.value = client?.nom || nom || "";
 
     document.getElementById('modal-client-sheet')?.classList.remove('hidden');
     await renderClientHistoryInSheet(id, nom);
+};
+
+window.selectClientFromSheetSearch = async function() {
+    const searchVal = document.getElementById('sheet_client_search')?.value || "";
+    if (!searchVal) return;
+    const client = findClientByName(searchVal) || cacheClients.find(c => normalizeText(c.nom).includes(normalizeText(searchVal)));
+    if (!client) return alert("Client introuvable dans la Base Clients.");
+    applyClientToForm(client);
+    document.getElementById('sheet_client_id').value = client.id || "";
+    document.getElementById('sheet_client_nom').value = safeText(client.nom);
+    document.getElementById('sheet_client_type').value = safeText(client.type) || "particulier";
+    document.getElementById('sheet_client_tel').value = safeText(client.telephone);
+    document.getElementById('sheet_client_email').value = safeText(client.email);
+    document.getElementById('sheet_client_adresse').value = safeText(client.adresse);
+    document.getElementById('sheet_client_notes').value = safeText(client.notes);
+    await renderClientHistoryInSheet(client.id || "", client.nom || "");
 };
 
 window.saveClientSheet = async function() {
@@ -1397,7 +1435,13 @@ window.saveClientSheet = async function() {
 function findDossierByClientName(name) {
     const n = String(name || "").trim().toLowerCase();
     if (!n) return null;
-    const matches = cacheDossiersAdmin.filter(d => String(d?.data?.mandant?.nom || "").trim().toLowerCase() === n);
+    const matches = cacheDossiersAdmin.filter(d => {
+        const mandant = String(d?.data?.mandant?.nom || "").trim().toLowerCase();
+        const payeur = String(d?.data?.payeur?.nom || "").trim().toLowerCase();
+        const linkedPayeur = String(d?.data?.details_op?.payeur_client_nom || "").trim().toLowerCase();
+        const linkedClient = String(d?.data?.details_op?.client_nom || "").trim().toLowerCase();
+        return mandant === n || payeur === n || linkedPayeur === n || linkedClient === n;
+    });
     if (matches.length === 0) return null;
     if (matches.length === 1) return matches[0];
     return chooseDossierFromMatches(matches, "client");
@@ -1497,7 +1541,7 @@ window.checkClientAuto = function() {
     }
     else {
         const client = cacheFactures.find(f => f.finalClient === val);
-        if(client) document.getElementById('client_adresse').value = client.client_adresse || client.client?.adresse || '';
+        if(client) document.getElementById('client_adresse').value = safeText(client.client_adresse || client.client?.adresse || '');
     }
 };
 
