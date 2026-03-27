@@ -168,10 +168,19 @@ window.filtrerBaseClients = DB.filtrerBaseClients;
 window.chargerDossiersAdminList = DB.chargerDossiersAdminList;
 window.filtrerDossiersAdmin = DB.filtrerDossiersAdmin;
 window.supprimerDossier = DB.supprimerDossier;
+window.showAdminListView = function() {
+    document.getElementById('admin-detail-view')?.classList.add('hidden');
+    document.getElementById('admin-list-view')?.classList.remove('hidden');
+};
+window.showAdminDetailView = function() {
+    document.getElementById('admin-list-view')?.classList.add('hidden');
+    document.getElementById('admin-detail-view')?.classList.remove('hidden');
+};
 window.nouveauDossier = function() {
     window.currentDossierId = null;
     DB.viderFormulaire();
     window.showSection('admin');
+    window.showAdminDetailView();
 };
 window.viderFormulaire = function() {
     window.currentDossierId = null;
@@ -242,7 +251,7 @@ window.toggleSections = function() {
 window.toggleVol2 = function() { const chk = document.getElementById('check_vol2'); const bloc = document.getElementById('bloc_vol2'); if(chk && bloc) { chk.checked ? bloc.classList.remove('hidden') : bloc.classList.add('hidden'); } };
 window.togglePolice = function() { const select = document.getElementById('type_presence_select'); const bP = document.getElementById('police_fields'); const bF = document.getElementById('famille_fields'); if(!select) return; if(select.value === 'police') { bP.classList.remove('hidden'); bF.classList.add('hidden'); } else { bP.classList.add('hidden'); bF.classList.remove('hidden'); } };
 window.copierMandant = function() { const chk = document.getElementById('copy_mandant'); if(chk && chk.checked) { document.getElementById('f_nom_prenom').value = document.getElementById('soussigne').value; document.getElementById('f_lien').value = document.getElementById('lien').value; } };
-window.showSection = function(id) { document.querySelectorAll('.main-content > div').forEach(div => { if(div.id.startsWith('view-')) div.classList.add('hidden'); }); const target = document.getElementById('view-' + id); if(target) target.classList.remove('hidden'); if(id === 'base') DB.chargerBaseClients(); if(id === 'stock') DB.chargerStock(); if(id === 'admin') { DB.chargerSelectImport(); DB.chargerDossiersAdminList(); } };
+window.showSection = function(id) { document.querySelectorAll('.main-content > div').forEach(div => { if(div.id.startsWith('view-')) div.classList.add('hidden'); }); const target = document.getElementById('view-' + id); if(target) target.classList.remove('hidden'); if(id === 'base') DB.chargerBaseClients(); if(id === 'stock') DB.chargerStock(); if(id === 'admin') { window.showAdminListView(); DB.chargerDossiersAdminList(); DB.chargerSelectImport(); } };
 window.switchAdminTab = function(tabName) {
     ['identite', 'technique', 'protocole'].forEach((name) => {
         document.getElementById('tab-content-' + name)?.classList.add('hidden');
@@ -465,5 +474,6 @@ window.chargerDossier = async function(id) {
         const btn = document.getElementById('btn-save-bdd'); if (btn) { btn.innerHTML = `<i class="fas fa-pen"></i> MODIFIER LE DOSSIER`; btn.classList.remove('btn-green'); btn.classList.add('btn-warning'); btn.style.backgroundColor = "#f59e0b"; btn.onclick = function() { window.sauvegarderDossier(); }; }
         if(window.toggleSections) window.toggleSections(); if(window.togglePolice) window.togglePolice(); if(window.toggleVol2) window.toggleVol2();
         window.showSection('admin');
+        window.showAdminDetailView();
     } catch (e) { console.error(e); alert("Erreur : " + e.message); }
 };
