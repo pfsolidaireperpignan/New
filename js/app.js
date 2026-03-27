@@ -39,6 +39,7 @@ function gedMimetypeForRules(file) {
 }
 const pendingGedFiles = new Map();
 const COMPACT_STORAGE_KEY = "pf_ui_compact";
+let payeursCache = [];
 
 function updateCompactToggleLabel() {
     const btn = document.getElementById('btn-compact-toggle');
@@ -151,6 +152,23 @@ async function ensureClientRecordFromPerson(person, roleLabel = "client") {
     return { id: created.id, nom };
 }
 
+async function chargerSuggestionsPayeurs() {
+    try {
+        payeursCache = [];
+        const dl = document.getElementById('payeurs_suggestions');
+        if (!dl) return;
+        dl.innerHTML = "";
+        const snap = await getDocs(query(collection(db, "clients"), limit(600)));
+        const options = [];
+        snap.forEach(d => {
+            const c = { id: d.id, ...(d.data() || {}) };
+            payeursCache.push(c);
+            if (c.nom) options.push(`<option value="${escapeHtml(c.nom)}">`);
+        });
+        dl.innerHTML = options.join("");
+    } catch (_) {}
+}
+
 // ============================================================
 // 1. SÉCURITÉ & AUTHENTIFICATION
 // ============================================================
@@ -191,6 +209,7 @@ onAuthStateChanged(auth, (user) => {
         document.getElementById('login-screen')?.classList.add('hidden');
         Utils.chargerLogoBase64();
         DB.chargerBaseClients();
+        chargerSuggestionsPayeurs();
         setInterval(() => {
             const now = new Date();
             if(document.getElementById('header-time')) document.getElementById('header-time').innerText = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
@@ -231,6 +250,46 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (_) {}
     updateCompactToggleLabel();
 });
+
+window.onPayeurNomInput = function() {
+    const nomEl = document.getElementById('payeur_nom');
+    const idEl = document.getElementById('payeur_client_id');
+    const telEl = document.getElementById('payeur_tel');
+    const emailEl = document.getElementById('payeur_email');
+    const adrEl = document.getElementById('payeur_adresse');
+    if (!nomEl) return;
+    const typed = String(nomEl.value || "").trim();
+    if (!typed) {
+        if (idEl) idEl.value = "";
+        return;
+    }
+    const exact = payeursCache.find(c => norm(c?.nom) === norm(typed)) || null;
+    if (!exact) {
+        if (idEl) idEl.value = "";
+        if (typeof window.updatePayeurLinkBadge === "function") window.updatePayeurLinkBadge(false);
+        return;
+    }
+    if (idEl) idEl.value = exact.id || "";
+    if (telEl && !telEl.value) telEl.value = exact.telephone || "";
+    if (emailEl && !emailEl.value) emailEl.value = exact.email || "";
+    if (adrEl && !adrEl.value) adrEl.value = exact.adresse || "";
+    if (typeof window.updatePayeurLinkBadge === "function") window.updatePayeurLinkBadge(true, exact.nom || "");
+};
+window.updatePayeurLinkBadge = function(isLinked, displayName = "") {
+    const badge = document.getElementById('payeur_link_badge');
+    if (!badge) return;
+    if (isLinked) {
+        badge.textContent = `Client lié${displayName ? " : " + displayName : ""}`;
+        badge.style.background = "#ecfdf5";
+        badge.style.color = "#166534";
+        badge.style.border = "1px solid #bbf7d0";
+    } else {
+        badge.textContent = "Nouveau client";
+        badge.style.background = "#fff7ed";
+        badge.style.color = "#9a3412";
+        badge.style.border = "1px solid #fed7aa";
+    }
+};
 
 // ============================================================
 // 2. BRANCHEMENT DES FONCTIONS
@@ -287,9 +346,15 @@ window.startNewPrestationFromClient = async function(clientId, clientObj) {
     setVal('soussigne', window.prefillClientContext.nom);
     setVal('tel_mandant', window.prefillClientContext.tel);
     setVal('demeurant', window.prefillClientContext.adresse);
+    setVal('payeur_client_id', "");
+    setVal('payeur_nom', "");
+    setVal('payeur_tel', "");
+    setVal('payeur_email', "");
+    setVal('payeur_adresse', "");
     const chkPayeur = document.getElementById('payeur_different');
     if (chkPayeur) chkPayeur.checked = false;
     if (window.togglePayeurSection) window.togglePayeurSection();
+    if (window.updatePayeurLinkBadge) window.updatePayeurLinkBadge(false);
 };
 window.viderFormulaire = function() {
     window.currentDossierId = null;
@@ -366,6 +431,7 @@ window.togglePayeurSection = function() {
     if (!chk || !bloc) return;
     if (chk.checked) bloc.classList.remove('hidden');
     else bloc.classList.add('hidden');
+    if (!chk.checked && typeof window.updatePayeurLinkBadge === "function") window.updatePayeurLinkBadge(false);
 };
 window.showSection = function(id) { document.querySelectorAll('.main-content > div').forEach(div => { if(div.id.startsWith('view-')) div.classList.add('hidden'); }); const target = document.getElementById('view-' + id); if(target) target.classList.remove('hidden'); if(id === 'base') { DB.showBaseClientListView(); DB.chargerBaseClients(); } if(id === 'stock') DB.chargerStock(); if(id === 'admin') { window.showAdminListView(); DB.chargerDossiersAdminList(); DB.chargerSelectImport(); } };
 window.switchAdminTab = function(tabName) {
@@ -468,6 +534,23 @@ window.sauvegarderDossier = async function() {
             }
         };
         const payeurDifferent = getChk('payeur_different');
+        const selectedPayeurClientId = getVal('payeur_client_id');
+        if (payeurDifferent) {
+            if (!getVal('payeur_nom').trim()) {
+                alert("Veuillez renseigner le nom du payeur (distinct).");
+                if(btn) btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
+                return;
+            }
+            const hasTel = !!getVal('payeur_tel').trim();
+            const hasAdr = !!getVal('payeur_adresse').trim();
+            if (!hasTel && !hasAdr) {
+                const okContinue = confirm("Le payeur distinct n'a ni téléphone ni adresse.\n\nContinuer quand même ?");
+                if (!okContinue) {
+                    if(btn) btn.innerHTML = '<i class="fas fa-save"></i> ENREGISTRER';
+                    return;
+                }
+            }
+        }
         const payeurData = payeurDifferent
             ? {
                 nom: getVal('payeur_nom'),
@@ -490,14 +573,54 @@ window.sauvegarderDossier = async function() {
             adresse: data.mandant?.adresse,
             type: "particulier"
         }, "signataire");
-        const linkedPayeur = payeurDifferent
-            ? await ensureClientRecordFromPerson({
-                nom: payeurData.nom,
-                telephone: payeurData.telephone,
-                adresse: payeurData.adresse,
-                type: "particulier"
-            }, "payeur")
-            : linkedMandant;
+        let linkedPayeur = linkedMandant;
+        if (payeurDifferent) {
+            if (selectedPayeurClientId) {
+                try {
+                    const pSnap = await getDoc(doc(db, "clients", selectedPayeurClientId));
+                    if (pSnap.exists()) {
+                        const pdata = pSnap.data() || {};
+                        linkedPayeur = { id: pSnap.id, nom: pdata.nom || payeurData.nom || "" };
+                        const current = { nom: pdata.nom || "", telephone: pdata.telephone || "", adresse: pdata.adresse || "" };
+                        const incoming = { nom: payeurData.nom || "", telephone: payeurData.telephone || "", adresse: payeurData.adresse || "" };
+                        if (!sameClientIdentity(current, incoming) && incoming.nom) {
+                            const okUpd = confirm(`Les coordonnées du payeur "${incoming.nom}" diffèrent de la Base Clients.\n\nMettre à jour la fiche client ?`);
+                            if (okUpd) {
+                                await updateDoc(doc(db, "clients", pSnap.id), {
+                                    nom: incoming.nom,
+                                    telephone: incoming.telephone,
+                                    adresse: incoming.adresse,
+                                    email: payeurData.email || pdata.email || "",
+                                    updated_at: new Date().toISOString()
+                                });
+                                linkedPayeur = { id: pSnap.id, nom: incoming.nom };
+                            }
+                        }
+                    } else {
+                        linkedPayeur = await ensureClientRecordFromPerson({
+                            nom: payeurData.nom,
+                            telephone: payeurData.telephone,
+                            adresse: payeurData.adresse,
+                            type: "particulier"
+                        }, "payeur");
+                    }
+                } catch (_) {
+                    linkedPayeur = await ensureClientRecordFromPerson({
+                        nom: payeurData.nom,
+                        telephone: payeurData.telephone,
+                        adresse: payeurData.adresse,
+                        type: "particulier"
+                    }, "payeur");
+                }
+            } else {
+                linkedPayeur = await ensureClientRecordFromPerson({
+                    nom: payeurData.nom,
+                    telephone: payeurData.telephone,
+                    adresse: payeurData.adresse,
+                    type: "particulier"
+                }, "payeur");
+            }
+        }
 
         data.details_op = {
             ...(data.details_op || {}),
@@ -598,11 +721,13 @@ window.chargerDossier = async function(id) {
         }
         if (data.mandant) { set('civilite_mandant', data.mandant.civility); set('soussigne', data.mandant.nom); set('lien', data.mandant.lien); set('tel_mandant', data.mandant.telephone); set('demeurant', data.mandant.adresse); }
         setChk('payeur_different', !!data?.payeur?.different);
+        set('payeur_client_id', data?.details_op?.payeur_client_id || "");
         set('payeur_nom', data?.payeur?.nom || "");
         set('payeur_tel', data?.payeur?.telephone || "");
         set('payeur_email', data?.payeur?.email || "");
         set('payeur_adresse', data?.payeur?.adresse || "");
         if(window.togglePayeurSection) window.togglePayeurSection();
+        if(window.updatePayeurLinkBadge) window.updatePayeurLinkBadge(!!(data?.details_op?.payeur_client_id), data?.details_op?.payeur_client_nom || data?.payeur?.nom || "");
         if (data.technique) { const op = data.technique.type_operation || 'Inhumation'; set('prestation', op); set('lieu_mise_biere', data.technique.lieu_mise_biere); set('date_fermeture', data.technique.date_fermeture); set('cimetiere_nom', data.technique.cimetiere); set('crematorium_nom', data.technique.crematorium); set('num_concession', data.technique.num_concession); set('faita', data.technique.faita); set('dateSignature', data.technique.date_signature); set('p_nom_grade', data.technique.police_nom); set('p_commissariat', data.technique.police_commissariat); if (op === 'Inhumation') { set('date_inhumation', data.technique.date_ceremonie); set('heure_inhumation', data.technique.heure_ceremonie); } else if (op === 'Crémation') { set('date_cremation', data.technique.date_ceremonie); set('heure_cremation', data.technique.heure_ceremonie); } }
         if (data.transport) { set('av_lieu_depart', data.transport.av_dep); set('av_lieu_arrivee', data.transport.av_arr); set('av_date_dep', data.transport.av_date_dep); set('av_heure_dep', data.transport.av_heure_dep); set('av_date_arr', data.transport.av_date_arr); set('av_heure_arr', data.transport.av_heure_arr); set('ap_lieu_depart', data.transport.ap_dep); set('ap_lieu_arrivee', data.transport.ap_arr); set('ap_date_dep', data.transport.ap_date_dep); set('ap_heure_dep', data.transport.ap_heure_dep); set('ap_date_arr', data.transport.ap_date_arr); set('ap_heure_arr', data.transport.ap_heure_arr); set('rap_pays', data.transport.rap_pays); set('rap_ville', data.transport.rap_ville); set('rap_lta', data.transport.rap_lta); set('vol1_num', data.transport.vol1_num); set('vol1_dep_aero', data.transport.vol1_dep_aero); set('vol1_arr_aero', data.transport.vol1_arr_aero); set('vol1_dep_time', data.transport.vol1_dep_time); set('vol1_arr_time', data.transport.vol1_arr_time); set('vol2_num', data.transport.vol2_num); set('vol2_dep_aero', data.transport.vol2_dep_aero); set('vol2_arr_aero', data.transport.vol2_arr_aero); set('vol2_dep_time', data.transport.vol2_dep_time); set('vol2_arr_time', data.transport.vol2_arr_time); set('rap_immat', data.transport.rap_immat); set('rap_date_dep_route', data.transport.rap_date_dep_route); set('rap_ville_dep', data.transport.rap_ville_dep); set('rap_ville_arr', data.transport.rap_ville_arr); set('attest_trajet_depart', data.transport.attest_trajet_depart); set('attest_trajet_arrivee', data.transport.attest_trajet_arrivee); const aco = data.transport.attest_cercueil_option || 'funisorb'; document.querySelectorAll('input[name="attest_cercueil_option"]').forEach((r) => { r.checked = r.value === aco; }); }
         
