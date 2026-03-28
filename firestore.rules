@@ -102,6 +102,7 @@ service cloud.firestore {
         'statut_doc',
         'avoir_de',
         'reference_devis',
+        'remise_ttc',
         'info'
       ])
       && (!('numero' in request.resource.data) || isString(request.resource.data.numero))
@@ -124,7 +125,8 @@ service cloud.firestore {
       && (!('total_ttc' in request.resource.data) || isNumber(request.resource.data.total_ttc))
       && (!('total_paye' in request.resource.data) || isNumber(request.resource.data.total_paye))
       && (!('reste_a_payer' in request.resource.data) || isNumber(request.resource.data.reste_a_payer))
-      && (!('acompte' in request.resource.data) || isNumber(request.resource.data.acompte));
+      && (!('acompte' in request.resource.data) || isNumber(request.resource.data.acompte))
+      && (!('remise_ttc' in request.resource.data) || isNumber(request.resource.data.remise_ttc));
     }
 
     match /factures_v2/{docId} {
