@@ -740,6 +740,7 @@ window.apercuDocument = async function(id) {
                 // Calcul du total sécurisé pour éviter le NaN
                 total: parseFloat((data.total !== undefined) ? data.total : (data.info?.total || 0)) 
             },
+            remise_ttc: parseFloat(data.remise_ttc) || 0,
             lignes: data.lignes || [],
             paiements: data.paiements || []
         };
@@ -1102,6 +1103,7 @@ window.nouveauDocument = function() {
     if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = "";
     if(document.getElementById('dossier_numero')) document.getElementById('dossier_numero').value = "";
     if(document.getElementById('dossier_id')) document.getElementById('dossier_id').value = "";
+    if (document.getElementById('doc_remise_ttc')) document.getElementById('doc_remise_ttc').value = "0";
     document.getElementById('tbody_lignes').innerHTML = "";
     paiements = [];
     window.renderPaiements();
@@ -1158,7 +1160,23 @@ window.chargerDocument = async (id) => {
         document.getElementById('doc_date').value = data.date || data.info?.date; 
         document.getElementById('tbody_lignes').innerHTML = ""; 
         
-        if(data.lignes) data.lignes.forEach(l => { if(l.type==='section') window.ajouterSection(l.text); else window.ajouterLigne(l.desc, l.prix, l.cat); }); 
+        let extraRemiseFromLignes = 0;
+        const lignesLues = data.lignes || [];
+        const lignesNettes = [];
+        lignesLues.forEach(l => {
+            if (l.type === 'section') lignesNettes.push(l);
+            else if (l.cat === 'Remise') extraRemiseFromLignes += Math.abs(parseFloat(l.prix) || 0);
+            else lignesNettes.push(l);
+        });
+        lignesNettes.forEach(l => {
+            if (l.type === 'section') window.ajouterSection(l.text);
+            else window.ajouterLigne(l.desc, l.prix, (l.cat === 'Courant' || l.cat === 'Optionnel') ? l.cat : 'Courant');
+        });
+        const remiseField = document.getElementById('doc_remise_ttc');
+        if (remiseField) {
+            const base = parseFloat(data.remise_ttc) || 0;
+            remiseField.value = (base + extraRemiseFromLignes).toFixed(2);
+        }
         
         paiements = data.paiements || []; 
         window.renderPaiements(); window.calculTotal(); 
@@ -1197,8 +1215,18 @@ window.ajouterSection = function(titre="SECTION") {
 };
 
 window.calculTotal = function() {
-    let total = 0;
-    document.querySelectorAll('.val-prix').forEach(i => total += parseFloat(i.value) || 0);
+    let sousTotal = 0;
+    document.querySelectorAll('#tbody_lignes tr.row-item').forEach(tr => {
+        sousTotal += parseFloat(tr.querySelector('.val-prix')?.value) || 0;
+    });
+    let remise = parseFloat(document.getElementById('doc_remise_ttc')?.value) || 0;
+    if (remise < 0) remise = 0;
+    if (remise > sousTotal) remise = sousTotal;
+    const total = Math.max(0, sousTotal - remise);
+    const elSous = document.getElementById('sous_total_lignes');
+    if (elSous) elSous.textContent = sousTotal.toFixed(2) + " €";
+    const remiseEl = document.getElementById('doc_remise_ttc');
+    if (remiseEl && parseFloat(remiseEl.value) > sousTotal) remiseEl.value = sousTotal.toFixed(2);
     const lettrage = summarizePaiements(paiements, total);
     document.getElementById('total_general').innerText = total.toFixed(2) + " €";
     document.getElementById('total_paye').innerText = lettrage.encaisseReel.toFixed(2) + " €";
@@ -1283,6 +1311,14 @@ window.sauvegarderDocument = async function() {
     const docType = document.getElementById('doc_type').value;
     const id = document.getElementById('current_doc_id').value;
     const docDate = document.getElementById('doc_date').value;
+    let sousTotalLignes = 0;
+    lignes.forEach(l => {
+        if (l.type === 'item') sousTotalLignes += parseFloat(l.prix) || 0;
+    });
+    let remiseTtc = Math.min(Math.max(0, parseFloat(document.getElementById('doc_remise_ttc')?.value) || 0), sousTotalLignes);
+    const remiseInputSave = document.getElementById('doc_remise_ttc');
+    if (remiseInputSave) remiseInputSave.value = remiseTtc.toFixed(2);
+    window.calculTotal();
     const totalValue = parseFloat(document.getElementById('total_display').innerText);
     const lettrage = summarizePaiements(paiements, totalValue);
     const totalPayeCalc = lettrage.totalPaye;
@@ -1323,7 +1359,7 @@ window.sauvegarderDocument = async function() {
         date_echeance: dateEcheance,
         date_dernier_paiement: lettrage.lastDate === "-" ? "" : lettrage.lastDate,
         mode_paiement_principal: lettrage.mainMode === "-" ? "" : lettrage.mainMode,
-        total: totalValue, total_paye: lettrage.encaisseReel, reste_a_payer: resteCalc,
+        total: totalValue, remise_ttc: remiseTtc, total_paye: lettrage.encaisseReel, reste_a_payer: resteCalc,
         lignes: lignes, paiements: paiements,
         statut_doc: document.getElementById('doc_type').value === 'DEVIS'
             ? (document.getElementById('doc_statut')?.value || 'En cours')
@@ -1877,6 +1913,7 @@ window.genererPDFFacture = function() {
         client: { nom: document.getElementById('client_nom').value, adresse: document.getElementById('client_adresse').value, info: document.getElementById('client_info') ? document.getElementById('client_info').value : "", civility: document.getElementById('client_civility').value },
         defunt: { nom: document.getElementById('defunt_nom').value, naiss: document.getElementById('defunt_date_naiss').value, deces: document.getElementById('defunt_date_deces').value },
         info: { type: document.getElementById('doc_type').value, date: document.getElementById('doc_date').value, numero: document.getElementById('doc_numero').value, total: parseFloat(document.getElementById('total_display').innerText) },
+        remise_ttc: parseFloat(document.getElementById('doc_remise_ttc')?.value) || 0,
         lignes: [], paiements: paiements
     };
     document.querySelectorAll('#tbody_lignes tr').forEach(tr => {
@@ -1946,6 +1983,12 @@ window.generatePDFFromData = function(data, saveMode = false) {
     if (footerY > 250) { doc.addPage(); footerY = 20; }
 
     const rightLabelX = 165; const rightValueX = 195;
+    let sousTotalPdf = 0;
+    (data.lignes || []).forEach(l => {
+        if (l.type === 'item') sousTotalPdf += parseFloat(l.prix) || 0;
+    });
+    const remisePdf = Math.max(0, parseFloat(data.remise_ttc !== undefined && data.remise_ttc !== null ? data.remise_ttc : data.info?.remise_ttc) || 0);
+    const remiseAffiche = Math.min(remisePdf, sousTotalPdf);
     const totalTTC = data.info.total;
     const list = data.paiements || [];
     const totalVerse = list.reduce((sum, p) => sum + parseFloat(p.montant), 0);
@@ -1954,10 +1997,19 @@ window.generatePDFFromData = function(data, saveMode = false) {
     const resteAPayer = totalTTC - totalVerse;
 
     doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(0);
-    doc.text(`Total TTC :`, rightLabelX, footerY, { align: 'right' }); 
+    doc.text(`Sous-total TTC :`, rightLabelX, footerY, { align: 'right' }); 
+    doc.text(`${sousTotalPdf.toFixed(2)} €`, rightValueX, footerY, { align: 'right' });
+    footerY += 6;
+    if (remiseAffiche > 0.001) {
+        doc.text(`Remise TTC :`, rightLabelX, footerY, { align: 'right' }); 
+        doc.text(`- ${remiseAffiche.toFixed(2)} €`, rightValueX, footerY, { align: 'right' }); 
+        footerY += 6; 
+    }
     doc.setFont("helvetica", "bold"); 
+    doc.text(`Total TTC :`, rightLabelX, footerY, { align: 'right' }); 
     doc.text(`${totalTTC.toFixed(2)} €`, rightValueX, footerY, { align: 'right' });
     footerY += 6;
+    doc.setFont("helvetica", "normal");
 
     if (encaissePdf > 0) {
         doc.setFont("helvetica", "normal"); 
