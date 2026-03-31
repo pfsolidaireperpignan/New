@@ -253,9 +253,7 @@ window.genererDemandeRapatriement = function() {
     pdf.setDrawColor(0); pdf.setLineWidth(0.5); pdf.setFillColor(240, 240, 240);
     pdf.rect(15, 15, 180, 25, 'FD'); 
     pdf.setTextColor(0); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14);
-    pdf.text("DEMANDE D'AUTORISATION DE TRANSPORT DE CORPS", 105, 23, {align:"center"});
-    pdf.setFontSize(10); pdf.setFont("helvetica", "normal");
-    pdf.text("Dans le cas où la fermeture de cercueil a lieu dans les Pyrénées-Orientales", 105, 30, {align:"center"});
+    pdf.text("DEMANDE D'AUTORISATION DE TRANSPORT DE CORPS", 105, 28, {align:"center"});
     
     let y = 55; const x = 15;
     pdf.setFontSize(10); pdf.setFont("helvetica", "normal");
