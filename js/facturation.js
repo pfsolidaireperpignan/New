@@ -1934,6 +1934,8 @@ window.generatePDFFromData = function(data, saveMode = false) {
     doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.setTextColor(80);
     doc.text("32 boulevard Léon Jean Grégory Thuir - TEL : 07.55.18.27.77", 15, 45);
     doc.text("HABILITATION N° : 23-66-0205 | SIRET : 53927029800042", 15, 49);
+    doc.text("N° TVA Intracommunautaire : FR92539270298", 15, 53);
+    doc.text("RCS : 539270298", 15, 57);
     doc.setFillColor(245, 245, 245); doc.roundedRect(110, 10, 85, 32, 3, 3, 'F');
     doc.setFontSize(10); doc.setTextColor(0); doc.setFont("helvetica","bold");
     doc.text(`${data.client.civility || ''} ${data.client.nom}`, 115, 18);
@@ -1948,7 +1950,7 @@ window.generatePDFFromData = function(data, saveMode = false) {
         doc.text(doc.splitTextToSize(infoText, 80), 115, infoY);
         doc.setTextColor(0);
     }
-    let y = 58; doc.setFontSize(13); doc.setFont("helvetica","bold"); doc.setTextColor(...greenColor);
+    let y = 62; doc.setFontSize(13); doc.setFont("helvetica","bold"); doc.setTextColor(...greenColor);
     doc.text(`${data.info.type} N° ${data.info.numero}`, 15, y);
     doc.setFontSize(10); doc.setTextColor(0); doc.setFont("helvetica","normal");
     doc.text(`Date : ${new Date(data.info.date).toLocaleDateString()}`, 15, y+6);
