@@ -76,6 +76,19 @@ function formatDate(d) {
     return d; 
 }
 
+function getNomJeuneFilleSuffix() {
+    const maiden = (getVal("nom_jeune_fille") || "").trim();
+    if (!maiden) return "";
+    return ` (nom de jeune fille : ${maiden.toUpperCase()})`;
+}
+
+function getDefuntEtatCivilComplet() {
+    const civilite = (getVal("civilite_defunt") || "").trim();
+    const nom = (getVal("nom") || "").trim().toUpperCase();
+    const prenom = (getVal("prenom") || "").trim();
+    return `${civilite} ${nom} ${prenom}`.trim() + getNomJeuneFilleSuffix();
+}
+
 // --- GESTION INTELLIGENTE DE LA DATE DE NAISSANCE ---
 function getTexteNaissance() {
     const chk = document.getElementById('chk_sans_jour_mois');
@@ -174,7 +187,7 @@ window.genererPouvoir = async function() {
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(0, 0, 0);
     pdf.text(
-        `Défunt(e) ${getVal("civilite_defunt")} ${getVal("nom")} ${getVal("prenom")}`,
+        `Défunt(e) ${getDefuntEtatCivilComplet()}`,
         x + 4,
         yName
     );
@@ -554,7 +567,7 @@ window.genererDemandeInhumation = function() {
     pdf.setFont("helvetica", "normal");
     pdf.text("Je soussigné M. CHERKAOUI Mustapha, dirigeant des PF Solidaire,", x, y); y+=6;
     pdf.text("Sollicite l'autorisation d'inhumer le défunt :", x, y); y+=12;
-    pdf.setFont("helvetica", "bold"); pdf.text(`${getVal("civilite_defunt")} ${getVal("nom").toUpperCase()} ${getVal("prenom")}`, x+10, y); y+=6;
+    pdf.setFont("helvetica", "bold"); pdf.text(getDefuntEtatCivilComplet(), x+10, y); y+=6;
     pdf.setFont("helvetica", "normal"); pdf.text(`Décédé(e) le ${formatDate(getVal("date_deces"))} à ${getVal("lieu_deces")}`, x+10, y); y+=15;
     pdf.text("Lieu d'inhumation :", x, y); y+=6;
     pdf.setFont("helvetica", "bold"); pdf.text(`Cimetière : ${getVal("cimetiere_nom")}`, x+10, y); y+=6;
@@ -575,7 +588,7 @@ window.genererDemandeCremation = function() {
     pdf.setFontSize(12); pdf.text("OBJET : DEMANDE D'AUTORISATION DE CREMATION", 20, 80);
     let y = 100;
     pdf.setFont("times", "normal");
-    const txt = `Monsieur le Maire,\n\nJe soussigné(e) ${getVal("civilite_mandant")} ${getVal("soussigne")}, agissant en qualité de ${getVal("lien")} du défunt(e), sollicite l'autorisation de procéder à la crémation de :\n\n${getVal("civilite_defunt")} ${getVal("nom").toUpperCase()} ${getVal("prenom")}\nNé(e) ${getTexteNaissance()} et décédé(e) le ${formatDate(getVal("date_deces"))}.\n\nLa crémation aura lieu le ${formatDate(getVal("date_cremation"))} au ${getVal("crematorium_nom")}.\nDestination des cendres : ${getVal("destination_cendres")}.\n\nJe certifie que le défunt n'était pas porteur d'un stimulateur cardiaque.`;
+    const txt = `Monsieur le Maire,\n\nJe soussigné(e) ${getVal("civilite_mandant")} ${getVal("soussigne")}, agissant en qualité de ${getVal("lien")} du défunt(e), sollicite l'autorisation de procéder à la crémation de :\n\n${getDefuntEtatCivilComplet()}\nNé(e) ${getTexteNaissance()} et décédé(e) le ${formatDate(getVal("date_deces"))}.\n\nLa crémation aura lieu le ${formatDate(getVal("date_cremation"))} au ${getVal("crematorium_nom")}.\nDestination des cendres : ${getVal("destination_cendres")}.\n\nJe certifie que le défunt n'était pas porteur d'un stimulateur cardiaque.`;
     const splitTxt = pdf.splitTextToSize(txt, 170); pdf.text(splitTxt, 20, y);
     y += (splitTxt.length * 7) + 20;
     pdf.text(`Fait à ${getVal("faita")}, le ${formatDate(getVal("dateSignature"))}`, 120, y);
@@ -606,7 +619,7 @@ window.genererFermeture = function() {
     pdf.setFillColor(240, 240, 240); pdf.rect(x, y, 170, 30, 'F');
     pdf.setFont("helvetica", "bold"); pdf.text("IDENTITÉ DU DÉFUNT(E)", x+5, y+6);
     pdf.setFont("helvetica", "normal");
-    pdf.text(`Nom : ${getVal("civilite_defunt")} ${getVal("nom").toUpperCase()}`, x+5, y+14); pdf.text(`Prénom : ${getVal("prenom")}`, x+80, y+14);
+    pdf.text(`Nom : ${getVal("civilite_defunt")} ${getVal("nom").toUpperCase()}${getNomJeuneFilleSuffix()}`, x+5, y+14); pdf.text(`Prénom : ${getVal("prenom")}`, x+80, y+14);
     
     const prefixNe = document.getElementById('chk_sans_jour_mois')?.checked ? "Né(e) en :" : "Né(e) le :";
     pdf.text(`${prefixNe} ${getValNaissanceSeule()}`, x+5, y+22); 
@@ -681,7 +694,7 @@ window.genererDemandeOuverture = function() {
     pdf.setFont("helvetica", "normal");
     pdf.text("> M/Mme : ", x+5, y);
     pdf.setFont("helvetica", "bold");
-    pdf.text(`${getVal("civilite_defunt")} ${getVal("nom").toUpperCase()} ${getVal("prenom")}`, x+30, y);
+    pdf.text(getDefuntEtatCivilComplet(), x+30, y);
     pdf.setFont("helvetica", "normal");
     pdf.text(`né(e) ${getTexteNaissance()} à ${getVal("lieu_naiss")}`, x+110, y);
     y+=6;
@@ -745,7 +758,7 @@ window.genererTransport = function(type) {
     pdf.setDrawColor(0); pdf.rect(x, y, 170, 30); 
     pdf.setFont("helvetica", "bold"); pdf.text("DÉFUNT(E)", x+5, y+6);
     pdf.setFontSize(14); 
-    pdf.text(`${getVal("civilite_defunt")} ${getVal("nom")} ${getVal("prenom")}`, 105, y+15, {align:"center"});
+    pdf.text(getDefuntEtatCivilComplet(), 105, y+15, {align:"center"});
     pdf.setFontSize(9); pdf.setFont("helvetica", "normal");
     const phraseEtatCivil = `Né(e) ${getTexteNaissance()} à ${getVal("lieu_naiss")}    —    Décédé(e) le ${formatDate(getVal("date_deces"))} à ${getVal("lieu_deces")}`;
     pdf.text(phraseEtatCivil, 105, y+22, {align:"center"}); 
@@ -788,7 +801,7 @@ window.genererDemandeFermetureMairie = function() {
     pdf.setFont("helvetica", "bold");
     pdf.text("A l'honneur de solliciter votre autorisation de fermeture du cercueil de :", x, y); y+=15;
     pdf.setFillColor(245, 245, 245); pdf.rect(x-5, y-5, 170, 35, 'F');
-    pdf.text("• Nom et Prénom : " + getVal("civilite_defunt") + " " + getVal("nom").toUpperCase() + " " + getVal("prenom"), x+10, y); y+=10;
+    pdf.text(`• Nom et Prénom : ${getDefuntEtatCivilComplet()}`, x+10, y); y+=10;
     pdf.text(`• Né(e) ${getTexteNaissance()} à ${getVal("lieu_naiss")}`, x+10, y); y+=10;
     pdf.text("• Décédé(e) le : " + formatDate(getVal("date_deces")) + " à " + getVal("lieu_deces"), x+10, y); y+=20;
     pdf.text("Et ce,", x, y); y+=10;
@@ -1076,7 +1089,7 @@ window.genererAttestationPresence = function() {
     pdf.setFont("helvetica", "normal");
     pdf.text("A assisté aux funérailles de :", x, y); y+=10;
     pdf.setFont("helvetica", "bold");
-    pdf.text(`M. / Mme ${getVal("civilite_defunt")} ${getVal("nom").toUpperCase()} ${getVal("prenom")}`, x+20, y); y+=20;
+    pdf.text(`M. / Mme ${getDefuntEtatCivilComplet()}`, x+20, y); y+=20;
     
     pdf.setFont("helvetica", "normal");
     let dateCeremonie = getVal("date_inhumation") || getVal("date_cremation");
