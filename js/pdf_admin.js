@@ -79,7 +79,7 @@ function formatDate(d) {
 function getNomJeuneFilleSuffix() {
     const maiden = (getVal("nom_jeune_fille") || "").trim();
     if (!maiden) return "";
-    return ` (nom de jeune fille : ${maiden.toUpperCase()})`;
+    return ` née ${maiden.toUpperCase()}`;
 }
 
 function getDefuntEtatCivilComplet() {
