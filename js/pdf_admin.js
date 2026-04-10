@@ -82,6 +82,19 @@ function getNomJeuneFilleSuffix() {
     return ` née ${maiden.toUpperCase()}`;
 }
 
+function getTitreCivilite(civilite) {
+    const c = String(civilite || "").trim().toLowerCase();
+    if (c === "mme" || c.startsWith("mad")) return "Madame";
+    if (c === "m." || c === "m" || c.startsWith("mon")) return "Monsieur";
+    return "";
+}
+
+function getDefuntNomCompletSansCivilite() {
+    const nom = (getVal("nom") || "").trim().toUpperCase();
+    const prenom = (getVal("prenom") || "").trim();
+    return `${nom} ${prenom}`.trim() + getNomJeuneFilleSuffix();
+}
+
 function getDefuntEtatCivilComplet() {
     const civilite = (getVal("civilite_defunt") || "").trim();
     const nom = (getVal("nom") || "").trim().toUpperCase();
@@ -1084,12 +1097,14 @@ window.genererAttestationPresence = function() {
     
     pdf.text("Certifie que :", x, y); y+=10;
     pdf.setFont("helvetica", "bold");
-    pdf.text(`M. / Mme ${getVal("civilite_mandant")} ${getVal("soussigne")}`, x+20, y); y+=20;
+    const titreMandant = getTitreCivilite(getVal("civilite_mandant"));
+    pdf.text(`${titreMandant ? titreMandant + " " : ""}${getVal("soussigne")}`, x+20, y); y+=20;
     
     pdf.setFont("helvetica", "normal");
     pdf.text("A assisté aux funérailles de :", x, y); y+=10;
     pdf.setFont("helvetica", "bold");
-    pdf.text(`M. / Mme ${getDefuntEtatCivilComplet()}`, x+20, y); y+=20;
+    const titreDefunt = getTitreCivilite(getVal("civilite_defunt"));
+    pdf.text(`${titreDefunt ? titreDefunt + " " : ""}${getDefuntNomCompletSansCivilite()}`, x+20, y); y+=20;
     
     pdf.setFont("helvetica", "normal");
     let dateCeremonie = getVal("date_inhumation") || getVal("date_cremation");
