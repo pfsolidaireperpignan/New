@@ -72,6 +72,15 @@
         .btn-split:hover { background: #ea580c; color: white; }
         .btn-del { background: #fef2f2; color: #ef4444; }
         .btn-del:hover { background: #ef4444; color: white; }
+        .btn-edit-pdf { background: #ecfdf5; color: #059669; }
+        .btn-edit-pdf:hover { background: #059669; color: white; }
+
+        .file-name-input { flex: 1; min-width: 0; max-width: 420px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: var(--dark); }
+        .file-name-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
+
+        .fusion-options { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; background: white; padding: 16px; border-radius: 12px; border: 1px solid var(--border); }
+        .fusion-options label { font-size: 0.75rem; color: var(--gray); display: block; margin-bottom: 4px; font-weight: 600; }
+        .fusion-options input[type="text"] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; min-width: 200px; }
 
         .btn-fusion { 
             background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); 
@@ -91,6 +100,18 @@
         #preview-container { flex: 1; background: #475569; padding: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         #preview-frame { width: 100%; height: 100%; border: none; }
         #preview-image { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+
+        #pdf-edit-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10001; display: flex; justify-content: center; align-items: center; padding: 16px; }
+        .pdf-edit-box { background: white; border-radius: 16px; max-width: 520px; width: 100%; max-height: 85vh; overflow: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.2); }
+        .pdf-edit-head { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+        .pdf-page-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
+        .pdf-page-row span { flex: 1; min-width: 100px; font-size: 0.9rem; color: var(--dark); }
+        .btn-page-act { border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .btn-rot { background: #eff6ff; color: #1d4ed8; }
+        .btn-rot:hover { background: #3b82f6; color: white; }
+        .btn-rm-page { background: #fef2f2; color: #dc2626; }
+        .btn-rm-page:hover { background: #ef4444; color: white; }
+        .pdf-edit-foot { padding: 16px 20px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border); }
 
         /* LOADER SECU */
         #app-loader { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; justify-content: center; align-items: center; }
@@ -154,11 +175,23 @@
         <div class="header-fusion">
             <div>
                 <h2 style="margin-bottom:5px;"><i class="fas fa-tools" style="color:#ea580c;"></i> Atelier de Fusion</h2>
-                <p style="margin:0; color:#64748b; font-size:0.9rem;">1. Ajoutez. 2. Vérifiez (👁️) et Découpez (✂️). 3. Fusionnez !</p>
+                <p style="margin:0; color:#64748b; font-size:0.9rem;">1. Ajoutez. 2. Renommez si besoin. 3. PDF : pages (↻ / 🗑). 4. Fusionnez !</p>
             </div>
             <button id="btn-merge" class="btn-fusion" onclick="fusionnerTout()" disabled>
                 <i class="fas fa-file-pdf"></i> TÉLÉCHARGER LE DOSSIER
             </button>
+        </div>
+
+        <div class="fusion-options">
+            <div>
+                <label for="fusion-nom-defunt">Nom défunt (nom du fichier)</label>
+                <input type="text" id="fusion-nom-defunt" placeholder="ex: DUPONT Marie" autocomplete="off">
+            </div>
+            <div>
+                <label for="fusion-date-suffix">Date (suffixe)</label>
+                <input type="date" id="fusion-date-suffix">
+            </div>
+            <div style="font-size:0.8rem; color:#94a3b8; margin-top:18px;">Le PDF sera nommé : <strong>Dossier_<span id="fusion-name-preview">Nom</span>_<span id="fusion-date-preview">date</span>.pdf</strong></div>
         </div>
 
         <div class="upload-zone" id="drop-zone" onclick="document.getElementById('fileInput').click()">
@@ -179,6 +212,20 @@
         <i class="fas fa-bars"></i>
     </button>
     <div id="mobile-overlay" onclick="toggleSidebar()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:4000;"></div>
+
+    <div id="pdf-edit-modal" class="hidden">
+        <div class="pdf-edit-box">
+            <div class="pdf-edit-head">
+                <span id="pdf-edit-title">Pages du PDF</span>
+                <button type="button" class="btn-close-preview" onclick="closePdfEdit()">Fermer</button>
+            </div>
+            <div id="pdf-edit-pages"></div>
+            <div class="pdf-edit-foot">
+                <button type="button" class="btn btn-grey" onclick="closePdfEdit()" style="padding:10px 16px; border-radius:8px; border:1px solid #e2e8f0; background:white; cursor:pointer;">Annuler</button>
+                <button type="button" class="btn-fusion" onclick="applyPdfEdit()" style="padding:10px 20px;"><i class="fas fa-check"></i> Appliquer</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
         import { auth } from './js/config.js'; 
@@ -219,8 +266,17 @@
             }
         };
 
-        // === 2. MOTEUR ATELIER (VOTRE CODE ORIGINAL) ===
-        
+        // === 2. MOTEUR ATELIER ===
+        const { PDFDocument } = PDFLib;
+
+        function wrapFile(file) {
+            return { file, displayName: file.name };
+        }
+
+        function getFile(entry) {
+            return entry && entry.file ? entry.file : entry;
+        }
+
         // GESTION DRAG & DROP
         const dropZone = document.getElementById('drop-zone');
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -237,69 +293,140 @@
             handleFiles(dt.files);
         }, false);
 
-        // LOGIQUE FICHIERS
-        let fichiers = []; 
+        let fichiers = [];
+        let sortableInstance = null;
+        const fileListEl = document.getElementById('fileList');
 
-        const el = document.getElementById('fileList');
-        Sortable.create(el, {
-            handle: '.drag-handle',
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            onEnd: function (evt) {
-                const item = fichiers.splice(evt.oldIndex, 1)[0];
-                fichiers.splice(evt.newIndex, 0, item);
-                renderList(); 
-            },
-        });
+        function bindSortable() {
+            if (sortableInstance) {
+                sortableInstance.destroy();
+                sortableInstance = null;
+            }
+            sortableInstance = Sortable.create(fileListEl, {
+                handle: '.drag-handle',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onEnd: function (evt) {
+                    const item = fichiers.splice(evt.oldIndex, 1)[0];
+                    fichiers.splice(evt.newIndex, 0, item);
+                    renderList();
+                },
+            });
+        }
 
         window.handleFiles = function(files) {
-            Array.from(files).forEach(file => { fichiers.push(file); });
+            Array.from(files).forEach(file => { fichiers.push(wrapFile(file)); });
             renderList();
         };
 
+        function escapeAttr(s) {
+            return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        }
+
+        function sanitizeFilePart(s) {
+            const t = String(s || '').trim() || 'Dossier';
+            return t.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_').slice(0, 80);
+        }
+
+        function updateFusionPreview() {
+            const nom = document.getElementById('fusion-nom-defunt')?.value?.trim();
+            const dateEl = document.getElementById('fusion-date-suffix');
+            let d = dateEl?.value;
+            if (!d) {
+                try { d = new Date().toISOString().slice(0, 10); } catch (_) { d = 'date'; }
+            }
+            const np = document.getElementById('fusion-name-preview');
+            const dp = document.getElementById('fusion-date-preview');
+            if (np) np.textContent = sanitizeFilePart(nom || 'NomDefunt');
+            if (dp) dp.textContent = d;
+        }
+
+        const fusionNomEl = document.getElementById('fusion-nom-defunt');
+        const fusionDateEl = document.getElementById('fusion-date-suffix');
+        if (fusionDateEl && !fusionDateEl.value) {
+            try { fusionDateEl.value = new Date().toISOString().slice(0, 10); } catch (_) {}
+        }
+        if (fusionNomEl) fusionNomEl.addEventListener('input', updateFusionPreview);
+        if (fusionDateEl) fusionDateEl.addEventListener('change', updateFusionPreview);
+        updateFusionPreview();
+
         function renderList() {
-            const container = document.getElementById('fileList');
+            const container = fileListEl;
             const emptyMsg = '<div style="padding:40px; text-align:center; color:#cbd5e1; font-style:italic;" id="empty-msg">La liste est vide.</div>';
-            
-            if(fichiers.length === 0) {
+
+            if (fichiers.length === 0) {
+                if (sortableInstance) {
+                    sortableInstance.destroy();
+                    sortableInstance = null;
+                }
                 container.innerHTML = emptyMsg;
                 document.getElementById('btn-merge').disabled = true;
                 return;
             }
-            
-            document.getElementById('btn-merge').disabled = false;
-            container.innerHTML = ''; 
 
-            fichiers.forEach((file, index) => {
+            document.getElementById('btn-merge').disabled = false;
+            container.innerHTML = '';
+
+            fichiers.forEach((entry, index) => {
+                const file = getFile(entry);
+                const displayName = entry.displayName != null ? entry.displayName : file.name;
                 const isPdf = file.type === 'application/pdf';
                 const iconClass = isPdf ? 'file-icon' : 'file-icon img-icon';
                 const faIcon = isPdf ? 'fa-file-pdf' : 'fa-file-image';
                 const size = (file.size / 1024 / 1024).toFixed(2) + ' Mo';
 
-                // Boutons conditionnels
-                const splitBtn = isPdf 
-                    ? `<button class="btn-mini btn-split" onclick="window.diviserPdf(${index})" title="Diviser les pages"><i class="fas fa-cut"></i></button>`
+                const splitBtn = isPdf
+                    ? `<button type="button" class="btn-mini btn-split" data-idx="${index}" title="Diviser les pages"><i class="fas fa-cut"></i></button>`
+                    : '';
+                const editPdfBtn = isPdf
+                    ? `<button type="button" class="btn-mini btn-edit-pdf" data-edit="${index}" title="Rotation / supprimer pages"><i class="fas fa-magic"></i></button>`
                     : '';
 
                 const html = `
-                    <div class="file-item">
+                    <div class="file-item" data-row-index="${index}">
                         <i class="fas fa-grip-vertical drag-handle" title="Déplacer"></i>
-                        <div class="file-info">
+                        <div class="file-info" style="flex:1; min-width:0;">
                             <div class="${iconClass}"><i class="fas ${faIcon}"></i></div>
-                            <div>
-                                <div style="font-weight:700; color:var(--dark);">${file.name}</div>
-                                <div style="font-size:0.8rem; color:var(--gray);">${size}</div>
+                            <div style="flex:1; min-width:0;">
+                                <input type="text" class="file-name-input" data-rename="${index}" value="${escapeAttr(displayName)}" title="Nom affiché et utilisé pour l'export">
+                                <div style="font-size:0.8rem; color:var(--gray); margin-top:4px;">${size} · ${escapeAttr(file.name)}</div>
                             </div>
                         </div>
                         <div class="file-actions">
-                            <button class="btn-mini btn-view" onclick="window.previewFile(${index})" title="Visualiser"><i class="fas fa-eye"></i></button>
+                            <button type="button" class="btn-mini btn-view" data-preview="${index}" title="Visualiser"><i class="fas fa-eye"></i></button>
+                            ${editPdfBtn}
                             ${splitBtn}
-                            <button class="btn-mini btn-del" onclick="window.removeFile(${index})" title="Retirer"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn-mini btn-del" data-remove="${index}" title="Retirer"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
                 `;
                 container.insertAdjacentHTML('beforeend', html);
             });
+
+            container.querySelectorAll('[data-rename]').forEach(inp => {
+                inp.addEventListener('change', () => {
+                    const i = parseInt(inp.getAttribute('data-rename'), 10);
+                    if (fichiers[i]) fichiers[i].displayName = inp.value;
+                });
+                inp.addEventListener('blur', () => {
+                    const i = parseInt(inp.getAttribute('data-rename'), 10);
+                    if (fichiers[i]) fichiers[i].displayName = inp.value;
+                });
+            });
+            container.querySelectorAll('[data-preview]').forEach(btn => {
+                btn.addEventListener('click', () => window.previewFile(parseInt(btn.getAttribute('data-preview'), 10)));
+            });
+            container.querySelectorAll('[data-remove]').forEach(btn => {
+                btn.addEventListener('click', () => window.removeFile(parseInt(btn.getAttribute('data-remove'), 10)));
+            });
+            container.querySelectorAll('[data-idx]').forEach(btn => {
+                btn.addEventListener('click', () => window.diviserPdf(parseInt(btn.getAttribute('data-idx'), 10)));
+            });
+            container.querySelectorAll('[data-edit]').forEach(btn => {
+                btn.addEventListener('click', () => window.openPdfEdit(parseInt(btn.getAttribute('data-edit'), 10)));
+            });
+
+            bindSortable();
         }
 
         window.removeFile = function(index) {
@@ -307,18 +434,18 @@
             renderList();
         };
 
-        // --- GESTION PREVISUALISATION ---
         window.previewFile = function(index) {
-            const file = fichiers[index];
+            const file = getFile(fichiers[index]);
             const url = URL.createObjectURL(file);
             const modal = document.getElementById('preview-modal');
             const container = document.getElementById('preview-container');
             const title = document.getElementById('preview-title');
+            const disp = fichiers[index].displayName || file.name;
 
-            title.innerText = file.name;
-            container.innerHTML = ''; 
+            title.innerText = disp;
+            container.innerHTML = '';
 
-            if(file.type === 'application/pdf') {
+            if (file.type === 'application/pdf') {
                 container.innerHTML = `<iframe src="${url}" id="preview-frame"></iframe>`;
             } else {
                 container.innerHTML = `<img src="${url}" id="preview-image">`;
@@ -329,47 +456,144 @@
 
         window.closePreview = function() {
             document.getElementById('preview-modal').classList.add('hidden');
-            document.getElementById('preview-container').innerHTML = ''; 
+            document.getElementById('preview-container').innerHTML = '';
         };
 
-        // --- DIVISION PDF ---
-        window.diviserPdf = async function(index) {
-            const file = fichiers[index];
-            if(file.type !== 'application/pdf') return;
+        let pdfEditIndex = -1;
+        let pdfEditPagesState = [];
 
-            const btn = document.querySelectorAll('.btn-split')[index]; 
-            if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        function renderPdfEditRows() {
+            const pagesEl = document.getElementById('pdf-edit-pages');
+            pagesEl.innerHTML = '';
+            if (!pdfEditPagesState.length) {
+                pagesEl.innerHTML = '<div style="padding:20px; color:#64748b;">Aucune page (toutes supprimées).</div>';
+                return;
+            }
+            pdfEditPagesState.forEach((p, i) => {
+                const row = document.createElement('div');
+                row.className = 'pdf-page-row';
+                row.innerHTML = `
+                    <span>Page ${i + 1} <small style="color:#94a3b8;">(orig. ${p.origPage + 1})</small> ${p.rotation ? '<b style="color:#1d4ed8;">↻ ' + p.rotation + '°</b>' : ''}</span>
+                    <button type="button" class="btn-page-act btn-rot" data-rot="${i}"><i class="fas fa-redo"></i> +90°</button>
+                    <button type="button" class="btn-page-act btn-rm-page" data-del="${i}"><i class="fas fa-trash"></i> Supprimer</button>
+                `;
+                pagesEl.appendChild(row);
+            });
+            pagesEl.querySelectorAll('[data-rot]').forEach(b => {
+                b.addEventListener('click', () => {
+                    const i = parseInt(b.getAttribute('data-rot'), 10);
+                    pdfEditPagesState[i].rotation = (pdfEditPagesState[i].rotation + 90) % 360;
+                    renderPdfEditRows();
+                });
+            });
+            pagesEl.querySelectorAll('[data-del]').forEach(b => {
+                b.addEventListener('click', () => {
+                    const i = parseInt(b.getAttribute('data-del'), 10);
+                    pdfEditPagesState.splice(i, 1);
+                    renderPdfEditRows();
+                });
+            });
+        }
+
+        window.openPdfEdit = async function(index) {
+            const entry = fichiers[index];
+            const file = getFile(entry);
+            if (file.type !== 'application/pdf') return;
+
+            pdfEditIndex = index;
+            document.getElementById('pdf-edit-title').textContent = 'Pages : ' + (entry.displayName || file.name);
+
+            try {
+                const buf = await file.arrayBuffer();
+                const pdf = await PDFDocument.load(buf);
+                const n = pdf.getPageCount();
+                pdfEditPagesState = [];
+                for (let i = 0; i < n; i++) pdfEditPagesState.push({ origPage: i, rotation: 0 });
+                renderPdfEditRows();
+                document.getElementById('pdf-edit-modal').classList.remove('hidden');
+            } catch (e) {
+                console.error(e);
+                alert('Impossible de lire le PDF : ' + e.message);
+            }
+        };
+
+        window.closePdfEdit = function() {
+            document.getElementById('pdf-edit-modal').classList.add('hidden');
+            pdfEditIndex = -1;
+            pdfEditPagesState = [];
+        };
+
+        window.applyPdfEdit = async function() {
+            if (pdfEditIndex < 0) {
+                closePdfEdit();
+                return;
+            }
+            if (!pdfEditPagesState.length) {
+                alert('Ajoutez au moins une page, ou annulez.');
+                return;
+            }
+            const entry = fichiers[pdfEditIndex];
+            const file = getFile(entry);
+            const baseName = (entry.displayName || file.name).replace(/\.pdf$/i, '');
+
+            try {
+                const srcBuf = await file.arrayBuffer();
+                const srcPdf = await PDFDocument.load(srcBuf);
+                const outPdf = await PDFDocument.create();
+
+                for (const st of pdfEditPagesState) {
+                    const [copied] = await outPdf.copyPages(srcPdf, [st.origPage]);
+                    outPdf.addPage(copied);
+                    const pages = outPdf.getPages();
+                    const last = pages[pages.length - 1];
+                    if (st.rotation && typeof PDFLib.degrees === 'function') {
+                        last.setRotation(PDFLib.degrees(st.rotation));
+                    }
+                }
+
+                const pdfBytes = await outPdf.save();
+                const newFile = new File([pdfBytes], file.name, { type: 'application/pdf' });
+                fichiers[pdfEditIndex] = { file: newFile, displayName: baseName + '.pdf' };
+                closePdfEdit();
+                renderList();
+            } catch (e) {
+                console.error(e);
+                alert('Erreur : ' + e.message);
+            }
+        };
+
+        window.diviserPdf = async function(index) {
+            const entry = fichiers[index];
+            const file = getFile(entry);
+            if (file.type !== 'application/pdf') return;
+
+            const baseLabel = (entry.displayName || file.name).replace(/\.pdf$/i, '');
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                const pdf = await PDFDocument.load(arrayBuffer);
                 const pageCount = pdf.getPageCount();
 
-                if(pageCount <= 1) {
+                if (pageCount <= 1) {
                     alert("Ce PDF ne contient qu'une seule page.");
-                    renderList();
                     return;
                 }
 
-                if(!confirm(`Diviser ce document de ${pageCount} pages en ${pageCount} fichiers séparés ?`)) {
-                    renderList();
-                    return;
-                }
+                if (!confirm(`Diviser ce document de ${pageCount} pages en ${pageCount} fichiers séparés ?`)) return;
 
-                fichiers.splice(index, 1); // Retirer l'original
+                fichiers.splice(index, 1);
 
                 for (let i = 0; i < pageCount; i++) {
-                    const newPdf = await PDFLib.PDFDocument.create();
+                    const newPdf = await PDFDocument.create();
                     const [copiedPage] = await newPdf.copyPages(pdf, [i]);
                     newPdf.addPage(copiedPage);
                     const pdfBytes = await newPdf.save();
-                    
-                    const newFile = new File([pdfBytes], `${file.name.replace('.pdf','')} - P${i+1}.pdf`, { type: 'application/pdf' });
-                    fichiers.splice(index + i, 0, newFile); 
+                    const partName = `${baseLabel}_P${i + 1}.pdf`;
+                    const newFile = new File([pdfBytes], partName, { type: 'application/pdf' });
+                    fichiers.splice(index + i, 0, wrapFile(newFile));
                 }
 
                 renderList();
-
             } catch (e) {
                 console.error(e);
                 alert("Erreur lors de la division : " + e.message);
@@ -377,31 +601,40 @@
             }
         };
 
-        // --- FUSION ---
+        function buildMergeFileName() {
+            const nomRaw = document.getElementById('fusion-nom-defunt')?.value?.trim();
+            const dateEl = document.getElementById('fusion-date-suffix');
+            let d = dateEl?.value;
+            if (!d) {
+                try { d = new Date().toISOString().slice(0, 10); } catch (_) { d = 'date'; }
+            }
+            const partNom = sanitizeFilePart(nomRaw || 'NomDefunt');
+            return `Dossier_${partNom}_${d}.pdf`;
+        }
+
         window.fusionnerTout = async function() {
             const btn = document.getElementById('btn-merge');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> TRAITEMENT...';
             btn.disabled = true;
-            
+
             try {
-                const { PDFDocument } = PDFLib;
                 const pdfDoc = await PDFDocument.create();
 
-                for (const file of fichiers) {
+                for (const entry of fichiers) {
+                    const file = getFile(entry);
                     const arrayBuffer = await file.arrayBuffer();
 
                     if (file.type === 'application/pdf') {
                         const sourcePdf = await PDFDocument.load(arrayBuffer);
                         const copiedPages = await pdfDoc.copyPages(sourcePdf, sourcePdf.getPageIndices());
                         copiedPages.forEach((page) => pdfDoc.addPage(page));
-                    } 
-                    else {
+                    } else {
                         let image;
                         if (file.type === 'image/jpeg' || file.type === 'image/jpg') image = await pdfDoc.embedJpg(arrayBuffer);
                         else if (file.type === 'image/png') image = await pdfDoc.embedPng(arrayBuffer);
-                        
-                        if(image) {
+
+                        if (image) {
                             const page = pdfDoc.addPage();
                             const { width, height } = image.scaleToFit(page.getWidth(), page.getHeight());
                             page.drawImage(image, {
@@ -415,13 +648,12 @@
                 }
 
                 const pdfBytes = await pdfDoc.save();
-                download(pdfBytes, "Dossier_Complet_PF.pdf", "application/pdf");
-                
+                download(pdfBytes, buildMergeFileName(), "application/pdf");
             } catch (err) {
                 alert("Erreur lors de la fusion : " + err.message);
                 console.error(err);
             }
-            
+
             btn.innerHTML = originalText;
             btn.disabled = false;
         };

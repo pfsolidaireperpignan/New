@@ -88,6 +88,7 @@ service cloud.firestore {
         'defunt',
         'defunt_nom',
         'defunt_date_naiss',
+        'defunt_annee_naiss',
         'defunt_date_deces',
         'type_obseques',
         'lignes',
@@ -118,6 +119,7 @@ service cloud.firestore {
       && (!('mode_paiement_principal' in request.resource.data) || isString(request.resource.data.mode_paiement_principal))
       && (!('client' in request.resource.data) || isMap(request.resource.data.client))
       && (!('client_info' in request.resource.data) || isString(request.resource.data.client_info))
+      && (!('defunt_annee_naiss' in request.resource.data) || isString(request.resource.data.defunt_annee_naiss))
       && (!('defunt' in request.resource.data) || isMap(request.resource.data.defunt))
       && (!('lignes' in request.resource.data) || request.resource.data.lignes is list)
       && (!('paiements' in request.resource.data) || request.resource.data.paiements is list)
