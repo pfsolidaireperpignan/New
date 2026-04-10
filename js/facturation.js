@@ -731,6 +731,7 @@ window.apercuDocument = async function(id) {
             defunt: { 
                 nom: data.defunt_nom || data.defunt?.nom || "", 
                 naiss: data.defunt_date_naiss || data.defunt?.naiss || "", 
+                annee_naiss: data.defunt_annee_naiss || data.defunt?.annee_naiss || "",
                 deces: data.defunt_date_deces || data.defunt?.deces || "" 
             },
             info: { 
@@ -1097,6 +1098,9 @@ window.nouveauDocument = function() {
     document.getElementById('client_adresse').value = "";
     if(document.getElementById('client_info')) document.getElementById('client_info').value = "";
     document.getElementById('defunt_nom').value = "";
+    if(document.getElementById('defunt_date_naiss')) document.getElementById('defunt_date_naiss').value = "";
+    if(document.getElementById('defunt_annee_naiss')) document.getElementById('defunt_annee_naiss').value = "";
+    if(document.getElementById('defunt_date_deces')) document.getElementById('defunt_date_deces').value = "";
     document.getElementById('doc_type').value = "DEVIS";
     window.renderDocStatutOptionsForType("DEVIS");
     setDocStatutSelectValue("En cours");
@@ -1138,6 +1142,7 @@ window.chargerDocument = async (id) => {
 
         document.getElementById('defunt_nom').value = data.defunt_nom || data.defunt?.nom || "";
         document.getElementById('defunt_date_naiss').value = data.defunt_date_naiss || data.defunt?.date_naiss || "";
+        if (document.getElementById('defunt_annee_naiss')) document.getElementById('defunt_annee_naiss').value = data.defunt_annee_naiss || data.defunt?.annee_naiss || "";
         document.getElementById('defunt_date_deces').value = data.defunt_date_deces || data.defunt?.date_deces || "";
         if(document.getElementById('doc_echeance')) document.getElementById('doc_echeance').value = data.date_echeance || "";
         if(document.getElementById('dossier_numero')) document.getElementById('dossier_numero').value = data.dossier_numero || "";
@@ -1353,7 +1358,7 @@ window.sauvegarderDocument = async function() {
         client_info: document.getElementById('client_info') ? document.getElementById('client_info').value : "",
         dossier_numero: document.getElementById('dossier_numero') ? document.getElementById('dossier_numero').value : "",
         dossier_id: document.getElementById('dossier_id') ? document.getElementById('dossier_id').value : "",
-        defunt_nom: document.getElementById('defunt_nom').value, defunt_date_naiss: document.getElementById('defunt_date_naiss').value, defunt_date_deces: document.getElementById('defunt_date_deces').value,
+        defunt_nom: document.getElementById('defunt_nom').value, defunt_date_naiss: document.getElementById('defunt_date_naiss').value, defunt_annee_naiss: (document.getElementById('defunt_annee_naiss') ? document.getElementById('defunt_annee_naiss').value : ""), defunt_date_deces: document.getElementById('defunt_date_deces').value,
         statut,
         date_emission: dateEmission,
         date_echeance: dateEcheance,
@@ -1575,10 +1580,12 @@ function applyDefuntFromDossierToForm(dossier) {
     const defunt = dossier.data.defunt || {};
     const nomEl = document.getElementById('defunt_nom');
     const naissEl = document.getElementById('defunt_date_naiss');
+    const anneeEl = document.getElementById('defunt_annee_naiss');
     const decesEl = document.getElementById('defunt_date_deces');
 
     if (nomEl && defunt.nom) nomEl.value = defunt.nom;
     if (naissEl && (defunt.date_naiss || defunt.naiss)) naissEl.value = defunt.date_naiss || defunt.naiss || "";
+    if (anneeEl && defunt.annee_naiss) anneeEl.value = String(defunt.annee_naiss || "");
     if (decesEl && (defunt.date_deces || defunt.deces)) decesEl.value = defunt.date_deces || defunt.deces || "";
 }
 
@@ -1911,7 +1918,7 @@ window.loadTemplate = function(type) {
 window.genererPDFFacture = function() {
     const data = {
         client: { nom: document.getElementById('client_nom').value, adresse: document.getElementById('client_adresse').value, info: document.getElementById('client_info') ? document.getElementById('client_info').value : "", civility: document.getElementById('client_civility').value },
-        defunt: { nom: document.getElementById('defunt_nom').value, naiss: document.getElementById('defunt_date_naiss').value, deces: document.getElementById('defunt_date_deces').value },
+        defunt: { nom: document.getElementById('defunt_nom').value, naiss: document.getElementById('defunt_date_naiss').value, annee_naiss: (document.getElementById('defunt_annee_naiss') ? document.getElementById('defunt_annee_naiss').value : ""), deces: document.getElementById('defunt_date_deces').value },
         info: { type: document.getElementById('doc_type').value, date: document.getElementById('doc_date').value, numero: document.getElementById('doc_numero').value, total: parseFloat(document.getElementById('total_display').innerText) },
         remise_ttc: parseFloat(document.getElementById('doc_remise_ttc')?.value) || 0,
         lignes: [], paiements: paiements
@@ -1955,7 +1962,13 @@ window.generatePDFFromData = function(data, saveMode = false) {
     doc.setFontSize(10); doc.setTextColor(0); doc.setFont("helvetica","normal");
     doc.text(`Date : ${new Date(data.info.date).toLocaleDateString()}`, 15, y+6);
     doc.text(`Défunt : ${data.defunt.nom}`, 15, y+12);
-    let datesDefunt = ""; if(data.defunt.naiss) datesDefunt += `Né(e) le : ${new Date(data.defunt.naiss).toLocaleDateString()} `; if(data.defunt.deces) datesDefunt += `- Décédé(e) le : ${new Date(data.defunt.deces).toLocaleDateString()}`; doc.setFontSize(8); doc.setTextColor(100); doc.text(datesDefunt, 15, y+16);
+    let datesDefunt = "";
+    const naissanceDate = String(data?.defunt?.naiss || "").trim();
+    const naissanceAnnee = String(data?.defunt?.annee_naiss || "").trim();
+    if (naissanceDate) datesDefunt += `Né(e) le : ${new Date(naissanceDate).toLocaleDateString()} `;
+    else if (naissanceAnnee) datesDefunt += `Né(e) en : ${naissanceAnnee} `;
+    if (data.defunt.deces) datesDefunt += `- Décédé(e) le : ${new Date(data.defunt.deces).toLocaleDateString()}`;
+    doc.setFontSize(8); doc.setTextColor(100); doc.text(datesDefunt, 15, y+16);
     y += 22;
     const body = [];
     data.lignes.forEach(l => {
